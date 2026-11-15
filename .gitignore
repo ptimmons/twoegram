@@ -1,0 +1,5 @@
+build/
+vendor/*.po
+tools/ac
+tools/ac-mac-*
+.DS_Store

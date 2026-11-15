@@ -1,0 +1,43 @@
+/*
+ * Twoegram -- a client for OpenClaw agents on the Enhanced Apple //e,
+ * with the network done by a CoGS card.
+ */
+#include <apple2.h>
+#include <stdint.h>
+#include "screen.h"
+#include "kbd.h"
+#include "ui.h"
+
+/* Before the 80-column screen is known to exist: a message on the
+ * 40-column screen, written straight to page 1. */
+static void fail40(const char *msg)
+{
+    uint8_t *p = (uint8_t *)0x0400;
+
+    while (*msg) {
+        *p++ = (uint8_t)(*msg++ | 0x80);
+    }
+    key_get();
+}
+
+int main(void)
+{
+    uint8_t os = get_ostype();
+
+    if (os < APPLE_IIE) {
+        fail40("TWOEGRAM NEEDS AN APPLE //E");
+        return 1;
+    }
+    has_mousetext = (uint8_t)(os != APPLE_IIE);
+
+    scr_init();
+    splash_show();
+    net_check();                /* while the splash is up */
+    status_msg("PRESS ANY KEY");
+    key_get();                  /* consumed: it must not act on the screen */
+
+    convo_run();
+
+    scr_done();
+    return 0;
+}
