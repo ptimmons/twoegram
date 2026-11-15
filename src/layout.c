@@ -4,6 +4,14 @@
 #include <string.h>
 #include "layout.h"
 
+/* This file's code runs from the language card ($D400-$DFFF, bank 2),
+ * which cc65 fills at startup: main memory is full (PLAN.md, milestone 4
+ * notes). Code there must not call ProDOS or the ROM; ProDOS restores the
+ * language card when it returns to the main code that calls it. */
+#ifdef __CC65__
+#pragma code-name ("LC")
+#endif
+
 /* In LOWBSS ($0800-$1FFF): only the first lay_count lines are ever read. */
 #ifdef __CC65__
 #pragma bss-name (push, "LOWBSS")

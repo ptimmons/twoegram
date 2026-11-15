@@ -17,6 +17,10 @@ extern char    link_err[64];        /* why there is no session, if there is none
  * link_err saying why. */
 void link_start(void);
 
+/* Before each request: restart the backstop clock the card's waits run
+ * against (30 s; the card's own timeouts come first). */
+void link_begin(void);
+
 /* Say hello again (Open-Apple-R). 0, or why not. */
 uint8_t link_connect(void);
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include "msgs.h"
 #include "session.h"
+#include "store.h"
 
 typedef struct {
     uint8_t     mine;
@@ -139,8 +140,15 @@ void msg_select(uint8_t a)
     }
 }
 
+/* The live conversation is the store's (store.h); its text comes out of
+ * aux memory into this buffer to be laid out. */
+static char tbuf[ST_TEXT_MAX];
+
 uint16_t msg_count(void)
 {
+    if (msgs_now == MSGS_LIVE) {
+        return st_count;
+    }
     return (uint16_t)(base_n() + pool_n);
 }
 
@@ -148,6 +156,9 @@ uint8_t msg_mine(uint16_t i)
 {
     uint8_t n = base_n();
 
+    if (msgs_now == MSGS_LIVE) {
+        return st[i].mine;
+    }
     return i < n ? agents[cur].msgs[i].mine : pool_mine[i - n];
 }
 
@@ -155,6 +166,9 @@ const char *msg_meta(uint16_t i)
 {
     uint8_t n = base_n();
 
+    if (msgs_now == MSGS_LIVE) {
+        return st[i].time;
+    }
     if (i < n) {
         return agents[cur].msgs[i].meta;
     }
@@ -165,6 +179,11 @@ const char *msg_text(uint16_t i, uint16_t *len)
 {
     uint8_t n = base_n();
 
+    if (msgs_now == MSGS_LIVE) {
+        *len = st[i].len;
+        st_text((uint8_t)i, 0, st[i].len, tbuf);
+        return tbuf;
+    }
     if (i < n) {
         *len = (uint16_t)strlen(agents[cur].msgs[i].text);
         return agents[cur].msgs[i].text;
@@ -177,6 +196,10 @@ void msg_copy(uint16_t i, uint16_t off, uint8_t len, char *dst)
 {
     uint16_t n;
 
+    if (msgs_now == MSGS_LIVE) {
+        st_text((uint8_t)i, off, len, dst);
+        return;
+    }
     memcpy(dst, msg_text(i, &n) + off, len);
 }
 

@@ -7,7 +7,8 @@
 #   make run        build, boot it in Virtual ][, print the screen
 #   make shots      boot the disk and capture docs/images/*.png
 #   make host-test  the C that has no Apple dependencies, run on the Mac:
-#                   card protocol, conversation layout, keys, HMAC, replies
+#                   card protocol, conversation layout, keys, HMAC, replies,
+#                   the session, the message store and history
 #   make clean
 
 TARGET  = apple2enh
@@ -43,7 +44,10 @@ APP = \
 	src/cogs_http.c \
 	src/cogs_extra.c \
 	src/hmac.c \
-	src/proto.c
+	src/proto.c \
+	src/store.c \
+	src/history.c \
+	src/auxmem.s
 
 # The milestone 2 probe: the protocol end to end against the dev server.
 PROBE = \
@@ -126,6 +130,8 @@ $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	@if [ -f probe.cfg ]; then \
 	    tr '\n' '\r' < probe.cfg | tools/ac -ptx $(DISK) A2PROBE.CFG; \
 	    echo "A2PROBE.CFG: $$(sed -n 's/^URL=//p' probe.cfg), with a key (from probe.cfg)"; \
+	    printf '# Twoegram: the gateway%ss address\rGATEWAY=%s\r' "'" "$$(sed -n 's/^URL=//p' probe.cfg)" | tools/ac -ptx $(DISK) TWOEGRAM.CFG; \
+	    echo "TWOEGRAM.CFG: the same address, no key (the key stays on the card)"; \
 	else \
 	    echo "no A2PROBE.CFG (give URL= and KEY= once for the probe)"; \
 	fi
@@ -151,15 +157,29 @@ build/host/test_layout: tests/host/test_layout.c src/layout.c $(HDRS) | build/ho
 	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_layout.c src/layout.c
 
 HOST_A2 = src/cogs.c src/cogs_extra.c src/cogs_http.c src/hmac.c src/proto.c src/session.c \
-          src/keystore.c src/config.c src/fmt.c tests/host/sha256.c
+          src/keystore.c src/config.c src/fmt.c src/store.c src/history.c \
+          tests/host/sha256.c tests/host/auxmodel.c
 
 build/host/test_a2: tests/host/test_a2.c $(HOST_A2) $(HDRS) tests/host/sha256.h | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -Itests/host -o $@ tests/host/test_a2.c $(HOST_A2)
 
-host-test: build/host/test_cogs build/host/test_layout build/host/test_a2
+build/host/test_store: tests/host/test_store.c src/store.c tests/host/auxmodel.c $(HDRS) | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_store.c src/store.c tests/host/auxmodel.c
+
+# The conversation screen itself, on test_a2.c's model card and gateway,
+# with a text screen and scripted keys in place of the Apple's.
+HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/demo.c src/link.c src/setup.c \
+             src/help.c src/status.c src/screen.c
+
+build/host/test_convo: tests/host/test_convo.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -Wno-unused-function -Itests/host -Ibuild -o $@ tests/host/test_convo.c $(HOST_CONVO)
+
+host-test: build/host/test_cogs build/host/test_layout build/host/test_a2 build/host/test_store build/host/test_convo
 	build/host/test_cogs
 	build/host/test_layout
 	build/host/test_a2
+	build/host/test_store
+	build/host/test_convo
 
 clean:
 	rm -rf build

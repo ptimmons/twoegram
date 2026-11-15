@@ -9,6 +9,7 @@
 #include "ui.h"
 #include "link.h"
 #include "session.h"
+#include "store.h"
 
 /* Before the 80-column screen is known to exist: a message on the
  * 40-column screen, written straight to page 1. */
@@ -25,6 +26,7 @@ static void fail40(const char *msg)
 int main(void)
 {
     uint8_t os = get_ostype();
+    const char *why;
 
     if (os < APPLE_IIE) {
         fail40("TWOEGRAM NEEDS AN APPLE //E");
@@ -34,6 +36,13 @@ int main(void)
 
     scr_init();
     splash_show();
+    why = st_init();               /* 128K, and aux memory for messages */
+    if (why) {
+        status_msg(why);
+        key_get();
+        scr_done();
+        return 1;
+    }
     net_check();                /* while the splash is up */
     status_msg("PRESS ANY KEY");
     key_get();                  /* consumed: it must not act on the screen */

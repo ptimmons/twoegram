@@ -16,6 +16,8 @@
 #include "session.h"
 #include "keystore.h"
 #include "config.h"
+#include "store.h"
+#include "history.h"
 
 static int fails, checks;
 #define CHECK(c) do { ++checks; if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); ++fails; } } while (0)
@@ -153,6 +155,76 @@ static const char *header(const char *name, char *out, unsigned cap)
     return out;
 }
 
+
+/* The model gateway's conversation: 100 messages, every seventh at the
+ * protocol's 1,500-byte limit, so pages are cut by size as well as k. */
+#define CONV_N  100
+
+static unsigned conv_len(unsigned n)
+{
+    return n % 7 == 0 ? 1500 : 5 + (n * 13) % 200;
+}
+
+static void conv_text(unsigned n, char *dst)
+{
+    unsigned i, len = conv_len(n);
+
+    char tag[12];
+    unsigned t = (unsigned)sprintf(tag, "m%u ", n);
+
+    for (i = 0; i < len; ++i) {
+        dst[i] = (char)(i < t ? tag[i] : (i % 61 == 60) ? '\n' : 'a' + (n + i) % 26);
+    }
+}
+
+/* One msg record at out; returns its length. */
+static unsigned conv_record(char *out, unsigned n)
+{
+    unsigned k = (unsigned)sprintf(out, "msg %u %u 10:%02u %u\n", n, n & 1, n % 60, conv_len(n));
+
+    conv_text(n, out + k);
+    k += conv_len(n);
+    out[k++] = '\n';
+    out[k] = 0;
+    return k;
+}
+
+static unsigned conv_size(unsigned n)
+{
+    static char tmp[1600];
+    return conv_record(tmp, n);
+}
+
+/* hist: newest first into the page, oldest first on the wire; poll: from
+ * after+1 up. Each stops at k messages or 1,900 bytes of payload. */
+static void conv_page(char *payload, const char *url, int hist)
+{
+    char v[16];
+    unsigned before, after, k, lo, hi, size = 7 + (hist ? 0 : 7), n, pos;
+
+    if (hist) {
+        before = query(url, "before=", v, sizeof v)[0] ? (unsigned)atoi(v) : CONV_N + 1;
+        k = query(url, "k=", v, sizeof v)[0] ? (unsigned)atoi(v) : 20;
+        hi = before > CONV_N + 1 ? CONV_N : before - 1;
+        lo = hi + 1;
+        while (lo > 1 && hi + 1 - lo < k && size + conv_size(lo - 1) <= 1900) {
+            size += conv_size(--lo);
+        }
+        pos = (unsigned)sprintf(payload, "more %d\n", lo > 1);
+    } else {
+        after = query(url, "after=", v, sizeof v)[0] ? (unsigned)atoi(v) : 0;
+        lo = after + 1;
+        hi = after;
+        while (hi < CONV_N && size + conv_size(hi + 1) <= 1900) {
+            size += conv_size(++hi);
+        }
+        pos = (unsigned)sprintf(payload, "more %d\nbusy 0\n", hi < CONV_N);
+    }
+    for (n = lo; n <= hi; ++n) {
+        pos += conv_record(payload + pos, n);
+    }
+}
+
 static void gateway(void)
 {
     char d[16], c[40], mhex[70], sid[16], seqs[16], target[256];
@@ -230,7 +302,18 @@ static void gateway(void)
         return;
     }
     gw_last_seq = seq;
-    gw_reply(0, gw_sk, seq, 0, "more 0\nbusy 0\n");
+    {
+        static char page[2100];
+
+        if (!strncmp(target, "/a2/hist?", 9)) {
+            conv_page(page, req_url, 1);
+        } else if (!strncmp(target, "/a2/poll?a=main&after=", 22)) {
+            conv_page(page, req_url, 0);
+        } else {
+            strcpy(page, "more 0\nbusy 0\n");
+        }
+        gw_reply(0, gw_sk, seq, 0, page);
+    }
 }
 
 static void http_frame(const uint8_t *p, unsigned len)
@@ -796,6 +879,60 @@ static void test_no_card(void)
     cogs_slot = 4;
 }
 
+/* Every held message is the gateway's, byte for byte, and contiguous. */
+static int held_intact(void)
+{
+    static char want[1600], got[1600];
+    uint8_t i;
+
+    for (i = 0; i < st_count; ++i) {
+        unsigned n = st[i].n;
+        if (i && n != st[i - 1].n + 1u) return 0;
+        if (st[i].len != conv_len(n) || st[i].mine != (n & 1)) return 0;
+        conv_text(n, want);
+        st_text(i, 0, st[i].len, got);
+        if (memcmp(got, want, st[i].len)) return 0;
+    }
+    return 1;
+}
+
+static void test_history(void)
+{
+    unsigned i, pages;
+
+    gateway_reset();
+    CHECK(ses_hello() == 0);
+    CHECK(st_init() == 0);
+
+    /* The newest page: it ends at the newest, and there is older. */
+    CHECK(hist_load("main") == 0);
+    CHECK(st_count > 0 && st_count <= HIST_PAGE && hist_added == st_count);
+    CHECK(st[st_count - 1].n == CONV_N && st_older && st_newest && held_intact());
+    CHECK(strstr(gw_last_target, "/a2/hist?a=main&k=20") == gw_last_target);
+
+    /* Up to the start: older pages, the window sliding when full. */
+    for (pages = 0; st_older && pages < 100; ++pages) {
+        CHECK(hist_older("main") == 0 && hist_added > 0);
+        CHECK(held_intact());
+    }
+    CHECK(st[0].n == 1 && !st_older);
+    CHECK(!st_newest);                      /* the newest were dropped on the way */
+    CHECK(hist_older("main") == 0 && hist_added == 0 && st[0].n == 1);
+
+    /* Back down to the newest. */
+    for (pages = 0; !st_newest && pages < 100; ++pages) {
+        CHECK(hist_newer("main") == 0 && hist_added > 0);
+        CHECK(held_intact());
+    }
+    CHECK(st[st_count - 1].n == CONV_N && st_newest && st_older);
+    CHECK(hist_newer("main") == 0 && hist_added == 0);
+
+    /* Every reply was cut to fit, and every page verified. */
+    for (i = 0; i + 1 < st_count; ++i) CHECK(st[i].n + 1 == st[i + 1].n);
+    gateway_on = 0;
+}
+
+#ifndef A2_NO_MAIN
 int main(void)
 {
     cogs_slot = 4;                      /* the model card's slot */
@@ -808,6 +945,8 @@ int main(void)
     test_session();
     test_keystore();
     test_config();
+    test_history();
     printf("a2: %d checks, %d failed (%u hashes on the model card)\n", checks, fails, hashes);
     return fails != 0;
 }
+#endif

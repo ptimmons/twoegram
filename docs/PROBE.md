@@ -1,5 +1,36 @@
 # Testing on the card
 
+## Milestone 4: messages and scrolling
+
+The dev server can start every conversation with made-up history, so
+there is something to scroll through before sending exists. Restart it
+with a seed:
+
+```bash
+npm run dev -- --host 0.0.0.0 --seed 100
+```
+
+Each agent's conversation then has 100 messages: short questions, short
+and long answers, and a code block every tenth; each begins with its
+number (`Question 37 ...`, `Answer 40 ...`).
+
+1. Boot the newest `TWOEGRAM-bNNN.po`. It signs in with no questions
+   (`make disk` now puts the gateway's address on the disk too).
+2. The conversation with `main` shows its newest messages, 100 at the
+   foot.
+3. **Up and Down** scroll a line; **Open-Apple-Up and -Down** a page.
+   Keep going up: older messages are fetched as you reach the top
+   (`FETCHING OLDER MESSAGES` on the status bar), and the line you were on
+   stays where it was. At message 1 it says `THE START OF THE
+   CONVERSATION`. Down goes back, fetching newer ones when needed.
+4. **Open-Apple-<** jumps to the oldest message held, **Open-Apple->** to
+   the newest. **Tab**, an arrow and Return open `coder`, whose history
+   loads the same way.
+
+Worth a photo: the newest messages, somewhere in the middle, the start,
+and any status message in inverse. Worth noticing: how long a fetch
+takes, and whether a scroll ever jumps or repeats a line.
+
 ## Milestone 3: Twoegram itself
 
 From milestone 3, Twoegram signs in to the gateway itself. With the dev

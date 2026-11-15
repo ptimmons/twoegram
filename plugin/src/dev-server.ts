@@ -2,6 +2,7 @@
 // developing the Apple side before the plugin is inside OpenClaw.
 //
 //   node src/dev-server.ts [--host 127.0.0.1] [--port 8417] [--store .dev/devices.json]
+//                          [--seed N]   start each conversation with N made-up messages
 //
 // It listens on loopback unless told otherwise. Give --host 0.0.0.0 (or
 // the Mac's LAN address) for the Apple to reach it, and never forward the
@@ -21,6 +22,7 @@ const { values } = parseArgs({
     port: { type: "string", default: "8417" },
     store: { type: "string", default: ".dev/devices.json" },
     delay: { type: "string", default: "800" },
+    seed: { type: "string", default: "0" },
   },
 });
 
@@ -49,6 +51,7 @@ const server = new A2Server({
   log: (l) => console.log(`${new Date().toISOString()} ${l}`),
   ident: id,
   connOf: (req) => connNumber.get(req.socket),
+  seed: Number(values.seed),
 });
 
 const http = createServer((req, res) => {

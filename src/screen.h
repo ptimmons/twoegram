@@ -9,6 +9,7 @@
 #define SCREEN_H
 
 #include <stdint.h>
+#include "port.h"
 
 #define SCR_COLS    80
 #define SCR_ROWS    24

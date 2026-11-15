@@ -36,6 +36,9 @@ export type Options = {
   /** For diagnostics: the number of the TCP connection a request came
    * on. When given, every reply carries a `conn` line. */
   connOf?: (req: IncomingMessage) => number | undefined;
+  /** For testing the client: each conversation starts with this many
+   * made-up messages. */
+  seed?: number;
 };
 
 type Session = { sid: string; device: string; sk: Buffer; lastSeq: number; lastUsed: number };
@@ -72,7 +75,7 @@ export class A2Server {
   private ipRefusals = new Map<string, { count: number; start: number; until: number }>();
 
   constructor(options: Options) {
-    this.o = { now: Date.now, log: () => {}, ident: "", connOf: () => undefined, ...options };
+    this.o = { now: Date.now, log: () => {}, ident: "", connOf: () => undefined, seed: 0, ...options };
   }
 
   // ---- the handler ----
@@ -199,6 +202,11 @@ export class A2Server {
     if (!c) {
       c = { msgs: [], next: 1, busy: 0, seen: 0 };
       this.convs.set(k, c);
+      for (const [mine, text] of seedMessages(agent, this.o.seed)) {
+        c.msgs.push({ n: c.next, mine, time: hhmm(this.o.now() - (this.o.seed - c.next + 1) * 60_000), text });
+        c.next++;
+      }
+      c.seen = c.next - 1;
     }
     return c;
   }
@@ -385,4 +393,26 @@ function pack(lines: string[], msgs: Msg[], fromNewest: boolean, total: number):
   if (fromNewest) kept.reverse();
   const more = Buffer.from(`more ${kept.length < total ? 1 : 0}\n`, "latin1");
   return Buffer.concat([more, head, ...kept]);
+}
+
+/** Made-up history: questions and answers of varied length, a code block
+ * now and then, numbered so a reader can see where they are. */
+function seedMessages(agent: string, n: number): [boolean, string][] {
+  const out: [boolean, string][] = [];
+  const para =
+    "This answer is long on purpose, so that it wraps across several lines " +
+    "of the Apple's screen and the scrolling has something to work through.";
+  for (let i = 1; i <= n; i++) {
+    const hex = (i % 256).toString(16).padStart(2, "0");
+    if (i % 2) {
+      out.push([true, "Question " + i + " for " + agent + ": what comes next?"]);
+    } else if (i % 10 === 0) {
+      out.push([false, "Answer " + i + ", with code:\n\n        ldx #" + "$" + hex + "\nloop:   dex\n        bne loop\n        rts"]);
+    } else if (i % 6 === 0) {
+      out.push([false, "Answer " + i + ", a long one.\n\n" + para + " " + para + "\n\n" + para]);
+    } else {
+      out.push([false, "Answer " + i + ": a short reply."]);
+    }
+  }
+  return out;
 }

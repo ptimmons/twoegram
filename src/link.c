@@ -55,6 +55,13 @@ static uint8_t wait_for_network(void)
     return 1;
 }
 
+void link_begin(void)
+{
+    tick_reset();
+    start = ticks;
+    cogs_idle = idle;
+}
+
 uint8_t link_connect(void)
 {
     char msg[80];
@@ -69,11 +76,8 @@ uint8_t link_connect(void)
     }
     fmt_str(fmt_str(msg, "SAYING HELLO TO "), ses_base + 7);
     status_msg(msg);
-    tick_reset();
-    start = ticks;
-    cogs_idle = idle;
+    link_begin();
     rc = ses_hello();
-    cogs_idle = NULL;
     net_check();                    /* the status bar's address, fresh */
     if (rc) {
         offline("NOT CONNECTED", ses_strerror(rc));

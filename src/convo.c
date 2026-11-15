@@ -24,6 +24,8 @@
 #include "ui.h"
 #include "link.h"
 #include "session.h"
+#include "store.h"
+#include "history.h"
 
 #define LIST_W      20              /* columns 0..19 */
 #define DIV_COL     20
@@ -101,16 +103,55 @@ static const char *cur_name(void)
 
 /* ---- the conversation's lines ---- */
 
+/*
+ * The layout is a window on the held messages: it ends at win_end (-1:
+ * the newest held) and reaches back as far as LAY_MAX lines allow. Up
+ * past its top brings older messages into it, fetching them from the
+ * gateway when none older are held; down past its bottom does the same
+ * the other way (go_older, go_newer).
+ */
+#define WIN_BACK    40              /* messages laid out at most */
+#define WIN_STEP    8               /* messages a window moves forward */
+
+static int16_t win_end = -1;
+
+static void lay_one(uint16_t i)
+{
+    uint16_t n;
+    const char *p = msg_text(i, &n);
+
+    lay_msg(i, p, n, msg_mine(i), txt_len(msg_meta(i)));
+}
+
 static void relayout(void)
 {
-    uint16_t i, n, cnt = msg_count();
-    const char *p;
+    uint16_t i, cnt = msg_count(), end, from;
+
+    end = (win_end < 0 || (uint16_t)win_end >= cnt) ? cnt : (uint16_t)(win_end + 1);
+    if (end == cnt) {
+        win_end = -1;
+    }
+    from = end > WIN_BACK ? (uint16_t)(end - WIN_BACK) : 0;
+    lay_reset(text_w());
+    for (i = from; i < end; ++i) {
+        lay_one(i);
+    }
+}
+
+/* The window from the first held message, as far as it fits. */
+static void relayout_from_start(void)
+{
+    uint16_t i, cnt = msg_count();
 
     lay_reset(text_w());
     for (i = 0; i < cnt; ++i) {
-        p = msg_text(i, &n);
-        lay_msg(i, p, n, msg_mine(i), txt_len(msg_meta(i)));
+        lay_one(i);
+        if (lay_dropped) {
+            break;
+        }
     }
+    win_end = (int16_t)(i ? i - 1 : 0);
+    relayout();
 }
 
 /* ---- drawing ---- */
@@ -214,7 +255,7 @@ static const char *pane_note(uint8_t r)
             fmt_str(fmt_str(fmt_str(l1, "Signed in as device "), ses_id), ".");
             return l1;
         case 2: return "Every request and reply is signed; nothing is encrypted.";
-        case 4: return "Fetching and sending messages come in the next milestones.";
+        case 4: return "No messages with this agent yet. Sending comes in milestone 5.";
         }
         return "";
     }
@@ -303,11 +344,29 @@ static void draw_all(void)
 
 /* ---- actions ---- */
 
+/* Fetch the newest page of the current agent's conversation. */
+static void load_current(void)
+{
+    uint8_t rc;
+
+    if (msgs_now != MSGS_LIVE || !agent_count()) {
+        return;
+    }
+    status_msg("FETCHING MESSAGES");
+    link_begin();
+    rc = hist_load(agent_name(cur));
+    if (rc) {
+        status_msg(ses_strerror(rc));
+    }
+}
+
 static void open_agent(uint8_t a)
 {
     cur = a;
     sel = a;
     msg_select(a);
+    load_current();
+    win_end = -1;
     scroll = 0;
     relayout();
     draw_all();
@@ -373,6 +432,148 @@ static void send(void)
     draw_all();
 }
 
+/* Line index of message m's first (last 0) or last (last 1) line in
+ * the layout, or -1. */
+static int16_t line_of(uint16_t m, uint8_t last)
+{
+    int16_t i, found = -1;
+
+    /* Not the blank before it, which it has only when it is not the
+     * layout's first message. */
+    for (i = 0; i < (int16_t)lay_count; ++i) {
+        if (lay_lines[i].msg == m && lay_lines[i].kind != LK_BLANK) {
+            found = i;
+            if (!last) {
+                break;
+            }
+        }
+    }
+    return found;
+}
+
+/* Scroll so layout line k is on view row r (0 the top). */
+static void put_line(int16_t k, uint8_t r)
+{
+    int32_t s = (int32_t)lay_count - msg_rows() - (k - r);
+
+    if (s < 0) {
+        s = 0;
+    }
+    if (s > (int32_t)max_scroll()) {
+        s = max_scroll();
+    }
+    scroll = (uint16_t)s;
+}
+
+/* The message whose line is on view row r. */
+static uint16_t msg_on_row(uint8_t r)
+{
+    uint8_t n = msg_rows();
+    int16_t first = lay_count > n ? (int16_t)(lay_count - n - scroll) : 0;
+    int16_t i = (int16_t)(first + r);
+
+    if (i >= (int16_t)lay_count) {
+        i = (int16_t)(lay_count - 1);
+    }
+    return lay_lines[i < 0 ? 0 : i].msg;
+}
+
+/* At the top of the layout and asked to go up by step lines. */
+static void go_older(uint8_t step)
+{
+    uint16_t top, last;
+    int16_t k;
+    uint8_t rc;
+
+    if (!lay_count) {
+        return;
+    }
+    top = lay_lines[0].msg;
+    last = msg_on_row((uint8_t)(msg_rows() - 1));
+    if (top == 0) {
+        if (msgs_now != MSGS_LIVE || !st_older) {
+            status_msg("THE START OF THE CONVERSATION");
+            return;
+        }
+        status_msg("FETCHING OLDER MESSAGES");
+        st_shift = 0;
+        link_begin();
+        rc = hist_older(agent_name(cur));
+        if (rc) {
+            status_msg(ses_strerror(rc));
+            return;
+        }
+        if (!hist_added) {
+            status_msg("THE START OF THE CONVERSATION");
+            return;
+        }
+        top = (uint16_t)(top + st_shift);
+        last = (uint16_t)(last + st_shift);
+        if (last >= msg_count()) {
+            last = (uint16_t)(msg_count() - 1);  /* the newest were dropped */
+        }
+    }
+    /* The window ends with what is on the screen's last row, so all of
+     * the screen stays in it and what is before it comes in above; the
+     * top line then moves down by step rows. */
+    win_end = (int16_t)last;
+    relayout();
+    k = line_of(top, 0);
+    put_line(k < 0 ? 0 : k, step);
+    draw_all();
+}
+
+/* At the bottom of the layout and asked to go down by step lines. */
+static void go_newer(uint8_t step)
+{
+    uint16_t bottom, first, cnt, ahead;
+    int16_t k, r;
+    uint8_t rc;
+
+    if (!lay_count) {
+        return;
+    }
+    bottom = lay_lines[lay_count - 1].msg;
+    first = msg_on_row(0);
+    cnt = msg_count();
+    if (bottom + 1 >= cnt) {
+        if (msgs_now != MSGS_LIVE || st_newest) {
+            return;                 /* the newest: nothing below */
+        }
+        status_msg("FETCHING NEWER MESSAGES");
+        st_shift = 0;
+        link_begin();
+        rc = hist_newer(agent_name(cur));
+        if (rc) {
+            status_msg(ses_strerror(rc));
+            return;
+        }
+        cnt = msg_count();
+        if (!hist_added) {
+            draw_status();
+            return;
+        }
+        bottom = (uint16_t)(bottom + st_shift);
+        first = (int16_t)(first + st_shift) < 0 ? 0 : (uint16_t)(first + st_shift);
+    }
+    /* The window reaches a few messages further on, but never so far that
+     * what is on the screen's top row falls out of the layout's lines. */
+    for (ahead = WIN_STEP; ; ahead = (uint16_t)(ahead / 2)) {
+        win_end = (int16_t)(bottom + ahead);
+        if ((uint16_t)win_end >= cnt - 1) {
+            win_end = -1;
+        }
+        relayout();
+        if (ahead <= 1 || line_of(first, 0) >= 0) {
+            break;
+        }
+    }
+    k = line_of(bottom, 1);
+    r = (int16_t)msg_rows() - 1 - step;
+    put_line(k < 0 ? 0 : k, (uint8_t)(r < 0 ? 0 : r));
+    draw_all();
+}
+
 static void scroll_by(int16_t d)
 {
     int32_t s = (int32_t)scroll + d;
@@ -415,6 +616,8 @@ static uint8_t oa_key(uint8_t k)
         link_setup();
         cur = sel = 0;
         msg_select(0);
+        load_current();
+        win_end = -1;
         scroll = 0;
         relayout();
         draw_all();
@@ -430,6 +633,8 @@ static uint8_t oa_key(uint8_t k)
         link_connect();
         cur = sel = 0;
         msg_select(0);
+        load_current();
+        win_end = -1;
         scroll = 0;
         relayout();
         draw_all();
@@ -441,16 +646,34 @@ static uint8_t oa_key(uint8_t k)
         next_unread();
         break;
     case K_UP:
-        scroll_by((int16_t)(msg_rows() - 1));
+        if (scroll >= max_scroll()) {
+            go_older((uint8_t)(msg_rows() - 1));
+        } else {
+            scroll_by((int16_t)(msg_rows() - 1));
+        }
         break;
     case K_DOWN:
-        scroll_by((int16_t)-(msg_rows() - 1));
+        if (!scroll) {
+            go_newer((uint8_t)(msg_rows() - 1));
+        } else {
+            scroll_by((int16_t)-(msg_rows() - 1));
+        }
         break;
     case '<': case ',':
-        scroll_by(0x7FFF);
+        /* the oldest held message (older ones: keep going up) */
+        relayout_from_start();
+        scroll = max_scroll();
+        draw_all();
         break;
     case '>': case '.':
-        scroll_by(-0x7FFF);
+        /* the newest: from the gateway if it has newer than held */
+        if (msgs_now == MSGS_LIVE && !st_newest) {
+            load_current();
+        }
+        win_end = -1;
+        relayout();
+        scroll = 0;
+        draw_all();
         break;
     }
     return 0;
@@ -498,10 +721,18 @@ static void chat_key(uint8_t k)
         }
         break;
     case K_UP:
-        scroll_by(1);
+        if (scroll >= max_scroll()) {
+            go_older(1);
+        } else {
+            scroll_by(1);
+        }
         break;
     case K_DOWN:
-        scroll_by(-1);
+        if (!scroll) {
+            go_newer(1);
+        } else {
+            scroll_by(-1);
+        }
         break;
     case K_RETURN:
         send();
@@ -524,10 +755,16 @@ static void chat_key(uint8_t k)
 
 void convo_run(void)
 {
+    static uint8_t entered;
     uint8_t k;
 
-    msg_select(cur);
-    relayout();
+    /* The first time only: the host tests come back in where they left. */
+    if (!entered) {
+        entered = 1;
+        msg_select(cur);
+        load_current();
+        relayout();
+    }
     draw_all();
     if (!link_live && link_err[0]) {
         status_msg(link_err);

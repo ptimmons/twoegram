@@ -257,7 +257,7 @@ gateway's address and port.
 | 1 ✅ | `docs/PROTOCOL.md`; the plugin's HTTP, signing and queue code running stand-alone with the echo agent; the Python client | Vitest ✅, Python client against the dev server ✅ |
 | 2 | `A2PROBE.SYSTEM` on the real card, against the stand-alone server on the LAN: `HTTP` with headers and a body, the reply from `DATA` events, keep-alive reuse, HMAC timing, `PREFS` round trip, then a ProDOS read | host tests ✅, Virtual ][ no-card paths ✅, **real card ✅** (b001 and b002, all checks; [docs/PROBE.md](docs/PROBE.md)) |
 | 3 ✅ | `hmac.c`, `auth.c`, key entry, handshake | host tests ✅, Virtual ][ ✅, **real card ✅** (b005: set-up, sign-in) |
-| 4 | Conversation view, store, scrolling, history | host tests, Virtual ][ |
+| 4 ✅ | Conversation view, store, scrolling, history | host tests ✅ (the screen too), Virtual ][ ✅, **real card ✅** (b007) |
 | 5 | Compose, send, type-ahead, polling, replies arriving in parts | Virtual ][, real card with the echo agent |
 | 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | **your gateway**, Python client, then the real card |
 | 7 | Agent list, unread marks, lock and passphrase, error states | real card |
@@ -266,7 +266,25 @@ gateway's address and port.
 
 0 and 1 are independent. 6 needs only 1.
 
-## 9. Risks to settle at milestone 2
+## 9. Requests for later builds
+
+Asked for during testing, to fit in after the milestones they would
+otherwise interrupt:
+
+1. **One key to the very beginning and end of the conversation**
+   (2026-11-15, milestone 4's card run: paging there was a nuisance).
+   Open-Apple-< and -> today reach only the oldest and newest messages
+   held. The end is easy (load the newest page). The beginning needs the
+   oldest page in one request rather than paging back through every one:
+   a `hist` that counts from the start (for example `from=1`) in the
+   protocol and the plugin, then the same window logic.
+2. **Save the conversation to disk** (same day). A ProDOS text file, as
+   Newsiie's Open-Apple-S saves an article: the conversation as text with
+   who said what and when, never during a request (the network-disk
+   rule), retried on $27. Main memory is the obstacle (milestone 4
+   notes), so it likely belongs in an overlay loaded from disk.
+
+## 10. Risks to settle at milestone 2
 
 - ~~**`HTTP` + `KEEPALIVE`, with the reply read from `DATA` events, on the
   real card**~~ settled at milestone 2: it works, booted from the network
@@ -282,7 +300,7 @@ At milestone 6: the SDK pages not yet read (`sdk-channel-inbound`,
 listener, body limits on plugin routes, and whether the plugin can tell
 that a run is still in progress.
 
-## 10. Decisions for you
+## 11. Decisions for you
 
 Decided (2026-11-15): LAN only, for the client and for OpenClaw itself;
 signed but not encrypted for now, encryption later; OpenClaw
@@ -594,3 +612,63 @@ All checks passed again, against the same server (`569147e+`).
 - Not yet tried on the card: Open-Apple-X, and the error paths (a
   mistyped key, the server stopped, an unknown key); all are covered by
   host tests, and the mistyped key also in Virtual ][.
+
+### Milestone 4 notes
+
+- **The store** (`store.c`): the open conversation's messages, their
+  text in aux $0800-$BEFF and an index of up to 64 in main memory; always
+  contiguous in the gateway's numbering. A window that slides: adding
+  older messages when full drops the newest, and the other way round;
+  `st_older` and `st_newest` say whether the gateway has more beyond each
+  end. Text is compacted in aux when an addition does not fit. `/RAM` is
+  disconnected at startup, as in Newsiie, and 128K is required.
+- **History** (`history.c`): the newest page (`hist`, 20) when an agent
+  is opened, older pages (`hist before=`) at the top, newer ones (`poll
+  after=`) at the bottom; each reply verified before anything in it is
+  stored.
+- **The screen** (`convo.c`): the layout is a window on the held
+  messages, ending at a chosen message and reaching back up to 200 lines.
+  Up past the top brings older messages in (from the store, or fetched),
+  with the window ending at the screen's last row so everything shown
+  stays, and the top line moved down exactly the step; Down past the
+  bottom does the reverse, moving the window on by fewer messages when
+  long ones would push the screen's top row out of the layout.
+  Open-Apple-< and -> jump to the oldest held and the newest.
+- **A test of the screen itself** (`tests/host/test_convo.c`): the real
+  `convo.c` on the Mac, with a text screen in place of the Apple's,
+  scripted keys, and the model gateway serving 100 messages (every
+  seventh at 1,500 bytes). It goes up one line at a time from message 100
+  to message 1 and back (1,254 steps each way, 24 and 9 fetches), and
+  checks that every single step moves the pane by exactly one row. It
+  found three bugs that the emulator could not have shown, all fixed: the
+  window first ended at the screen's top message, leaving nothing to fill
+  the rows below it; a message's first line was taken to be the blank
+  before it; and `convo_run()` reloaded the conversation on each entry
+  (harmless in the app, which enters once).
+- **The dev server** takes `--seed N`: each conversation starts with N
+  made-up messages. `make disk` now writes `TWOEGRAM.CFG` with the
+  address from `probe.cfg` too, so each new build signs in with no
+  questions.
+- **Memory is full again.** The app is 35.4K; BSS reaches $B73D, leaving
+  1,475 bytes of heap against the 1,295 a file open needs. The language
+  card holds the layout, help and history code (2.8K of its 3K). Before
+  milestone 5 adds sending and polling, room has to be made: the
+  candidates are milestone 0's made-up conversations (1.2K of text and a
+  2K pool in LOWBSS, there only for the emulator), and the set-up screen
+  (2.8K, used rarely) as an overlay loaded from disk.
+- **Tests:** 719 card, 350 layout, 1,107 protocol/session/history (with
+  a 100-message model conversation paged to the start and back), 756
+  store (index and aux full, compaction, empty texts), 1,268 screen.
+- **Checked in Virtual ][** (b006): start-up claims aux memory, the
+  made-up conversation scrolls to its first message, quitting returns to
+  ProDOS.
+
+### Milestone 4 on the card (2026-11-15, build b007)
+
+- **Everything worked**, against the dev server seeded with 100 messages
+  an agent: the newest page on opening, scrolling up through fetches to
+  the start and back down, long answers wrapped, a code block kept line
+  for line, "scrolled back" in the heading, and `coder`'s own history on
+  opening it. Fetches took "a few seconds at most".
+- Two requests came out of it, now section 9: one key to the very
+  beginning and end, and saving the conversation to disk.
