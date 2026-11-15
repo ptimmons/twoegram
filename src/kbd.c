@@ -8,6 +8,11 @@
 uint8_t key_oa;
 uint8_t key_sa;
 
+void key_flush(void)
+{
+    KBDSTRB = 0;
+}
+
 uint8_t key_ready(void)
 {
     return (uint8_t)(KBD & 0x80);

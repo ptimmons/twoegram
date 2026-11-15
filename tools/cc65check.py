@@ -14,6 +14,18 @@ memcpy() into the program's own code. This walks each straight-line run of
 code, tracks a Y set by a constant load, and reports any ldaxysp (or
 staxysp, the matching store) called with Y = 0.
 
+It also refuses any function that returns a struct or union by value.
+cc65 2.18 compiled
+
+        static cogs_part_t part(const void *p, uint16_t n)   (4 bytes)
+
+to build the struct in memory and return only its first two bytes in
+A/X, never loading sreg with the other two, so every caller took a stale
+sreg as the length. On the card that hashed the wrong bytes (Twoegram,
+milestone 2). tests/cc65/struct_return.c reproduces it. cc65 marks each
+function with a comment giving its prototype; a return type of struct or
+union there is reported.
+
 Exit status 1 if any are found.
 
 tests/cc65/ldaxysp_y0.c reproduces it. With Homebrew's cc65 2.19 bottle it
@@ -33,12 +45,16 @@ Y_INC = re.compile(r"^\s+iny\b")
 Y_DEC = re.compile(r"^\s+dey\b")
 LABEL = re.compile(r"^[A-Za-z_.@][\w.@]*:")
 WANT = re.compile(r"^\s+jsr\s+(ldaxysp|staxysp|ldeaxysp)\b")
+STRUCT_RET = re.compile(r"^; (struct|union) \S+ .*?(\w+) \(")
 
 def check(path):
     problems = []
     y = None
     proc = "?"
     for n, line in enumerate(open(path), 1):
+        m = STRUCT_RET.match(line)
+        if m:
+            problems.append(f"{path}:{n}: {m.group(2)} returns a {m.group(1)} by value, which cc65 miscompiles")
         m = re.match(r"^\.proc\s+(\S+)", line)
         if m:
             proc = m.group(1).rstrip(":")
@@ -66,7 +82,7 @@ def main():
         found += check(path)
     for p in found:
         print(p)
-    print(f"cc65check: {len(found)} suspect call(s) in {len(sys.argv) - 1} file(s)")
+    print(f"cc65check: {len(found)} problem(s) in {len(sys.argv) - 1} file(s)")
     return 1 if found else 0
 
 if __name__ == "__main__":

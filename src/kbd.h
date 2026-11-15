@@ -21,5 +21,6 @@ extern uint8_t key_sa;
 
 uint8_t key_get(void);      /* wait for a key; 7-bit ASCII */
 uint8_t key_ready(void);    /* nonzero if a key is latched */
+void key_flush(void);       /* forget a key pressed before now */
 
 #endif

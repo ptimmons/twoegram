@@ -5,7 +5,7 @@
  *
  * Commands are $00-$7F. A reply is the command's opcode with bit 7 set.
  * $90-$9F are events, which can arrive ahead of any reply and are skipped
- * here; nothing Newsiie did has a socket open, so none matter.
+ * here, except where a caller reads them itself (cogs_http.c).
  * A command the card cannot parse gets no reply of its own: it gets an
  * ERROR event ($93) with socket $FF and a code.
  *
@@ -73,6 +73,7 @@ const char *cogs_strerror(uint8_t code)
     case COGS_E_PROTO:   return "CARD PROTOCOL ERROR";
     case COGS_E_NOCARD:  return "NO COGS CARD";
     case COGS_E_ABORT:   return "STOPPED";
+    case COGS_E_TOOBIG:  return "REPLY TOO LONG";
     }
     return "CARD ERROR";
 }
@@ -128,63 +129,100 @@ static uint8_t get_bytes(uint8_t *dst, uint16_t n)
     return 0;
 }
 
-uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
-                     const uint8_t *body, uint16_t nbody,
-                     uint8_t *buf, uint16_t cap, uint16_t *got)
+static uint8_t cmd_op;          /* the command last sent, for diagnostics */
+
+uint8_t cogs_send(uint8_t op, const cogs_part_t *parts, uint8_t nparts)
+{
+    uint16_t len = 0;
+    uint8_t i;
+
+    for (i = 0; i < nparts; ++i) {
+        len = (uint16_t)(len + parts[i].n);
+    }
+    cmd_op = op;
+    hdr[0] = op;
+    hdr[1] = (uint8_t)len;
+    hdr[2] = (uint8_t)(len >> 8);
+    if (cogs_putn(hdr, 3)) {
+        return lost(COGS_LOST_SEND, op);
+    }
+    for (i = 0; i < nparts; ++i) {
+        if (parts[i].n && cogs_putn(parts[i].p, parts[i].n)) {
+            return lost(COGS_LOST_SEND, op);
+        }
+    }
+    return COGS_OK;
+}
+
+uint8_t cogs_next(uint8_t *op, uint16_t *len)
+{
+    uint8_t rc;
+
+    if (cogs_idle) {
+        while (!(cogs_status() & COGS_ST_RX_AVAIL)) {
+            rc = cogs_idle();
+            if (rc) {
+                /* A reply may still come later. Flush what there is;
+                 * a late one is skipped by the next request, which
+                 * waits for its own opcode. */
+                cogs_lost_why = COGS_LOST_IDLE;
+                cogs_lost_op = cmd_op;
+                cogs_resync();
+                return rc;
+            }
+        }
+    }
+    if (get_bytes(hdr, 3)) {
+        /* Nothing at all, or a header cut short. Either way the card
+         * is not where we think it is. */
+        return lost(COGS_LOST_HEADER, cmd_op);
+    }
+    *op = hdr[0];
+    *len = le16(hdr + 1);
+    /* Every card-to-host opcode has bit 7 set. Anything else means we
+     * are reading the middle of a frame. */
+    if (!(*op & 0x80)) {
+        return lost(COGS_LOST_OPCODE, *op);
+    }
+    return COGS_OK;
+}
+
+uint8_t cogs_read(uint8_t *dst, uint16_t n)
+{
+    return get_bytes(dst, n) ? lost(COGS_LOST_PAYLOAD, hdr[0]) : COGS_OK;
+}
+
+uint8_t cogs_drop(uint16_t n)
+{
+    return n && cogs_skip(n) ? lost(COGS_LOST_PAYLOAD, hdr[0]) : COGS_OK;
+}
+
+uint8_t cogs_reply(uint8_t op, uint8_t *buf, uint16_t cap, uint16_t *got)
 {
     uint16_t len, n;
-    uint8_t rop, skipped, err[2];
+    uint8_t rop, skipped, rc, err[2];
 
     if (got) {
         *got = 0;
     }
-    len = (uint16_t)(npre + nbody);
-    hdr[0] = op;
-    hdr[1] = (uint8_t)len;
-    hdr[2] = (uint8_t)(len >> 8);
-    if (cogs_putn(hdr, 3) ||
-        (npre && cogs_putn(pre, npre)) ||
-        (nbody && cogs_putn(body, nbody))) {
-        return lost(COGS_LOST_SEND, op);
-    }
-
     for (skipped = 0; skipped < MAX_SKIPPED; ++skipped) {
-        if (cogs_idle) {
-            while (!(cogs_status() & COGS_ST_RX_AVAIL)) {
-                rop = cogs_idle();
-                if (rop) {
-                    /* A reply may still come later. Flush what there is;
-                     * a late one is skipped by the next request, which
-                     * waits for its own opcode. */
-                    cogs_lost_why = COGS_LOST_IDLE;
-                    cogs_lost_op = op;
-                    cogs_resync();
-                    return rop;
-                }
-            }
+        rc = cogs_next(&rop, &len);
+        if (rc) {
+            return rc;
         }
-        if (get_bytes(hdr, 3)) {
-            /* Nothing at all, or a header cut short. Either way the card
-             * is not where we think it is. */
-            return lost(COGS_LOST_HEADER, op);
-        }
-        rop = hdr[0];
-        len = le16(hdr + 1);
-
         if (rop == (uint8_t)(op | 0x80)) {
             n = len < cap ? len : cap;
-            if (get_bytes(buf, n) || (len > n && cogs_skip(len - n))) {
-                return lost(COGS_LOST_PAYLOAD, rop);
+            if ((rc = cogs_read(buf, n)) != 0 || (rc = cogs_drop(len - n)) != 0) {
+                return rc;
             }
             if (got) {
                 *got = n;
             }
             return COGS_OK;
         }
-
         if (rop == EV_ERROR && len >= 2) {
-            if (get_bytes(err, 2) || cogs_skip(len - 2)) {
-                return lost(COGS_LOST_PAYLOAD, rop);
+            if ((rc = cogs_read(err, 2)) != 0 || (rc = cogs_drop(len - 2)) != 0) {
+                return rc;
             }
             if (err[0] == SOCK_NONE) {
                 /* The card refused the command we just sent. */
@@ -192,17 +230,29 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
             }
             continue;
         }
-
-        /* Every card-to-host opcode has bit 7 set. Anything else means we
-         * are reading the middle of a frame. */
-        if (!(rop & 0x80)) {
-            return lost(COGS_LOST_OPCODE, rop);
-        }
-        if (len && cogs_skip(len)) {
-            return lost(COGS_LOST_PAYLOAD, rop);
+        if ((rc = cogs_drop(len)) != 0) {
+            return rc;
         }
     }
     return COGS_E_PROTO;
+}
+
+uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
+                     const uint8_t *body, uint16_t nbody,
+                     uint8_t *buf, uint16_t cap, uint16_t *got)
+{
+    cogs_part_t parts[2];
+    uint8_t rc;
+
+    if (got) {
+        *got = 0;
+    }
+    parts[0].p = pre;
+    parts[0].n = npre;
+    parts[1].p = body;
+    parts[1].n = nbody;
+    rc = cogs_send(op, parts, 2);
+    return rc ? rc : cogs_reply(op, buf, cap, got);
 }
 
 uint8_t cogs_netstat(cogs_netstat_t *s)

@@ -37,6 +37,7 @@ void cogs_irq_off(void);
 #define COGS_E_PROTO        0xF1    /* a reply too short, or none at all */
 #define COGS_E_NOCARD       0xF2
 #define COGS_E_ABORT        0xF3    /* the user stopped it */
+#define COGS_E_TOOBIG       0xF4    /* a reply longer than the caller's buffer */
 
 /* Result codes that mean something more specific for a stream. */
 #define COGS_E_REFUSED      4       /* STREAM_OPEN: refused, or HTTP status not 2xx */
@@ -79,6 +80,33 @@ extern uint8_t cogs_lost_op;        /* the opcode, for COGS_LOST_OPCODE/PAYLOAD 
  * both FIFOs (never the soft reset, which would also abort a network disk
  * ProDOS may be reading). */
 uint8_t cogs_open(uint8_t s);
+
+/* A command's payload can be sent in pieces, so nothing is copied to
+ * join them. */
+typedef struct {
+    const uint8_t *p;
+    uint16_t       n;
+} cogs_part_t;
+
+/* Fill in a part. A macro, not a function returning the struct: cc65
+ * 2.18 returns only the first two bytes of a 4-byte struct (the
+ * pointer) and leaves the length to whatever sreg held, which sent the
+ * card the wrong number of bytes to hash (milestone 2's first card run).
+ * tools/cc65check.py now refuses any function that returns a struct. */
+#define COGS_PART(x, ptr, len) \
+    ((x).p = (const uint8_t *)(ptr), (x).n = (uint16_t)(len))
+
+/* Send one command frame whose payload is the parts, in order. */
+uint8_t cogs_send(uint8_t op, const cogs_part_t *parts, uint8_t nparts);
+
+/* Wait for the next frame from the card (running cogs_idle meanwhile) and
+ * read its header. The caller then reads or drops exactly len bytes. */
+uint8_t cogs_next(uint8_t *op, uint16_t *len);
+uint8_t cogs_read(uint8_t *dst, uint16_t n);
+uint8_t cogs_drop(uint16_t n);
+
+/* Read frames until the reply to op arrives; as cogs_request. */
+uint8_t cogs_reply(uint8_t op, uint8_t *buf, uint16_t cap, uint16_t *got);
 
 /* Send one command frame (pre and body are concatenated as the payload)
  * and read frames until its reply arrives. Events and unrelated replies

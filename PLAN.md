@@ -255,7 +255,7 @@ gateway's address and port.
 |---|---|---|
 | 0 ✅ | Scaffold from Newsiie; splash, help, status bar; the two-pane screen with made-up text, list hide and show, re-wrap | host tests ✅, Virtual ][ screenshots ✅ |
 | 1 ✅ | `docs/PROTOCOL.md`; the plugin's HTTP, signing and queue code running stand-alone with the echo agent; the Python client | Vitest ✅, Python client against the dev server ✅ |
-| 2 | `A2PROBE.SYSTEM` on the real card, against the stand-alone server on the LAN: `HTTP` with headers and a body, the reply from `DATA` events, keep-alive reuse, HMAC timing, `PREFS` round trip, then a ProDOS read | **real card**: settles section 9 |
+| 2 | `A2PROBE.SYSTEM` on the real card, against the stand-alone server on the LAN: `HTTP` with headers and a body, the reply from `DATA` events, keep-alive reuse, HMAC timing, `PREFS` round trip, then a ProDOS read | host tests ✅, Virtual ][ no-card paths ✅, **real card ✅** (b001 and b002, all checks; [docs/PROBE.md](docs/PROBE.md)) |
 | 3 | `hmac.c`, `auth.c`, key entry, handshake | host tests, real card |
 | 4 | Conversation view, store, scrolling, history | host tests, Virtual ][ |
 | 5 | Compose, send, type-ahead, polling, replies arriving in parts | Virtual ][, real card with the echo agent |
@@ -268,8 +268,9 @@ gateway's address and port.
 
 ## 9. Risks to settle at milestone 2
 
-- **`HTTP` + `KEEPALIVE`, with the reply read from `DATA` events, on the
-  real card**, and
+- ~~**`HTTP` + `KEEPALIVE`, with the reply read from `DATA` events, on the
+  real card**~~ settled at milestone 2: it works, booted from the network
+  disk too. The rest of this list is as it stood before; see the notes.
   while booted from the network disk.
 - **`PREFS` bytes 15–31:** free for host software by the reference, but
   another program may use them too. If they are taken, the key goes in a
@@ -378,3 +379,149 @@ Still open, neither blocks milestones 0 to 5:
 - **Dev dependencies** moved to Vitest 4 after `npm audit` flagged
   Vitest 3's worker pool and mocker; test-only, but no reason to keep
   them. Audit now clean.
+
+### Milestone 2 notes
+
+- **Built, not yet run on the card.** How to run it, and what each line
+  means: [docs/PROBE.md](docs/PROBE.md).
+- **Card layer.** `cogs_request` is split into `cogs_send` (a payload in
+  pieces, nothing copied to join them), `cogs_next`, `cogs_read`,
+  `cogs_drop` and `cogs_reply`, so commands that end in events can read
+  their own frames. Newsiie's 719 card checks still pass. New in
+  `cogs_http.c`: `HTTP` on socket 0 with `KEEPALIVE`, the body gathered
+  from `DATA` events up to `HTTP_DONE` or an `ERROR` on the socket, other
+  sockets' events skipped, an over-long body read and dropped
+  (`COGS_E_TOOBIG`); and `PREFS_GET`/`PREFS_SET`.
+- **HMAC** (`hmac.c`): two card `HASH` calls, the key padded and XORed on
+  the Apple, the message sent in up to six pieces. **Keys and replies**
+  (`proto.c`): the written key with its mod-37 check, hex, the reply's
+  header line, and an iterator over its lines and message records.
+- **Tests:** 907 host checks on a model card that really hashes (a C
+  SHA-256 in `tests/host`), against known answers from the plugin's
+  TypeScript and RFC 4231: five keys and their device ids, every
+  one-character slip in a key, the hello proof, session key, a request
+  signature and a signed reply byte for byte, the 1,981-byte message
+  limit, `HTTP` with others' events interleaved, an over-long body, a
+  card error, a 404, and the prefs blob.
+- **The probe** (`a2probe.c`, 23K) reads `A2PROBE.CFG` (the server's
+  address and a test key, put on the disk by `make disk URL=... KEY=...`)
+  before any network use, then: hello with both proofs, a signed send,
+  the echo agent's answer by long poll, 20 timed polls, polls after 6 s
+  and 10 s idle, a replay and a forgery (both must be refused), 20 HMACs
+  of 1,900 bytes, the prefs blob (a write and exact restore of bytes
+  15-31 only if you press W), and a ProDOS block read last.
+- **Checked in Virtual ][** (no card there): no config file, a config
+  file with no card, and a mistyped key each give their own message, and
+  quitting returns to ProDOS.
+- **Assumed, for the card to settle:** extra header lines separated by
+  CR LF with none after the last (the reference says only "CRLF or LF
+  separated"); that `KEEPALIVE` reuses the connection across requests
+  inside 8 s (the dev server now logs each connection opened and
+  closed); that socket 0 is free (the card had one socket open before
+  Newsiie touched it).
+- **Size:** the app grew to 14,467 bytes with the split card layer.
+
+### Milestone 2: the first card runs
+
+- **Run 1 and run 2 (2026-11-15), card in slot 5, firmware 1.42, booted
+  from the network disk.** The card's `HTTP` command reached the dev
+  server on the Mac, the reply came back through `DATA` events and
+  `HTTP_DONE`, and the probe parsed it: the largest unknown of this
+  milestone works. The prefs blob holds 15 bytes, so bytes 15-31 are free
+  for the key; W wrote them, read them back and restored the original
+  exactly. HMAC: 50 of 1,900 bytes in 2 s by the card's clock, about 40
+  ms each (run 1's frame count was meaningless and is gone). The boot
+  volume read fine after.
+- **The hello was refused as an unknown device** both times. The disk's
+  key was in the server's store (the Python client got a session with
+  it), and the probe's new key fingerprint showed the 6502 parsed it the
+  same as the Mac (2D5F in Virtual ][ and on the card). So the device id,
+  `SHA-256("twoegram-id" || key)`, came out wrong on the Apple: 8c82f485
+  for 151a92be, and no truncation, padding or double hash of the right
+  input explains it.
+- **The cause: cc65 2.18 miscompiles a function returning a 4-byte
+  struct.** The probe's `part()` returned a `cogs_part_t` (pointer and
+  length). cc65 built it in memory but returned only the first two bytes
+  in A/X, never loading `sreg`, and every caller took a stale `sreg` as
+  the length, so the card hashed the right bytes at wrong lengths. The
+  Mac's compiler gets it right, so the host tests could not see it.
+  Fixed with `COGS_PART()`, a macro; `tests/cc65/struct_return.c`
+  reproduces the bug; **`tools/cc65check.py` now fails the build on any
+  function returning a struct or union by value** (it found only this
+  one).
+- **Build numbers** so runs cannot be confused: `BUILDNUM` holds the next
+  number; each `make disk` takes it and makes `build/TWOEGRAM-bNNN.po`
+  with volume `/TWOEGRAM.BNNN`, and the number shows on the splash, in
+  help and in the probe. A new file name per build also means the card's
+  disk cache can never serve an older image under it. The dev server
+  names its version and git commit at startup and in every hello reply
+  (refusals too), and the probe shows it ("Server is"), so each photo
+  records both sides. It also logs the device id of any refused hello.
+  The probe's status bar now says when it is waiting for W.
+
+### Milestone 2: run 3, all checks passed (2026-11-15, build b001)
+
+Probe build b001 against `twoegram-dev 0.1.0 569147e+` on the Mac, card
+in slot 5, firmware 1.42, booted from the network disk.
+
+- **Every check passed:** a hello proved both ways (device 151a92be, so
+  the cc65 fix holds), a signed POST stored as message 1, the echo
+  agent's answer by long poll, 20 polls with every reply genuine, polls
+  after 6 s and 10 s idle, the replay refused (code 5, signed) and the
+  forgery refused (code 3, unsigned) as they should be, the prefs write
+  and exact restore, and the boot volume read after all of it.
+- **Settled:**
+  - The card's `HTTP` command with a body and extra header lines works.
+    The lines are separated by CR LF with none after the last, and the
+    server received all three intact.
+  - Replies arrive whole through `DATA` events and `HTTP_DONE`, socket
+    0 was free, and the network disk kept working throughout.
+  - The prefs blob holds 15 bytes, so **bytes 15-31 are free for the
+    device key**, and a write and exact restore work.
+- **Measured:**
+  - **A poll round trip is about 300 ms:** 20 in 6 s by the card's
+    clock. That includes signing the request and verifying the reply.
+    Polling every 5 s when idle is cheap, and an answer shows within
+    a second of the server having it.
+  - **An HMAC of 1,900 bytes takes about 140 ms:** 50 in 7 s. Run 2's
+    "50 in 2 s" was wrong: the struct-return bug also gave those HMACs
+    a stale length. Verifying a full reply costs about that, and a
+    short one much less, since the time is mostly bytes moved to the
+    card. Moving `cogs_putn`'s loop is the lever if it ever matters.
+- **Keep-alive, half settled.** The server log, complete as pasted,
+  shows one connection from the hello until 10 s after the last request,
+  when the server's own keep-alive timeout closed it. So **the card
+  reused one connection for every request of the run**, two dozen of them.
+  But the two idle polls answered in 1 frame each: the probe's idle waits
+  ended at a keypress, and the W pressed early for the prefs prompt
+  latched and cut both waits to nothing. So reuse after a 6 s pause, and
+  a fresh connection after 10 s, are still untested.
+- **Fixed for the next run (build b002):** the idle waits ignore the
+  keyboard; the W prompt clears any key pressed before it; and the dev
+  server puts the connection's number in every reply (`conn N`), which the
+  probe shows on the Hello, 20-polls and Idle lines, marking "(the same)"
+  or "(a NEW one)", so keep-alive can be read off the photo.
+  `make disk` now keeps the probe's address and key in `probe.cfg`
+  (gitignored, mode 600), so a disk can no longer be built without them
+  by accident, as b002 first was.
+
+### Milestone 2: run 4, keep-alive settled (2026-11-15, build b002)
+
+All checks passed again, against the same server (`569147e+`).
+
+- **The card keeps one connection across idle gaps.** The probe waited
+  7 s (by the card's clock) and then 10 s, and both polls came back on
+  connection 1, "(the same)". The server log shows one connection for
+  the whole run, opened at the hello and closed 35 s later, 10 s after the
+  last request, by the server's own keep-alive timeout. The card's "8 s
+  keep-alive stall cutoff" (reference chapter 10) did not close it, so
+  for this protocol the server's idle timeout sets the limit. Polling
+  every 5 s when idle keeps the connection open for good.
+- **Measured again:** 20 polls in 5 s (run 3 said 6), so about 250-300 ms
+  a round trip on a reused connection. 50 HMACs of 1,900 bytes in 7 s.
+- **Still untested:** a request after the server has closed the parked
+  connection (an idle gap longer than the server's timeout, or a gateway
+  restart). The card must notice the dead connection and open a new one.
+  The app must survive this, so it will be tested at milestone 5. The
+  probe could check it sooner with an idle gap of 15 s.
+- The Hello line's connection number runs past column 80 (cosmetic).

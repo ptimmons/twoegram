@@ -14,6 +14,7 @@
  */
 #include "screen.h"
 #include "ui.h"
+#include "build.h"
 
 #define BOX_L       7           /* column of the left side */
 #define BOX_R       72          /* column of the right side */
@@ -77,7 +78,7 @@ void help_show(void)
     scr_blit(TOP_ROW);
 
     sides();
-    lb_center("TWOEGRAM  --  KEYBOARD COMMANDS", 0);
+    lb_center("TWOEGRAM " TWOEGRAM_VERSION " " BUILD_ID "  --  KEYBOARD COMMANDS", 0);
     scr_blit(TITLE_ROW);
 
     sides();

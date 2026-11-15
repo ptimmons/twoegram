@@ -31,6 +31,11 @@ export type Options = {
   agents: AgentPort;
   now?: () => number; // milliseconds
   log?: (line: string) => void;
+  /** What the server is and which build, sent in every hello reply. */
+  ident?: string;
+  /** For diagnostics: the number of the TCP connection a request came
+   * on. When given, every reply carries a `conn` line. */
+  connOf?: (req: IncomingMessage) => number | undefined;
 };
 
 type Session = { sid: string; device: string; sk: Buffer; lastSeq: number; lastUsed: number };
@@ -67,7 +72,7 @@ export class A2Server {
   private ipRefusals = new Map<string, { count: number; start: number; until: number }>();
 
   constructor(options: Options) {
-    this.o = { now: Date.now, log: () => {}, ...options };
+    this.o = { now: Date.now, log: () => {}, ident: "", connOf: () => undefined, ...options };
   }
 
   // ---- the handler ----
@@ -81,7 +86,9 @@ export class A2Server {
     } catch (e) {
       const r = e instanceof Refusal ? e : new Refusal(Code.BAD_REQUEST, "internal");
       if (!(e instanceof Refusal)) this.o.log(`a2: ${String(e)}`);
-      out = reply(r.code, null, Buffer.from(`why ${r.why}\n`, "latin1"));
+      // A refused hello still says which server refused it.
+      const who = target.startsWith("/a2/hello") ? this.serverLine() : "";
+      out = reply(r.code, null, Buffer.from(`why ${r.why}\n${who}`, "latin1"));
     }
     res.writeHead(200, { "Content-Type": "text/plain; charset=us-ascii", "Content-Length": out.length });
     res.end(out);
@@ -95,7 +102,7 @@ export class A2Server {
     const body = await readBody(req);
     if (body === null) throw new Refusal(Code.TOO_LARGE, "body too long");
 
-    if (url.pathname === "/a2/hello" && req.method === "GET") return this.hello(url, ip, now);
+    if (url.pathname === "/a2/hello" && req.method === "GET") return this.hello(url, ip, now, req);
 
     // Everything else: a session, a signature, a fresh sequence number.
     const sid = header(req, "x-a2-session");
@@ -114,7 +121,10 @@ export class A2Server {
       throw this.refuse(ip, Code.BAD_SIGNATURE, "bad signature", true);
     }
     // Genuine from here on, so replies are signed.
-    const signed = (code: number, payload: Buffer) => reply(code, replyMac(s.sk, seq, payload), payload);
+    const signed = (code: number, body: Buffer) => {
+      const payload = Buffer.concat([body, this.connLine(req)]);
+      return reply(code, replyMac(s.sk, seq, payload), payload);
+    };
     if (seq <= s.lastSeq) return signed(Code.REPLAY, Buffer.from("why seq not rising\n"));
     s.lastSeq = seq;
     s.lastUsed = now;
@@ -136,16 +146,20 @@ export class A2Server {
 
   // ---- hello ----
 
-  private hello(url: URL, ip: string, now: number): Buffer {
+  private hello(url: URL, ip: string, now: number, req: IncomingMessage): Buffer {
     const id = url.searchParams.get("d") ?? "";
     const cHex = url.searchParams.get("c") ?? "";
     const proof = url.searchParams.get("m") ?? "";
     if (!/^[0-9a-f]{8}$/.test(id) || !/^[0-9a-f]{32}$/.test(cHex)) throw new Refusal(Code.BAD_REQUEST, "bad hello");
     this.deviceCheck(id, now);
     const dev = this.o.devices.get(id);
-    if (!dev) throw this.refuse(ip, Code.UNKNOWN_DEVICE, "unknown device", true);
+    if (!dev) {
+      this.o.log(`a2: hello from unknown device ${id} at ${ip}`);
+      throw this.refuse(ip, Code.UNKNOWN_DEVICE, "unknown device", true);
+    }
     const cn = Buffer.from(cHex, "hex");
     if (!macEquals(helloProof(dev.key, cn), proof)) {
+      this.o.log(`a2: bad hello proof for device ${id} at ${ip}`);
       this.deviceFail(id, now);
       throw this.refuse(ip, Code.BAD_SIGNATURE, "bad hello proof", true);
     }
@@ -159,9 +173,22 @@ export class A2Server {
 
     const lines = [`sid ${sid}`, `sn ${sn.toString("hex")}`, `ver ${VERSION}`, `time ${Math.floor(now / 1000)}`];
     for (const a of this.o.agents.agents()) lines.push(`agent ${a}`);
-    const payload = Buffer.from(lines.join("\n") + "\n", "latin1");
+    const payload = Buffer.concat([
+      Buffer.from(lines.join("\n") + "\n" + this.serverLine(), "latin1"),
+      this.connLine(req),
+    ]);
     this.o.log(`a2: hello from ${dev.name} (${id}) at ${ip}`);
     return reply(Code.OK, helloMac(s.sk, payload), payload);
+  }
+
+  private connLine(req: IncomingMessage): Buffer {
+    const n = this.o.connOf(req);
+    return Buffer.from(n === undefined ? "" : `conn ${n}\n`, "latin1");
+  }
+
+  private serverLine(): string {
+    const id = this.o.ident.replace(/[^\x20-\x7e]/g, "?").slice(0, 60);
+    return id ? `server ${id}\n` : "";
   }
 
   // ---- the conversation ----
