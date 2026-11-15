@@ -256,7 +256,7 @@ gateway's address and port.
 | 0 ✅ | Scaffold from Newsiie; splash, help, status bar; the two-pane screen with made-up text, list hide and show, re-wrap | host tests ✅, Virtual ][ screenshots ✅ |
 | 1 ✅ | `docs/PROTOCOL.md`; the plugin's HTTP, signing and queue code running stand-alone with the echo agent; the Python client | Vitest ✅, Python client against the dev server ✅ |
 | 2 | `A2PROBE.SYSTEM` on the real card, against the stand-alone server on the LAN: `HTTP` with headers and a body, the reply from `DATA` events, keep-alive reuse, HMAC timing, `PREFS` round trip, then a ProDOS read | host tests ✅, Virtual ][ no-card paths ✅, **real card ✅** (b001 and b002, all checks; [docs/PROBE.md](docs/PROBE.md)) |
-| 3 | `hmac.c`, `auth.c`, key entry, handshake | host tests, real card |
+| 3 ✅ | `hmac.c`, `auth.c`, key entry, handshake | host tests ✅, Virtual ][ ✅, **real card ✅** (b005: set-up, sign-in) |
 | 4 | Conversation view, store, scrolling, history | host tests, Virtual ][ |
 | 5 | Compose, send, type-ahead, polling, replies arriving in parts | Virtual ][, real card with the echo agent |
 | 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | **your gateway**, Python client, then the real card |
@@ -525,3 +525,72 @@ All checks passed again, against the same server (`569147e+`).
   The app must survive this, so it will be tested at milestone 5. The
   probe could check it sooner with an idle gap of 15 s.
 - The Hello line's connection number runs past column 80 (cosmetic).
+
+### Milestone 3 notes
+
+- **Decided: the key lives on the card** (the plan's recommendation;
+  milestone 2 showed bytes 15-31 free). `keystore.c`: byte 15 is a mark
+  ($A2), bytes 16-31 the key, bytes 0-14 (the card's own settings) always
+  written back exactly as read, and every write read back. It refuses to
+  write when the card has none of its own settings stored (it would have
+  to invent them) or when bytes 15-31 hold another program's data. Its
+  clear goes back to the card's own fifteen bytes.
+- **The gateway's address** is `TWOEGRAM.CFG` (`GATEWAY=http://...`),
+  read once at startup before any network use and written only by the
+  set-up screen, retried on the network disk's $27. `config.c` adds
+  `http://` and port 8417 when missing, lowercases the host, and refuses
+  https and anything with a path or spaces.
+- **`session.c`** is the protocol: device id, hello with both proofs,
+  signed requests, every reply verified (an OK must be signed), and one
+  quiet hello again when the gateway has lost the session (a restart).
+  The probe now runs on it too, so its next card run tests the app's own
+  code. `link.c` ties start-up together: address, key, set-up when
+  either is missing or the gateway does not know the key, then hello,
+  with up to 20 s for the card's network first.
+- **The set-up screen** (`setup.c`, Open-Apple-K): gateway and key
+  fields, the key grouped in fives as typed with dashes optional, typing
+  slips caught before anything is sent, the key never shown back and
+  wiped from memory once parsed. Open-Apple-X there removes the key from
+  the card. Problems that do not stop the session (a write-protected
+  disk, a card that cannot keep the key) are said, then it connects
+  anyway. The key and session key are wiped at quit.
+- **The app** shows the gateway's agents in the list and says it is
+  signed in; messages remain milestones 4 and 5. With no card (the
+  emulator) it shows milestone 0's made-up text, labelled `DEMO, NO COGS
+  CARD`.
+- **A hazard fixed:** with no card found, `cogs_slot` is 0, and slot 0's
+  I/O addresses ($C080-$C08F) are the language card's switches. Every
+  card command now goes through `cogs_send`, which refuses when there is
+  no card, so nothing can touch them; a host test checks no byte is sent.
+- **Memory:** the app grew to 30.7K with the protocol linked in and ran
+  out of heap (794 bytes; memcheck stopped the build). The reply buffer
+  (2K), the demo pool (2K) and the layout table (1.6K) moved to LOWBSS
+  ($0800-$1FFF, never loaded, never zeroed, each written before it is
+  read), as Newsiie did: 6.4K of heap now.
+- **Tests:** 967 host checks in `test_a2`, now with a model gateway in C
+  (the server's side of the protocol): a hello proved both ways, signed
+  GET and POST checked by the gateway, a reply changed after signing
+  caught, replay and forgery refused, a lost session recovered by one
+  hello, an unknown key, a gateway that cannot prove itself, a non-
+  protocol answer, a card error; the key store on 0, 15 and 32 stored
+  bytes and with another program's data; address parsing.
+- **Checked in Virtual ][** (b003, b004): the made-up conversation with
+  `DEMO, NO COGS CARD`; the set-up screen; a mistyped key caught ("THE
+  KEY DOES NOT CHECK"); the right key accepted, `TWOEGRAM.CFG` written as
+  TXT, the key's failure to reach a card said, and back to the screen.
+
+### Milestone 3 on the card (2026-11-15, build b005)
+
+- **Set-up and sign-in work.** On a disk with no `TWOEGRAM.CFG` and a
+  card with no key, the set-up screen came up; the gateway and the test
+  key were typed, saved, and the hello proved both ways: "Signed in as
+  device 151a92be", the agent list `main` and `coder` from the dev
+  server, `SIGNED, NOT ENCRYPTED` and the card's address on the status
+  bar. The server logged the hello on a new connection, closed 11 s
+  later by its own timeout since nothing else was asked.
+- **A restart signs in with no questions:** the address came from
+  `TWOEGRAM.CFG` (so the network disk's share accepted the write) and the
+  key from the card's prefs blob.
+- Not yet tried on the card: Open-Apple-X, and the error paths (a
+  mistyped key, the server stopped, an unknown key); all are covered by
+  host tests, and the mistyped key also in Virtual ][.

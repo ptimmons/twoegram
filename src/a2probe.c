@@ -27,6 +27,7 @@
 #include "cogs_http.h"
 #include "hmac.h"
 #include "proto.h"
+#include "session.h"
 #include "fmt.h"
 #include "ui.h"
 #include "build.h"
@@ -43,18 +44,12 @@ static uint8_t row = FIRST_ROW;
 static uint8_t failures;
 static char    buf[96];
 
-static char    base[80];            /* http://host:port */
-static char    agent[17];
-static uint8_t key[A2_KEY_LEN];
-static uint8_t sk[32];
-static char    sid[9];
-static uint32_t seq;
+/* The protocol is session.c's, the code Twoegram itself runs, so this
+ * probe tests the app's own requests on the card. */
+#define reply ses_reply
 
-static uint8_t  rbuf[2048];
-static char     url[256];
-static char     target[160];
-static char     hdrs[160];
-static a2_reply_t reply;
+static char    agent[17];
+static char    target[160];
 static uint16_t waited;             /* frames the last request waited */
 static char     srv[61];            /* the server's own name and build */
 
@@ -103,82 +98,38 @@ static uint8_t idle(void)
 
 /* ---- the protocol ---- */
 
-static void be32(uint8_t *b, uint32_t v)
-{
-    b[0] = (uint8_t)(v >> 24);
-    b[1] = (uint8_t)(v >> 16);
-    b[2] = (uint8_t)(v >> 8);
-    b[3] = (uint8_t)v;
-}
-
 #define R_GENUINE   1
 #define R_UNSIGNED  2
 #define R_FORGED    3               /* signed, but not by our session key */
 
 /*
- * One signed request with sequence number s (0: the next one). rc is a
- * card or COGS_E_* code; *how says whether the reply could be trusted.
- * With forge set, the request's signature is spoiled first.
+ * One signed request through session.c with sequence number s (0: the
+ * next one). rc is a card or COGS_E_* code; *how says whether the reply
+ * could be trusted. With forge set, the request's signature is spoiled.
  */
 static uint8_t request(const char *method, const char *tgt, const char *body,
                        uint32_t s, uint8_t forge, uint8_t *how)
 {
-    uint8_t mac[32], sq[4], rc;
-    uint16_t got, status, nbody = (uint16_t)strlen(body);
-    cogs_part_t p[6];
-    char *h;
+    uint8_t rc;
 
-    if (!s) {
-        s = ++seq;
-    }
-    be32(sq, s);
-    COGS_PART(p[0], "q", 1);
-    COGS_PART(p[1], sq, 4);
-    COGS_PART(p[2], method, (uint16_t)strlen(method));     /* "GET " or "POST " */
-    COGS_PART(p[3], tgt, (uint16_t)strlen(tgt));
-    COGS_PART(p[4], "\n", 1);
-    COGS_PART(p[5], body, nbody);
-    rc = hmac_parts(sk, 32, p, 6, mac);
-    if (rc) {
-        return rc;
-    }
-    if (forge) {
-        mac[0] ^= 1;
-    }
-    h = fmt_str(hdrs, "X-A2-Session: ");
-    h = fmt_str(h, sid);
-    h = fmt_str(h, "\r\nX-A2-Seq: ");
-    h = fmt_u32(h, s);
-    h = fmt_str(h, "\r\nX-A2-Mac: ");
-    a2_hex(h, mac, 32);
-    fmt_str(fmt_str(url, base), tgt);
-
-    /* the method without its trailing space */
-    memcpy(buf, method, strlen(method) - 1);
-    buf[strlen(method) - 1] = 0;
     tick_reset();
     start = ticks;
-    rc = cogs_http(buf, url, hdrs, (const uint8_t *)body, nbody, COGS_HTTP_KEEPALIVE,
-                   rbuf, sizeof rbuf, &got, &status);
+    rc = ses_request(method, tgt, (const uint8_t *)body, (uint16_t)strlen(body), s, forge);
     waited = ticks;
-    if (rc) {
-        return rc;
-    }
-    if (status != 200 || a2_reply(rbuf, got, &reply)) {
+    switch (rc) {
+    case 0:
+        *how = R_GENUINE;
+        return 0;
+    case SES_E_REFUSED:
+        *how = ses_genuine ? R_GENUINE : R_UNSIGNED;
+        return 0;
+    case SES_E_FORGED:
+        *how = R_FORGED;
+        return 0;
+    case SES_E_NOTSERVER:
         return COGS_E_PROTO;
     }
-    *how = R_UNSIGNED;
-    if (reply.signed_) {
-        COGS_PART(p[0], "r", 1);
-        COGS_PART(p[1], sq, 4);
-        COGS_PART(p[2], reply.payload, reply.plen);
-        rc = hmac_parts(sk, 32, p, 3, mac);
-        if (rc) {
-            return rc;
-        }
-        *how = memcmp(mac, reply.mac, 32) ? R_FORGED : R_GENUINE;
-    }
-    return COGS_OK;
+    return rc;
 }
 
 static const char *code_name(uint8_t c)
@@ -289,14 +240,14 @@ static uint8_t read_config(void)
             continue;
         }
         *v++ = 0;
-        if (!strcmp(s, "URL") && strlen(v) < sizeof base) {
-            fmt_str(base, v);
+        if (!strcmp(s, "URL") && strlen(v) < sizeof ses_base) {
+            fmt_str(ses_base, v);
             /* the targets start with '/' */
-            if (base[0] && base[strlen(base) - 1] == '/') {
-                base[strlen(base) - 1] = 0;
+            if (ses_base[0] && ses_base[strlen(ses_base) - 1] == '/') {
+                ses_base[strlen(ses_base) - 1] = 0;
             }
         } else if (!strcmp(s, "KEY")) {
-            rc = a2_key_parse(v, key);
+            rc = a2_key_parse(v, ses_key);
             if (rc) {
                 fail("Config", rc == A2_KEY_BADCHECK ? "KEY does not check: a typing slip?" : "KEY is not a key", 0);
                 return 0;
@@ -306,7 +257,7 @@ static uint8_t read_config(void)
             fmt_str(agent, v);
         }
     }
-    if (!base[0] || !got_key) {
+    if (!ses_base[0] || !got_key) {
         fail("Config", "A2PROBE.CFG needs URL= and KEY= lines", 0);
         return 0;
     }
@@ -319,9 +270,9 @@ static uint8_t read_config(void)
         char *p;
 
         for (i = 0; i < A2_KEY_LEN; ++i) {
-            kc = (uint16_t)(kc * 31 + key[i]);
+            kc = (uint16_t)(kc * 31 + ses_key[i]);
         }
-        p = fmt_str(buf, base);
+        p = fmt_str(buf, ses_base);
         p = fmt_str(p, "  key check ");
         p = fmt_hex8(p, (uint8_t)(kc >> 8));
         fmt_hex8(p, (uint8_t)kc);
@@ -332,122 +283,44 @@ static uint8_t read_config(void)
 
 static uint8_t hello(void)
 {
-    uint8_t cn[16], sn[16], dig[32], id[4], rc;
-    uint16_t got, status;
-    cogs_part_t p[3];
-    a2_iter_t it;
-    a2_item_t item;
-    char *u, *agents;
-    static char alist[40];
-    uint8_t have_sn = 0;
-
-    rc = cogs_random(cn, 16);
-    if (rc) {
-        fail("Hello", "RANDOM failed", rc);
-        return 0;
-    }
-    COGS_PART(p[0], "twoegram-id", 11);
-    COGS_PART(p[1], key, 16);
-    rc = sha256_parts(p, 2, dig);
-    if (rc) {
-        fail("Hello", "HASH failed", rc);
-        return 0;
-    }
-    memcpy(id, dig, 4);
-    COGS_PART(p[0], "hello", 5);
-    COGS_PART(p[1], cn, 16);
-    rc = hmac_parts(key, 16, p, 2, dig);
-    if (rc) {
-        fail("Hello", "HMAC failed", rc);
-        return 0;
-    }
-    u = fmt_str(fmt_str(url, base), "/a2/hello?d=");
-    u = a2_hex(u, id, 4);
-    u = fmt_str(u, "&c=");
-    u = a2_hex(u, cn, 16);
-    u = fmt_str(u, "&m=");
-    a2_hex(u, dig, 32);
+    uint8_t rc, i;
+    char *u;
 
     tick_reset();
     start = ticks;
-    rc = cogs_http("GET", url, "", NULL, 0, COGS_HTTP_KEEPALIVE, rbuf, sizeof rbuf, &got, &status);
+    rc = ses_hello();
     waited = ticks;
-    if (rc) {
-        fail("Hello", "no answer from the server", rc);
-        return 0;
-    }
-    if (status != 200 || a2_reply(rbuf, got, &reply)) {
-        fmt_u32(fmt_str(buf, "not a Twoegram server: HTTP status "), status);
-        fail("Hello", buf, 0);
-        return 0;
-    }
-    /* Which server answered, if it says (refusals say too). */
-    srv[0] = 0;
-    a2_iter(&it, &reply);
-    while (a2_next(&it, &item) == 1) {
-        if (a2_is(&item, "server") && item.vlen < sizeof srv) {
-            memcpy(srv, item.val, item.vlen);
-            srv[item.vlen] = 0;
-        }
-    }
-    if (reply.code) {
-        u = describe(fmt_str(buf, "refused, "), reply.signed_ ? R_GENUINE : R_UNSIGNED);
-        u = fmt_str(u, ", device ");
-        a2_hex(u, id, 4);
+    fmt_str(srv, ses_server);
+    if (rc == SES_E_REFUSED) {
+        u = describe(fmt_str(buf, "refused, "), ses_genuine ? R_GENUINE : R_UNSIGNED);
+        fmt_str(fmt_str(u, ", device "), ses_id);
         fail("Hello", buf, 0);
         say("Server is", srv[0] ? srv : "(it did not say)");
         return 0;
     }
-
-    alist[0] = 0;
-    agents = alist;
-    a2_iter(&it, &reply);
-    while ((rc = a2_next(&it, &item)) == 1) {
-        if (a2_is(&item, "sid") && item.vlen == 8) {
-            memcpy(sid, item.val, 8);
-            sid[8] = 0;
-        } else if (a2_is(&item, "sn") && item.vlen == 32) {
-            have_sn = !a2_unhex(sn, item.val, 16);
-        } else if (a2_is(&item, "agent") && agents + item.vlen + 2 < alist + sizeof alist) {
-            if (agents != alist) {
-                *agents++ = ' ';
-            }
-            memcpy(agents, item.val, item.vlen);
-            agents += item.vlen;
-            *agents = 0;
-        }
-    }
-    if (rc == A2_ITER_BAD || !have_sn || !sid[0]) {
-        fail("Hello", "reply malformed", 0);
-        return 0;
-    }
-    /* The session key, and the proof that the server holds the key. */
-    COGS_PART(p[0], "session", 7);
-    COGS_PART(p[1], cn, 16);
-    COGS_PART(p[2], sn, 16);
-    rc = hmac_parts(key, 16, p, 3, sk);
-    if (!rc) {
-        COGS_PART(p[0], "h", 1);
-        COGS_PART(p[1], reply.payload, reply.plen);
-        rc = hmac_parts(sk, 32, p, 2, dig);
-    }
-    if (rc) {
-        fail("Hello", "HMAC failed", rc);
-        return 0;
-    }
-    if (!reply.signed_ || memcmp(dig, reply.mac, 32)) {
+    if (rc == SES_E_FORGED) {
         fail("Hello", "the reply is NOT signed with our key: not our server", 0);
         return 0;
     }
+    if (rc == SES_E_NOTSERVER) {
+        fail("Hello", "not a Twoegram server at that address", 0);
+        return 0;
+    }
+    if (rc) {
+        fail("Hello", "no answer from the server", rc);
+        return 0;
+    }
     u = fmt_str(buf, "session ");
-    u = fmt_str(u, sid);
+    u = fmt_str(u, ses_sid);
     u = fmt_str(u, ", device ");
-    u = a2_hex(u, id, 4);
-    u = fmt_str(u, ", agents: ");
-    u = fmt_str(u, alist);
+    u = fmt_str(u, ses_id);
+    u = fmt_str(u, ", agents:");
+    for (i = 0; i < ses_nagents; ++i) {
+        u = fmt_str(fmt_str(u, " "), ses_agents[i]);
+    }
     u = fmt_str(u, ", ");
     u = fmt_u32(u, waited);
-    u = fmt_str(u, " frames");
+    u = fmt_str(u, " fr");
     last_conn = reply_conn();
     if (last_conn) {
         fmt_u32(fmt_str(u, ", conn "), last_conn);
@@ -474,7 +347,7 @@ static uint8_t converse(void)
     char *p;
 
     fmt_str(fmt_str(target, "/a2/send?a="), agent);
-    rc = request("POST ", target, "Hello from A2PROBE on the //e", 0, 0, &how);
+    rc = request("POST", target, "Hello from A2PROBE on the //e", 0, 0, &how);
     if (rc) {
         fail("Send", "no answer", rc);
         return 0;
@@ -505,7 +378,7 @@ static uint8_t converse(void)
         p = fmt_str(p, "&after=");
         p = fmt_u32(p, mine);
         fmt_str(p, "&w=4000");
-        rc = request("GET ", target, "", 0, 0, &how);
+        rc = request("GET", target, "", 0, 0, &how);
         frames = (uint16_t)(frames + waited);
         if (rc) {
             fail("Answer", "poll failed", rc);
@@ -550,7 +423,7 @@ static void polls(void)
     fmt_str(fmt_str(p, agent), "&after=99999");
     t0 = uptime();
     for (i = 0; i < 20; ++i) {
-        rc = request("GET ", target, "", 0, 0, &how);
+        rc = request("GET", target, "", 0, 0, &how);
         frames = (uint16_t)(frames + waited);
         if (rc || how != R_GENUINE || reply.code) {
             fmt_u32(fmt_str(buf, "poll failed at number "), i + 1);
@@ -587,7 +460,7 @@ static void idle_poll(const char *label, uint8_t secs)
     line(label, buf, 0);
     t0 = uptime();
     wait_secs(secs);
-    rc = request("GET ", target, "", 0, 0, &how);
+    rc = request("GET", target, "", 0, 0, &how);
     if (rc || how != R_GENUINE || reply.code) {
         fail(label, "poll failed", rc);
         return;
@@ -607,7 +480,7 @@ static void attacks(void)
     uint8_t rc, how;
 
     /* The last request again, signature and all: refused, signed. */
-    rc = request("GET ", target, "", seq, 0, &how);
+    rc = request("GET", target, "", ses_seq, 0, &how);
     if (rc) {
         fail("Replay", "no answer", rc);
     } else if (reply.code == A2_REPLAY && how == R_GENUINE) {
@@ -619,7 +492,7 @@ static void attacks(void)
     }
 
     /* A fresh request with its signature spoiled: refused, unsigned. */
-    rc = request("GET ", target, "", 0, 1, &how);
+    rc = request("GET", target, "", 0, 1, &how);
     if (rc) {
         fail("Forgery", "no answer", rc);
     } else if (reply.code == A2_BAD_SIGNATURE && how == R_UNSIGNED) {
@@ -646,7 +519,7 @@ static void hmac_speed(void)
     COGS_PART(p[0], big, sizeof big);
     t0 = uptime();
     for (i = 0; i < 50; ++i) {
-        rc = hmac_parts(sk, 32, p, 1, mac);
+        rc = hmac_parts(ses_key, A2_KEY_LEN, p, 1, mac);
         if (rc) {
             fail("HMAC", "failed", rc);
             return;

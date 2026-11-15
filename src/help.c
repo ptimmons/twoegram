@@ -45,6 +45,8 @@ static const struct help_row rows[] = {
     { OA "-Up Dn",  "page",            "ANYWHERE",   0 },
     { OA "-< >",    "oldest, newest",  OA "-B",      "hide, show agents" },
     { "Tab",        "to the agents",   OA "-N",      "next with news" },
+    { "",           "",                OA "-K",      "gateway and key" },
+    { "",           "",                OA "-R",      "connect again" },
     { "",           "",                OA "-?",      "this help" },
     { "",           "",                OA "-Q",      "quit" },
 };
@@ -96,7 +98,7 @@ void help_show(void)
     sides();
     scr_blit(row++);
     sides();
-    lb_text(COL1_KEY, "Milestone 0: the text is made up; nothing is sent.", 0);
+    lb_text(COL1_KEY, "Messages come in milestones 4 and 5.", 0);
     scr_blit(row++);
     sides();
     lb_text(COL1_KEY, "press any key to return", 0);

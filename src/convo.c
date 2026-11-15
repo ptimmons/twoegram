@@ -22,6 +22,8 @@
 #include "layout.h"
 #include "msgs.h"
 #include "ui.h"
+#include "link.h"
+#include "session.h"
 
 #define LIST_W      20              /* columns 0..19 */
 #define DIV_COL     20
@@ -87,6 +89,14 @@ static uint16_t max_scroll(void)
     uint8_t n = msg_rows();
 
     return lay_count > n ? (uint16_t)(lay_count - n) : 0;
+}
+
+static const char *cur_name(void)
+{
+    if (!agent_count()) {
+        return "(no agents)";
+    }
+    return agent_name(cur);
 }
 
 /* ---- the conversation's lines ---- */
@@ -170,7 +180,7 @@ static void draw_head(void)
     if (list_on) {
         lb_text(1, "AGENTS", 0);
     }
-    lb_text(text_x(), agent_name(cur), 0);
+    lb_text(text_x(), cur_name(), 0);
     lb_text((uint8_t)(SCR_COLS - 1 - txt_len(note)), note, 0);
     scr_blit(HEAD_ROW);
 
@@ -193,6 +203,31 @@ static void draw_line(const lay_line_t *l)
     }
 }
 
+/* What the pane says when there is nothing to show: line r of it. */
+static const char *pane_note(uint8_t r)
+{
+    static char l1[80];
+
+    if (msgs_now == MSGS_LIVE) {
+        switch (r) {
+        case 1:
+            fmt_str(fmt_str(fmt_str(l1, "Signed in as device "), ses_id), ".");
+            return l1;
+        case 2: return "Every request and reply is signed; nothing is encrypted.";
+        case 4: return "Fetching and sending messages come in the next milestones.";
+        }
+        return "";
+    }
+    if (msgs_now == MSGS_NONE) {
+        switch (r) {
+        case 1: return link_err;
+        case 3: return OA "-K  set the gateway and key";
+        case 4: return OA "-R  try to connect again";
+        }
+    }
+    return "";
+}
+
 static void draw_msgs(void)
 {
     uint8_t n = msg_rows(), r;
@@ -209,6 +244,8 @@ static void draw_msgs(void)
         i = (uint16_t)(first + r);
         if (i < lay_count) {
             draw_line(&lay_lines[i]);
+        } else if (!lay_count) {
+            lb_text(text_x(), pane_note(r), 0);
         }
         scr_blit((uint8_t)(FIRST_ROW + r));
     }
@@ -248,7 +285,7 @@ static void draw_compose(void)
 
 static void draw_status(void)
 {
-    status_main(agent_name(cur), SEC_DEMO);
+    status_main(cur_name(), link_sec);
 }
 
 static void draw_body(void)
@@ -314,6 +351,10 @@ static void send(void)
     if (!clen) {
         return;
     }
+    if (msgs_now != MSGS_DEMO) {
+        status_msg("SENDING COMES IN MILESTONE 5");
+        return;
+    }
     fmt_str(fmt_u32(fmt_str(reply,
         "Milestone 0 has no gateway yet, so nothing was sent. You wrote "),
         clen), " characters.");
@@ -369,6 +410,32 @@ static uint8_t oa_key(uint8_t k)
         crows = compose_rows();
         relayout();
         draw_all();
+        break;
+    case 'k': case 'K':
+        link_setup();
+        cur = sel = 0;
+        msg_select(0);
+        scroll = 0;
+        relayout();
+        draw_all();
+        if (!link_live && msgs_now != MSGS_DEMO) {
+            status_msg(link_err);
+        }
+        break;
+    case 'r': case 'R':
+        if (msgs_now == MSGS_DEMO) {
+            status_msg("NO COGS CARD: NOTHING TO CONNECT TO");
+            break;
+        }
+        link_connect();
+        cur = sel = 0;
+        msg_select(0);
+        scroll = 0;
+        relayout();
+        draw_all();
+        if (!link_live) {
+            status_msg(link_err);
+        }
         break;
     case 'n': case 'N':
         next_unread();
@@ -462,6 +529,9 @@ void convo_run(void)
     msg_select(cur);
     relayout();
     draw_all();
+    if (!link_live && link_err[0]) {
+        status_msg(link_err);
+    }
     for (;;) {
         k = key_get();
         if (key_oa) {

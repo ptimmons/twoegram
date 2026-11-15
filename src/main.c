@@ -7,6 +7,8 @@
 #include "screen.h"
 #include "kbd.h"
 #include "ui.h"
+#include "link.h"
+#include "session.h"
 
 /* Before the 80-column screen is known to exist: a message on the
  * 40-column screen, written straight to page 1. */
@@ -36,8 +38,10 @@ int main(void)
     status_msg("PRESS ANY KEY");
     key_get();                  /* consumed: it must not act on the screen */
 
+    link_start();
     convo_run();
 
+    ses_forget();               /* no key left in memory after quitting */
     scr_done();
     return 0;
 }

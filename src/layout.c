@@ -4,7 +4,14 @@
 #include <string.h>
 #include "layout.h"
 
+/* In LOWBSS ($0800-$1FFF): only the first lay_count lines are ever read. */
+#ifdef __CC65__
+#pragma bss-name (push, "LOWBSS")
+#endif
 lay_line_t lay_lines[LAY_MAX];
+#ifdef __CC65__
+#pragma bss-name (pop)
+#endif
 uint16_t   lay_count;
 uint8_t    lay_width;
 uint8_t    lay_dropped;

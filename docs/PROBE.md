@@ -1,4 +1,33 @@
-# Running the milestone 2 probe
+# Testing on the card
+
+## Milestone 3: Twoegram itself
+
+From milestone 3, Twoegram signs in to the gateway itself. With the dev
+server running as in step 1 below:
+
+1. Boot the newest `TWOEGRAM-bNNN.po` and press a key at the splash.
+2. **The set-up screen** appears, since the disk has no `TWOEGRAM.CFG`
+   and the card holds no key yet. Type the gateway (`192.168.1.10`; the
+   port 8417 is added), press Tab, and type the key from `npm run pair`
+   (the same test key as the probe's is fine: it is in `probe.cfg`).
+   Return saves the address to `TWOEGRAM.CFG` and the key to the card's
+   spare settings bytes, then says hello.
+3. **Signed in:** the agent list shows the dev server's agents (`main`,
+   `coder`), the pane says "Signed in as device ...", and the status bar
+   says `SIGNED, NOT ENCRYPTED`. Messages come in milestones 4 and 5.
+4. **Quit and start again** (Open-Apple-Q, then `TWOEGRAM.SYSTEM` in the
+   selector). It should sign in with no questions: the address from the
+   file, the key from the card.
+5. Open-Apple-K reopens set-up; there, Open-Apple-X removes the key from
+   the card (it asks first). Open-Apple-R says hello again.
+
+Worth a photo: the set-up screen, the signed-in screen, and any message
+in inverse on the status bar. Things to try: a key with one character
+wrong (caught before sending), stopping the dev server and pressing
+Open-Apple-R (an error, not a hang), and a key the server does not know
+(the set-up screen comes back saying so).
+
+## Milestone 2: the probe
 
 `A2PROBE.SYSTEM` checks the Twoegram protocol from end to end on the real
 card, against the plugin's dev server on the Mac, and reports on one

@@ -136,6 +136,11 @@ uint8_t cogs_send(uint8_t op, const cogs_part_t *parts, uint8_t nparts)
     uint16_t len = 0;
     uint8_t i;
 
+    /* No card found: slot 0's I/O addresses are the language card's
+     * switches, which a command must never touch. */
+    if (!cogs_slot) {
+        return COGS_E_NOCARD;
+    }
     for (i = 0; i < nparts; ++i) {
         len = (uint16_t)(len + parts[i].n);
     }

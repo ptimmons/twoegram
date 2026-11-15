@@ -20,7 +20,7 @@ void status_main(const char *agent, const char *security);
 void status_msg(const char *msg);
 
 /* What the security field says. Milestone 0 talks to nothing. */
-#define SEC_DEMO        "DEMO, NOT CONNECTED"
+#define SEC_DEMO        "DEMO, NO COGS CARD"
 #define SEC_SIGNED      "SIGNED, NOT ENCRYPTED"
 
 /* The card's state, shown in status_main()'s network field: "COGS

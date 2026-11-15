@@ -13,6 +13,9 @@
 #include "hmac.h"
 #include "proto.h"
 #include "sha256.h"
+#include "session.h"
+#include "keystore.h"
+#include "config.h"
 
 static int fails, checks;
 #define CHECK(c) do { ++checks; if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); ++fails; } } while (0)
@@ -53,6 +56,183 @@ static void put(uint8_t op, const uint8_t *p, unsigned n)
     qt += n;
 }
 
+
+/* ---- the model gateway: the server's side of PROTOCOL.md, in C ---- */
+
+static int      gateway_on;
+static uint8_t  gw_key[16];             /* the one device it knows */
+static char     gw_id[9];
+static uint8_t  gw_sk[32];
+static char     gw_sid[9] = "01234567";
+static uint32_t gw_last_seq;
+static int      gw_hellos;
+static int      gw_forge_hello;         /* spoil the hello reply's signature */
+static int      gw_forge_reply;         /* change a reply after signing it */
+static int      gw_drop_session;        /* answer NO_SESSION once */
+static char     gw_last_target[256];
+static uint8_t  gw_last_body[2048];
+static unsigned gw_last_blen;
+
+static void hmac_c(const uint8_t *key, unsigned klen, const uint8_t *msg, unsigned n, uint8_t out[32])
+{
+    static uint8_t buf[4200];
+    uint8_t pad[64], inner[32];
+    unsigned i;
+
+    memset(pad, 0x36, 64);
+    for (i = 0; i < klen; ++i) pad[i] ^= key[i];
+    memcpy(buf, pad, 64);
+    memcpy(buf + 64, msg, n);
+    sha256(buf, 64 + n, inner);
+    memset(pad, 0x5c, 64);
+    for (i = 0; i < klen; ++i) pad[i] ^= key[i];
+    memcpy(buf, pad, 64);
+    memcpy(buf + 64, inner, 32);
+    sha256(buf, 96, out);
+}
+
+static void hexs(char *dst, const uint8_t *src, unsigned n)
+{
+    unsigned i;
+    for (i = 0; i < n; ++i) sprintf(dst + 2 * i, "%02x", src[i]);
+}
+
+static void gw_reply(int code, const uint8_t *sk, uint32_t seq, int hello, const char *payload)
+{
+    static uint8_t m[2100];
+    uint8_t mac[32];
+    char hex[65];
+    unsigned n = (unsigned)strlen(payload);
+
+    if (sk) {
+        if (hello) {
+            m[0] = 'h';
+            memcpy(m + 1, payload, n);
+            hmac_c(sk, 32, m, n + 1, mac);
+            if (gw_forge_hello) mac[5] ^= 1;
+        } else {
+            m[0] = 'r';
+            m[1] = (uint8_t)(seq >> 24); m[2] = (uint8_t)(seq >> 16);
+            m[3] = (uint8_t)(seq >> 8);  m[4] = (uint8_t)seq;
+            memcpy(m + 5, payload, n);
+            hmac_c(sk, 32, m, n + 5, mac);
+        }
+        hexs(hex, mac, 32);
+    } else {
+        strcpy(hex, "-");
+    }
+    http_len = (unsigned)sprintf((char *)http_body, "A2 1 %d %s\n%s", code, hex, payload);
+    if (sk && !hello && gw_forge_reply) {
+        http_body[http_len - 2] ^= 1;   /* inside the payload, after signing */
+    }
+}
+
+static const char *query(const char *url, const char *name, char *out, unsigned cap)
+{
+    const char *p = strstr(url, name);
+    unsigned n = 0;
+
+    out[0] = 0;
+    if (!p) return out;
+    p += strlen(name);
+    while (*p && *p != '&' && n + 1 < cap) out[n++] = *p++;
+    out[n] = 0;
+    return out;
+}
+
+static const char *header(const char *name, char *out, unsigned cap)
+{
+    const char *p = strstr(req_hdrs, name);
+    unsigned n = 0;
+
+    out[0] = 0;
+    if (!p) return out;
+    p += strlen(name);
+    while (*p && *p != '\r' && *p != '\n' && n + 1 < cap) out[n++] = *p++;
+    out[n] = 0;
+    return out;
+}
+
+static void gateway(void)
+{
+    char d[16], c[40], mhex[70], sid[16], seqs[16], target[256];
+    uint8_t cn[16], sn[16], mac[32], msg[2200];
+    char want[65], payload[300];
+    const char *t;
+    uint32_t seq;
+    unsigned n;
+
+    http_status = 200;
+    t = strstr(req_url, "/a2/");
+    strcpy(target, t ? t : "");
+    strcpy(gw_last_target, target);
+    memcpy(gw_last_body, req_body, req_blen);
+    gw_last_blen = req_blen;
+
+    if (!strncmp(target, "/a2/hello?", 10)) {
+        ++gw_hellos;
+        query(req_url, "d=", d, sizeof d);
+        query(req_url, "c=", c, sizeof c);
+        query(req_url, "m=", mhex, sizeof mhex);
+        if (strcmp(d, gw_id)) {
+            gw_reply(2, NULL, 0, 1, "why unknown device\nserver model 1\n");
+            return;
+        }
+        a2_unhex(cn, c, 16);
+        memcpy(msg, "hello", 5);
+        memcpy(msg + 5, cn, 16);
+        hmac_c(gw_key, 16, msg, 21, mac);
+        hexs(want, mac, 32);
+        if (strcmp(want, mhex)) {
+            gw_reply(3, NULL, 0, 1, "why bad hello proof\nserver model 1\n");
+            return;
+        }
+        for (n = 0; n < 16; ++n) sn[n] = (uint8_t)(0xB0 + n);
+        memcpy(msg, "session", 7);
+        memcpy(msg + 7, cn, 16);
+        memcpy(msg + 23, sn, 16);
+        hmac_c(gw_key, 16, msg, 39, gw_sk);
+        gw_last_seq = 0;
+        hexs(want, sn, 16);
+        sprintf(payload, "sid %s\nsn %s\nver 1\ntime 0\nagent main\nagent coder\nserver model 1\n", gw_sid, want);
+        gw_reply(0, gw_sk, 0, 1, payload);
+        return;
+    }
+
+    header("X-A2-Session: ", sid, sizeof sid);
+    header("X-A2-Seq: ", seqs, sizeof seqs);
+    header("X-A2-Mac: ", mhex, sizeof mhex);
+    if (gw_drop_session) {
+        gw_drop_session = 0;
+        gw_reply(4, NULL, 0, 0, "why no such session\n");
+        return;
+    }
+    if (strcmp(sid, gw_sid)) {
+        gw_reply(4, NULL, 0, 0, "why no such session\n");
+        return;
+    }
+    seq = (uint32_t)strtoul(seqs, NULL, 10);
+    msg[0] = 'q';
+    msg[1] = (uint8_t)(seq >> 24); msg[2] = (uint8_t)(seq >> 16);
+    msg[3] = (uint8_t)(seq >> 8);  msg[4] = (uint8_t)seq;
+    n = 5;
+    n += (unsigned)sprintf((char *)msg + n, "%s %s\n", req_method, target);
+    memcpy(msg + n, req_body, req_blen);
+    n += req_blen;
+    hmac_c(gw_sk, 32, msg, n, mac);
+    hexs(want, mac, 32);
+    if (strcmp(want, mhex)) {
+        gw_reply(3, NULL, 0, 0, "why bad signature\n");
+        return;
+    }
+    if (seq <= gw_last_seq) {
+        gw_reply(5, gw_sk, seq, 0, "why seq not rising\n");
+        return;
+    }
+    gw_last_seq = seq;
+    gw_reply(0, gw_sk, seq, 0, "more 0\nbusy 0\n");
+}
+
 static void http_frame(const uint8_t *p, unsigned len)
 {
     unsigned i = 0, n, sent;
@@ -67,6 +247,9 @@ static void http_frame(const uint8_t *p, unsigned len)
     if (i != len) {
         printf("model: HTTP frame length %u, fields %u\n", len, i);
         exit(2);
+    }
+    if (gateway_on) {
+        gateway();
     }
     if (http_noise) {
         d[0] = 2; memset(d + 1, 'x', 40);
@@ -119,6 +302,14 @@ static void card_frame(void)
         break;
     case 0x20:
         http_frame(p, len);
+        break;
+    case 0x31:                                  /* RANDOM: not random, but distinct */
+        {
+            static uint8_t r_next = 0x51;
+            uint8_t rr[255];
+            for (n = 0; n < p[0]; ++n) rr[n] = r_next++;
+            put(0xB1, rr, p[0]);
+        }
         break;
     case 0x06:                                  /* PREFS_GET */
         r[0] = 0;
@@ -428,13 +619,195 @@ static void test_prefs(void)
     CHECK(cogs_prefs_get(blob, &n) == 0 && n == 15);
 }
 
+
+static void gateway_reset(void)
+{
+    static const uint8_t k[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+                                   0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
+    gateway_on = 1;
+    memcpy(gw_key, k, 16);
+    strcpy(gw_id, "922fadb6");
+    gw_hellos = 0;
+    gw_forge_hello = gw_forge_reply = gw_drop_session = 0;
+    http_noise = 0;
+    http_error = 0;
+    qh = qt = 0;
+    memcpy(ses_key, k, 16);
+    strcpy(ses_base, "http://10.0.0.2:8417");
+    ses_open = 0;
+}
+
+static void test_session(void)
+{
+    const char *v;
+    uint8_t vn;
+
+    /* A hello proved both ways. */
+    gateway_reset();
+    CHECK(ses_hello() == 0);
+    CHECK(ses_open && !strcmp(ses_id, "922fadb6") && !strcmp(ses_sid, "01234567"));
+    CHECK(ses_nagents == 2 && !strcmp(ses_agents[0], "main") && !strcmp(ses_agents[1], "coder"));
+    CHECK(!strcmp(ses_server, "model 1"));
+    CHECK(!strncmp(req_url, "http://10.0.0.2:8417/a2/hello?d=922fadb6&c=", 43));
+    CHECK(req_hdrs[0] == 0 && !strcmp(req_method, "GET"));
+
+    /* Signed requests: the gateway checks each, and each reply is checked. */
+    CHECK(ses_call("GET", "/a2/poll?a=main&after=0", NULL, 0) == 0);
+    CHECK(ses_genuine && ses_seq == 1);
+    CHECK(!strcmp(gw_last_target, "/a2/poll?a=main&after=0"));
+    CHECK(ses_line("busy", &v, &vn) && vn == 1 && v[0] == '0');
+    CHECK(strstr(req_hdrs, "X-A2-Session: 01234567\r\nX-A2-Seq: 2\r\nX-A2-Mac: ") == NULL);
+    CHECK(strstr(req_hdrs, "X-A2-Session: 01234567\r\nX-A2-Seq: 1\r\nX-A2-Mac: ") == req_hdrs);
+    CHECK(req_hdrs[strlen(req_hdrs) - 1] != '\n');
+    CHECK(ses_call("POST", "/a2/send?a=main", (const uint8_t *)"Hello\nthere", 11) == 0);
+    CHECK(gw_last_blen == 11 && !memcmp(gw_last_body, "Hello\nthere", 11) && !strcmp(req_method, "POST"));
+
+    /* A reply changed after signing is caught. */
+    gw_forge_reply = 1;
+    CHECK(ses_call("GET", "/a2/poll?a=main", NULL, 0) == SES_E_FORGED);
+    gw_forge_reply = 0;
+
+    /* A replayed sequence number: refused, and the refusal is genuine. */
+    CHECK(ses_request("GET", "/a2/poll?a=main", NULL, 0, ses_seq, 0) == SES_E_REFUSED);
+    CHECK(ses_reply.code == A2_REPLAY && ses_genuine);
+
+    /* A spoiled request signature: refused, unsigned. */
+    CHECK(ses_request("GET", "/a2/poll?a=main", NULL, 0, 0, 1) == SES_E_REFUSED);
+    CHECK(ses_reply.code == A2_BAD_SIGNATURE && !ses_genuine);
+    CHECK(!strcmp(ses_strerror(SES_E_REFUSED), "BAD SIGNATURE: IS THE KEY RIGHT?"));
+
+    /* The session gone (a gateway restart): hello again, once, quietly. */
+    gw_drop_session = 1;
+    gw_hellos = 0;
+    CHECK(ses_call("GET", "/a2/poll?a=main", NULL, 0) == 0);
+    CHECK(gw_hellos == 1 && ses_genuine);
+
+    /* An unknown key. */
+    gateway_reset();
+    ses_key[0] ^= 0x80;
+    CHECK(ses_hello() == SES_E_REFUSED && ses_reply.code == A2_UNKNOWN_DEVICE && !ses_open);
+    CHECK(!ses_genuine && !strcmp(ses_server, "model 1"));
+    CHECK(!strcmp(ses_strerror(SES_E_REFUSED), "THE GATEWAY DOES NOT KNOW THIS KEY"));
+
+    /* A gateway that cannot prove it holds the key. */
+    gateway_reset();
+    gw_forge_hello = 1;
+    CHECK(ses_hello() == SES_E_FORGED && !ses_open && ses_nagents == 0);
+
+    /* Something that is not this protocol at all. */
+    gateway_reset();
+    gateway_on = 0;
+    http_len = 5;
+    memcpy(http_body, "hello", 5);
+    CHECK(ses_hello() == SES_E_NOTSERVER);
+    http_status = 404;
+    http_len = 0;
+    CHECK(ses_hello() == SES_E_NOTSERVER);
+    http_status = 200;
+
+    /* The card's own failure. */
+    gateway_reset();
+    http_error = 4;
+    CHECK(ses_hello() == 4 && !strcmp(ses_strerror(4), "CONNECTION REFUSED"));
+    http_error = 0;
+
+    ses_forget();
+    CHECK(!ses_open && ses_key[0] == 0 && ses_key[15] == 0);
+    gateway_on = 0;
+}
+
+static void test_keystore(void)
+{
+    uint8_t key[16], got[16], orig[15];
+    unsigned i;
+
+    for (i = 0; i < 16; ++i) key[i] = (uint8_t)(0x40 + i);
+    for (i = 0; i < 15; ++i) orig[i] = (uint8_t)(i * 3 + 1);
+
+    /* Nothing stored at all: the card's own settings would be invented. */
+    prefs_len = 0;
+    CHECK(ks_load(got) == KS_NONE);
+    CHECK(ks_save(key) == KS_NOROOM && prefs_len == 0);
+
+    /* The user's card: 15 bytes of its own. */
+    memcpy(prefs, orig, 15);
+    prefs_len = 15;
+    CHECK(ks_load(got) == KS_NONE);
+    CHECK(ks_save(key) == 0);
+    CHECK(prefs_len == 32 && !memcmp(prefs, orig, 15) && prefs[15] == KS_MARK);
+    CHECK(ks_load(got) == 0 && !memcmp(got, key, 16));
+    /* Saving again replaces our own key. */
+    key[0] = 0x99;
+    CHECK(ks_save(key) == 0 && ks_load(got) == 0 && got[0] == 0x99);
+    /* Clearing goes back to the card's own fifteen bytes. */
+    CHECK(ks_clear() == 0 && prefs_len == 15 && !memcmp(prefs, orig, 15));
+    CHECK(ks_load(got) == KS_NONE);
+    CHECK(ks_clear() == 0 && prefs_len == 15);
+
+    /* Another program's data in 15-31: left alone. */
+    memcpy(prefs, orig, 15);
+    memset(prefs + 15, 0x11, 17);
+    prefs_len = 32;
+    CHECK(ks_save(key) == KS_INUSE && prefs[15] == 0x11);
+    CHECK(ks_load(got) == KS_NONE);
+    /* All zero there counts as free. */
+    memset(prefs + 15, 0, 17);
+    CHECK(ks_save(key) == 0 && prefs[15] == KS_MARK && !memcmp(prefs, orig, 15));
+}
+
+static void test_config(void)
+{
+    char text[200];
+
+    CHECK(cfg_set_gateway("192.168.1.20") && !strcmp(ses_base, "http://192.168.1.20:8417"));
+    CHECK(cfg_set_gateway("  192.168.1.20:9000 ") && !strcmp(ses_base, "http://192.168.1.20:9000"));
+    CHECK(cfg_set_gateway("HTTP://Gateway.Local:8417/") && !strcmp(ses_base, "http://gateway.local:8417"));
+    CHECK(!cfg_set_gateway("https://gateway.local"));
+    CHECK(!cfg_set_gateway(""));
+    CHECK(!cfg_set_gateway("http://"));
+    CHECK(!cfg_set_gateway("a b"));
+    CHECK(!cfg_set_gateway("host/path"));
+    CHECK(!cfg_set_gateway("a-host-name-far-too-long-for-the-buffer-that-holds-it-whole.example"));
+
+    strcpy(ses_base, "unchanged");
+    strcpy(text, "# Twoegram: the gateway's address\rGATEWAY=10.1.2.3:8417\r");
+    CHECK(cfg_parse(text) && !strcmp(ses_base, "http://10.1.2.3:8417"));
+    strcpy(text, "GATEWAY=10.9.9.9\n");
+    CHECK(cfg_parse(text) && !strcmp(ses_base, "http://10.9.9.9:8417"));
+    strcpy(ses_base, "unchanged");
+    strcpy(text, "# nothing here\rOTHER=1\r");
+    CHECK(!cfg_parse(text) && !strcmp(ses_base, "unchanged"));
+}
+
+static void test_no_card(void)
+{
+    uint8_t key[16], n, blob[32], dig[32];
+    cogs_part_t p[1];
+
+    /* With no card found, nothing reaches the slot's I/O addresses. */
+    cogs_slot = 0;
+    frn = 0;
+    COGS_PART(p[0], "x", 1);
+    CHECK(sha256_parts(p, 1, dig) == COGS_E_NOCARD);
+    CHECK(cogs_prefs_get(blob, &n) == COGS_E_NOCARD);
+    CHECK(ks_load(key) == COGS_E_NOCARD);
+    CHECK(ses_hello() == COGS_E_NOCARD && !ses_open);
+    CHECK(frn == 0);                    /* not one byte was written */
+    cogs_slot = 4;
+}
+
 int main(void)
 {
+    cogs_slot = 4;                      /* the model card's slot */
+    test_no_card();
     test_keys();
     test_hmac();
     test_reply();
     test_http();
     test_prefs();
+    test_session();
+    test_keystore();
+    test_config();
     printf("a2: %d checks, %d failed (%u hashes on the model card)\n", checks, fails, hashes);
     return fails != 0;
 }

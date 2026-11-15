@@ -14,6 +14,13 @@
 #define AGENT_NAME_MAX  16
 #define MSG_TEXT_MAX    1500        /* one part of a reply */
 
+/* Where the agents come from. */
+#define MSGS_DEMO   0               /* milestone 0's made-up text (no card) */
+#define MSGS_LIVE   1               /* the gateway's agents; messages from milestone 4 */
+#define MSGS_NONE   2               /* no session: no agents */
+void        msgs_mode(uint8_t m);
+extern uint8_t msgs_now;
+
 uint8_t     agent_count(void);
 const char *agent_name(uint8_t a);
 uint8_t     agent_unread(uint8_t a);

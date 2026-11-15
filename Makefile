@@ -34,11 +34,21 @@ APP = \
 	src/net.c \
 	src/convo.c \
 	src/layout.c \
-	src/demo.c
+	src/demo.c \
+	src/link.c \
+	src/setup.c \
+	src/config.c \
+	src/keystore.c \
+	src/session.c \
+	src/cogs_http.c \
+	src/cogs_extra.c \
+	src/hmac.c \
+	src/proto.c
 
 # The milestone 2 probe: the protocol end to end against the dev server.
 PROBE = \
 	src/a2probe.c \
+	src/session.c \
 	src/cogs_http.c \
 	src/cogs_extra.c \
 	src/hmac.c \
@@ -81,7 +91,7 @@ build/%.o: src/%.c $(HDRS) tools/cc65check.py | build build/asm
 	python3 -I tools/cc65check.py build/asm/$*.s > /dev/null || python3 -I tools/cc65check.py build/asm/$*.s
 	$(CL65) -t $(TARGET) -c -o $@ build/asm/$*.s
 
-build/splash.o build/help.o build/a2probe.o: build/build.h
+build/splash.o build/help.o build/setup.o build/a2probe.o: build/build.h
 
 build/%.o: src/%.s | build
 	$(CL65) -t $(TARGET) -c -o $@ $<
@@ -140,7 +150,8 @@ build/host/test_cogs: tests/host/test_cogs.c $(HOST_COGS) $(HDRS) | build/host
 build/host/test_layout: tests/host/test_layout.c src/layout.c $(HDRS) | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_layout.c src/layout.c
 
-HOST_A2 = src/cogs.c src/cogs_http.c src/hmac.c src/proto.c tests/host/sha256.c
+HOST_A2 = src/cogs.c src/cogs_extra.c src/cogs_http.c src/hmac.c src/proto.c src/session.c \
+          src/keystore.c src/config.c src/fmt.c tests/host/sha256.c
 
 build/host/test_a2: tests/host/test_a2.c $(HOST_A2) $(HDRS) tests/host/sha256.h | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -Itests/host -o $@ tests/host/test_a2.c $(HOST_A2)
