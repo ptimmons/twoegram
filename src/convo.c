@@ -376,32 +376,93 @@ static void draw_all(void)
 
 /* ---- actions ---- */
 
+/* The open agent's name: a new hello may bring a new list, in which it
+ * has another place, or none. */
+static char cur_agent[SES_AGENT_LEN + 1];
+static uint8_t restarting;
+
+static void restart(void);
+
+/* After a request: 0, with the status bar put right if that ended a spell
+ * of trouble; or nonzero, the failure said and acted on (link.h), and the
+ * caller stops. A failure the user asked for (loud) is said in full; a
+ * poll's only on the status bar. */
+static uint8_t done(uint8_t rc, uint8_t loud)
+{
+    if (!rc) {
+        if (link_ok()) {
+            draw_status();
+        }
+        /* A hello on the way (the gateway restarted) brought a list in
+         * which the open agent has moved: follow it. */
+        if (!restarting && cur_agent[0] && strcmp(agent_name(cur), cur_agent)) {
+            restart();
+            return 1;
+        }
+        return 0;
+    }
+    switch (link_trouble(rc)) {
+    case LT_RETRY:
+        draw_status();
+        if (!loud) {
+            return rc;
+        }
+        break;
+    case LT_AGENTS:
+        if (!restarting) {
+            link_connect();
+            restart();
+            return rc;
+        }
+        break;
+    case LT_OFFLINE:
+        restart();
+        return rc;
+    }
+    status_msg(ses_strerror(rc));
+    return rc;
+}
+
 /* Fetch the newest page of the current agent's conversation. */
 static void load_current(void)
 {
-    uint8_t rc;
-
     if (msgs_now != MSGS_LIVE || !agent_count()) {
         return;
     }
     status_msg("FETCHING MESSAGES");
     link_begin();
-    rc = hist_load(agent_name(cur));
-    if (rc) {
-        status_msg(ses_strerror(rc));
-    }
+    done(hist_load(agent_name(cur)), 1);
 }
 
 static void open_agent(uint8_t a)
 {
     cur = a;
     sel = a;
+    if (agent_count()) {
+        fmt_str(cur_agent, agent_name(a));
+    }
     msg_select(a);
     load_current();
     win_end = -1;
     scroll = 0;
     relayout();
     draw_all();
+}
+
+/* After a new hello, or losing the session: the same agent if it is
+ * still there, else the first, from the newest message. */
+static void restart(void)
+{
+    uint8_t a;
+
+    for (a = agent_count(); a && strcmp(agent_name(a - 1), cur_agent); --a) {
+    }
+    restarting = 1;
+    open_agent(a ? a - 1 : 0);
+    restarting = 0;
+    if (!link_live) {
+        status_msg(link_err);
+    }
 }
 
 static void next_unread(void)
@@ -434,8 +495,6 @@ static void compose_changed(void)
 
 static void send(void)
 {
-    uint8_t rc;
-
     if (!clen) {
         return;
     }
@@ -449,10 +508,8 @@ static void send(void)
     }
     status_msg("SENDING");
     link_begin();
-    rc = hist_send(agent_name(cur), cbuf, clen);
-    if (rc) {
-        status_msg(ses_strerror(rc));   /* the text stays, to send again */
-        return;
+    if (done(hist_send(agent_name(cur), cbuf, clen), 1)) {
+        return;                     /* the text stays, to send again */
     }
     clen = 0;
     cbuf[0] = 0;
@@ -515,7 +572,6 @@ static void go_older(uint8_t step)
 {
     uint16_t top, last;
     int16_t k;
-    uint8_t rc;
 
     if (!lay_count) {
         return;
@@ -530,9 +586,7 @@ static void go_older(uint8_t step)
         status_msg("FETCHING OLDER MESSAGES");
         st_shift = 0;
         link_begin();
-        rc = hist_older(agent_name(cur));
-        if (rc) {
-            status_msg(ses_strerror(rc));
+        if (done(hist_older(agent_name(cur)), 1)) {
             return;
         }
         if (!hist_added) {
@@ -560,7 +614,6 @@ static void go_newer(uint8_t step)
 {
     uint16_t bottom, first, cnt, ahead;
     int16_t k, r;
-    uint8_t rc;
 
     if (!lay_count) {
         return;
@@ -575,9 +628,7 @@ static void go_newer(uint8_t step)
         status_msg("FETCHING NEWER MESSAGES");
         st_shift = 0;
         link_begin();
-        rc = hist_newer(agent_name(cur));
-        if (rc) {
-            status_msg(ses_strerror(rc));
+        if (done(hist_newer(agent_name(cur)), 1)) {
             return;
         }
         cnt = msg_count();
@@ -627,6 +678,21 @@ static void scroll_by(int16_t d)
 
 #define POLL_IDLE   (5 * TICKS_PER_SEC)     /* nothing happening */
 #define POLL_BUSY   (1 * TICKS_PER_SEC)     /* the agent is answering */
+#define POLL_SLOW   60                      /* seconds, at most, after failures */
+
+/* How long to the next poll: after a failure 5 s, then 10, 20, 40 and
+ * 60, so a gateway that is down is not hammered (nor the Apple frozen
+ * waiting on it), and one that comes back is found within a minute. */
+static uint16_t poll_gap(void)
+{
+    uint8_t secs;
+
+    if (!link_fails) {
+        return hist_busy ? POLL_BUSY : POLL_IDLE;
+    }
+    secs = link_fails > 4 ? POLL_SLOW : (uint8_t)(5 << (link_fails - 1));
+    return (uint16_t)(secs * TICKS_PER_SEC);
+}
 
 /* Something new: show it if at the newest, else keep the screen still
  * and say there is more below. */
@@ -634,7 +700,7 @@ static void poll_now(void)
 {
     uint16_t anchor = 0;
     int16_t ofs = 0, k, top_line;
-    uint8_t rc, at_bottom = (uint8_t)(!scroll && win_end < 0);
+    uint8_t at_bottom = (uint8_t)(!scroll && win_end < 0);
     uint8_t was_busy = hist_busy, was_unseen = hist_unseen;
     uint8_t was_unread[SES_AGENTS_MAX];
 
@@ -648,9 +714,7 @@ static void poll_now(void)
     }
     st_shift = 0;
     link_begin();
-    rc = hist_poll(agent_name(cur));
-    if (rc) {
-        status_msg(ses_strerror(rc));
+    if (done(hist_poll(agent_name(cur)), 0)) {
         return;
     }
     if (hist_added) {
@@ -685,10 +749,16 @@ static uint8_t wait_key(void)
         if (tick_poll()) {
             ++since_poll;
         }
-        if (msgs_now == MSGS_LIVE && agent_count() &&
-            since_poll >= (hist_busy ? POLL_BUSY : POLL_IDLE)) {
-            since_poll = 0;
+        if (since_poll < poll_gap()) {
+            continue;
+        }
+        since_poll = 0;
+        if (msgs_now == MSGS_LIVE && agent_count()) {
             poll_now();
+        } else if (link_waiting) {
+            /* Not signed in, for a passing reason: try again. */
+            link_connect();
+            restart();
         }
     }
     return key_get();
@@ -717,16 +787,7 @@ static uint8_t oa_key(uint8_t k)
         break;
     case 'k': case 'K':
         link_setup();
-        cur = sel = 0;
-        msg_select(0);
-        load_current();
-        win_end = -1;
-        scroll = 0;
-        relayout();
-        draw_all();
-        if (!link_live) {
-            status_msg(link_err);
-        }
+        restart();
         break;
     case 'r': case 'R':
         if (!cogs_slot) {
@@ -734,16 +795,7 @@ static uint8_t oa_key(uint8_t k)
             break;
         }
         link_connect();
-        cur = sel = 0;
-        msg_select(0);
-        load_current();
-        win_end = -1;
-        scroll = 0;
-        relayout();
-        draw_all();
-        if (!link_live) {
-            status_msg(link_err);
-        }
+        restart();
         break;
     case 'n': case 'N':
         next_unread();
@@ -864,13 +916,12 @@ void convo_run(void)
     /* The first time only: the host tests come back in where they left. */
     if (!entered) {
         entered = 1;
-        msg_select(cur);
-        load_current();
-        relayout();
-    }
-    draw_all();
-    if (!link_live && link_err[0]) {
-        status_msg(link_err);
+        restart();
+    } else {
+        draw_all();
+        if (!link_live && link_err[0]) {
+            status_msg(link_err);
+        }
     }
     for (;;) {
         k = wait_key();

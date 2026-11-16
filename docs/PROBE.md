@@ -1,5 +1,38 @@
 # Testing on the card
 
+## Build b013: milestone 7, when things go wrong
+
+On your gateway, boot `build/TWOEGRAM-b013.po` and open a conversation.
+The commands are on the gateway host. Steps 1 to 4 matter most; 5 needs
+re-pairing, so it is optional.
+
+1. **The gateway stops and comes back.** `openclaw gateway stop`. Within
+   five seconds the status bar's middle says `GATEWAY NOT ANSWERING`,
+   and the conversation stays on the screen. Note roughly how long the
+   Apple is unresponsive to keys while each try waits (type-ahead should
+   still catch what you type). Leave it a minute or two, then
+   `openclaw gateway start`: within about a minute of the gateway being
+   up, the bar says `SIGNED, NOT ENCRYPTED` again by itself, and a new
+   message sends and is answered.
+2. **Sending while it's down.** Stop the gateway again and send
+   something: the reason takes over the status bar (`CONNECTION
+   REFUSED` or `TIMED OUT`) and your text stays on the compose line.
+   Start the gateway; once the bar is back to normal, Return sends it.
+3. **Starting while it's down.** Quit Twoegram, stop the gateway, start
+   Twoegram: it says `...: TRYING AGAIN`. Start the gateway: Twoegram
+   signs in and opens the conversation by itself.
+4. **A restart in the middle.** `openclaw gateway restart` while a
+   conversation is open: at most a moment of `GATEWAY NOT ANSWERING`,
+   then on as before; nothing to press.
+5. **Revoked** (optional: you'll need to pair again, and revoking also
+   deletes the Apple's conversations on the gateway).
+   `openclaw a2 revoke <id>`: at the next poll Twoegram says `THE
+   GATEWAY DOES NOT KNOW THIS KEY` and stops trying. Pair again
+   (`openclaw a2 pair "Apple //e"`), Open-Apple-K, type the new key.
+
+A photo of anything unexpected, and a note of how long step 1's tries
+freeze the keyboard, is plenty.
+
 ## Build b010: the new marks
 
 Against the dev server (or your gateway, once milestone 6 is

@@ -347,6 +347,137 @@ static void test_send_poll(void)
     CHECK(screen[SCR_ROWS - 3][30] == '_');      /* and back to one row */
 }
 
+/* Idle until n requests have been made, or give up: the count made. */
+static unsigned idle_for(unsigned n, unsigned max_idles)
+{
+    static uint8_t keys[1];
+    unsigned start = http_requests, i;
+
+    keys[0] = IDLE;
+    for (i = 0; i < max_idles && http_requests - start < n; ++i) {
+        run(keys, NULL, 1);
+    }
+    return http_requests - start;
+}
+
+static void test_errors(void)
+{
+    static uint8_t keys[100], oa[100];
+    char rows[SCR_ROWS][SCR_COLS + 1];
+    unsigned n, r, before_n;
+
+    memset(oa, 0, sizeof oa);
+    /* The last message's answer first, so polls are 5 s apart. */
+    keys[0] = keys[1] = keys[2] = IDLE;
+    run(keys, oa, 3);
+    CHECK(on_screen("SIGNED, NOT ENCRYPTED") && link_fails == 0 && !hist_busy);
+
+    /* The gateway stops answering: the conversation stays on the screen,
+     * the status bar says so, and polls come further and further apart. */
+    memcpy(rows, screen, sizeof screen);
+    http_error = 3;                                 /* connection timed out */
+    CHECK(idle_for(1, 5) == 1);
+    CHECK(on_screen("GATEWAY NOT ANSWERING") && link_fails == 1 && link_live);
+    for (r = TOP; r <= BOTTOM; ++r) {
+        CHECK(!strcmp(screen[r] + 21, rows[r] + 21));
+    }
+    /* Every 5 s while all is well; after failures 5, 10, 20, 40, then
+     * 60 s. 30 idles of 400 frames are 200 s: 40 polls when well, but
+     * 5 + 10 + 20 + 40 + 60 + 60 s take in only 6 or so now. */
+    before_n = http_requests;
+    keys[0] = IDLE;
+    for (n = 0; n < 30; ++n) run(keys, oa, 1);
+    n = http_requests - before_n;
+    CHECK(n >= 4 && n <= 7);
+    CHECK(link_fails == 1 + n);
+
+    /* Sending meanwhile: refused, said, and the text kept to send again. */
+    n = type(keys, "while down");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    CHECK(on_screen("TIMED OUT") && strstr(screen[BOTTOM + 2], "while down"));
+
+    /* It comes back: the next poll finds it, and the bar is put right.
+     * The text sends. */
+    http_error = 0;
+    CHECK(idle_for(1, 30) == 1);
+    CHECK(on_screen("SIGNED, NOT ENCRYPTED") && link_fails == 0);
+    keys[0] = K_RETURN;
+    run(keys, oa, 1);
+    CHECK(on_screen("while down") && !strstr(screen[BOTTOM + 2], "while down"));
+    idle_for(2, 5);
+
+    /* Busy: said, then gone at the next good poll. */
+    gw_refuse = 9; gw_refuse_left = -1;
+    idle_for(1, 5);
+    CHECK(on_screen("GATEWAY BUSY") && link_live);
+    gw_refuse = 0;
+    idle_for(1, 30);
+    CHECK(on_screen("SIGNED, NOT ENCRYPTED"));
+
+    /* The gateway restarts with its agents in another order: the open
+     * agent is followed to its new place. */
+    gw_agents = "agent coder\nagent main\n";
+    gw_drop_session = 1;
+    idle_for(2, 5);
+    CHECK(!strncmp(screen[0] + 22, "main", 4) && !strncmp(screen[3], ">main", 5));
+    CHECK(!strncmp(screen[2], " coder", 6));
+
+    /* An agent the gateway no longer has: hello again for the new list. */
+    gw_agents = "agent research\nagent main\n";
+    gw_refuse = 7; gw_refuse_left = 1;
+    idle_for(1, 5);
+    CHECK(!strncmp(screen[2], " research", 9) && !strncmp(screen[3], ">main", 5));
+    CHECK(!on_screen("coder") && link_live);
+
+    /* Revoked: the session ends, and the hello after it is refused.
+     * Nothing more is tried until the user acts. */
+    strcpy(gw_id, "ffffffff");
+    gw_drop_session = 1;
+    idle_for(2, 5);
+    CHECK(!link_live && !link_waiting);
+    CHECK(on_screen("THE GATEWAY DOES NOT KNOW THIS KEY"));
+    CHECK(idle_for(1, 10) == 0);
+    /* Paired again (here: the gateway knows it again); Open-Apple-R. */
+    strcpy(gw_id, "922fadb6");
+    keys[0] = 'r'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(link_live && on_screen("SIGNED, NOT ENCRYPTED") && !strncmp(screen[0] + 22, "main", 4));
+
+    /* Locked out: stopped, and told how long. */
+    gw_refuse = 6; gw_refuse_left = -1;
+    idle_for(1, 5);
+    CHECK(!link_live && on_screen("WAIT 15 MINUTES"));
+    CHECK(idle_for(1, 10) == 0);
+    gw_refuse = 0;
+    keys[0] = 'r'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(link_live);
+
+    /* A reply that does not check: stopped, never retried by itself. */
+    gw_forge_reply = 1;
+    idle_for(1, 5);
+    CHECK(!link_live && on_screen("NOT SIGNED WITH THIS KEY"));
+    CHECK(idle_for(1, 10) == 0);
+    gw_forge_reply = 0;
+
+    /* Starting (here: Open-Apple-R) while the gateway is down: no
+     * session, but hello is tried again by itself until it answers. */
+    http_error = 4;
+    keys[0] = 'r'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(!link_live && link_waiting && on_screen("TRYING AGAIN"));
+    CHECK(idle_for(1, 10) == 1 && !link_live);      /* tried again, still down */
+    http_error = 0;
+    CHECK(idle_for(1, 30) >= 1);
+    CHECK(link_live && !link_waiting && on_screen("SIGNED, NOT ENCRYPTED"));
+    CHECK(!strncmp(screen[0] + 22, "main", 4) && on_screen("while down"));
+    gw_agents = "agent main\nagent coder\n";
+}
+
 /* The glyph bytes: MouseText, or plain stand-ins without it. */
 static void test_glyphs(void)
 {
@@ -366,6 +497,7 @@ int main(void)
     test_glyphs();
     test_screen();
     test_send_poll();
+    test_errors();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

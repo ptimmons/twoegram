@@ -19,6 +19,8 @@
 uint8_t link_live;
 char    link_sec[24];
 char    link_err[64];
+uint8_t link_fails;
+uint8_t link_waiting;
 
 static uint16_t start;
 
@@ -34,9 +36,48 @@ static uint8_t idle(void)
 static void offline(const char *sec, const char *err)
 {
     link_live = 0;
+    link_waiting = 0;
     msgs_mode(MSGS_NONE);
     fmt_str(link_sec, sec);
     fmt_str(link_err, err);
+}
+
+uint8_t link_trouble(uint8_t rc)
+{
+    uint8_t code = rc == SES_E_REFUSED ? ses_reply.code : A2_OK;
+
+    if (code == A2_UNKNOWN_AGENT) {
+        return LT_AGENTS;
+    }
+    if (code == A2_BAD_REQUEST || code == A2_TOO_LARGE || rc == COGS_E_TOOBIG) {
+        return LT_NOTE;
+    }
+    /* Never retried by itself: a key the gateway does not know or has
+     * locked out, a signature it refused, a reply that did not check,
+     * something that is not a gateway, no card. */
+    if (code == A2_UNKNOWN_DEVICE || code == A2_BAD_SIGNATURE || code == A2_LOCKED ||
+        rc == SES_E_FORGED || rc == SES_E_NOTSERVER || rc == COGS_E_NOCARD) {
+        offline("NOT CONNECTED", ses_strerror(rc));
+        return LT_OFFLINE;
+    }
+    /* Passing: busy, a session lost twice over (the gateway in the middle
+     * of restarting), and the card's network errors. */
+    if (link_fails < 255) {
+        ++link_fails;
+    }
+    fmt_str(link_sec, code == A2_BUSY ? "GATEWAY BUSY" :
+                      rc == COGS_E_NOT_JOINED ? "NO NETWORK" : "GATEWAY NOT ANSWERING");
+    return LT_RETRY;
+}
+
+uint8_t link_ok(void)
+{
+    if (!link_fails) {
+        return 0;
+    }
+    link_fails = 0;
+    fmt_str(link_sec, SEC_SIGNED);
+    return 1;
 }
 
 /* Up to 20 s for the card to have a network, as after power-on. */
@@ -72,20 +113,29 @@ uint8_t link_connect(void)
     if (!cogs_slot) {
         return COGS_E_NOCARD;
     }
-    if (!wait_for_network()) {
-        offline("NOT CONNECTED", "The card has no network.");
-        return COGS_E_NOT_JOINED;
+    /* A retry by itself does not stop for 20 s to wait for a network. */
+    if (link_waiting ? !(cogs_status() & COGS_ST_LINK_UP) : !wait_for_network()) {
+        rc = COGS_E_NOT_JOINED;
+    } else {
+        fmt_str(fmt_str(msg, "SAYING HELLO TO "), ses_base + 7);
+        status_msg(msg);
+        link_begin();
+        rc = ses_hello();
+        net_check();                /* the status bar's address, fresh */
     }
-    fmt_str(fmt_str(msg, "SAYING HELLO TO "), ses_base + 7);
-    status_msg(msg);
-    link_begin();
-    rc = ses_hello();
-    net_check();                    /* the status bar's address, fresh */
     if (rc) {
-        offline("NOT CONNECTED", ses_strerror(rc));
+        link_live = 0;
+        msgs_mode(MSGS_NONE);
+        if (link_trouble(rc) != LT_OFFLINE) {
+            /* Passing (no network, the gateway not up yet): keep trying. */
+            link_waiting = 1;
+            fmt_str(fmt_str(link_err, ses_strerror(rc)), ": TRYING AGAIN");
+        }
         return rc;
     }
     link_live = 1;
+    link_waiting = 0;
+    link_fails = 0;
     link_err[0] = 0;
     fmt_str(link_sec, SEC_SIGNED);
     msgs_mode(MSGS_LIVE);

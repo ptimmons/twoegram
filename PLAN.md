@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** milestones 0 to 5 built and passed on the real card; milestone 6 (the plugin inside OpenClaw) built and run in a scratch gateway, waiting for yours.
+**Status:** milestones 0 to 6 built and passed on the real card and your gateway; milestone 7 (error states) built as b013 and tested on the Mac, waiting for the card.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -260,8 +260,8 @@ gateway's address and port.
 | 3 ✅ | `hmac.c`, `auth.c`, key entry, handshake | host tests ✅, Virtual ][ ✅, **real card ✅** (b005: set-up, sign-in) |
 | 4 ✅ | Conversation view, store, scrolling, history | host tests ✅ (the screen too), Virtual ][ ✅, **real card ✅** (b007) |
 | 5 ✅ | Compose, send, type-ahead, polling, replies arriving in parts | host tests ✅ (the screen too), Virtual ][ ✅, real card ✅ (b008) |
-| 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | Vitest ✅, scratch OpenClaw 2026.11.3 on the Mac ✅ (no model), **your gateway: waiting**, then the real card |
-| 7 | Agent list, unread marks, lock and passphrase, error states | real card |
+| 6 ✅ | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | Vitest ✅, scratch OpenClaw 2026.11.3 on the Mac ✅ (no model), **your gateway and the real card ✅** (2026-11-16, b010) |
+| 7 | Error states: every failure said plainly, and recovered from where it can be (the agent list and unread marks were done in b010; the lock and passphrase moved to section 9, item 6) | host tests, real card |
 | 8 | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | real card, your gateway |
 | later | Encryption, by one of the two routes in section 2 | |
 
@@ -303,6 +303,33 @@ otherwise interrupt:
    the glyphs Virtual ][ draws (tools/charset/charset.png, captured from
    CHARSET.SYSTEM by `make charset`), pixel for pixel like its own
    screenshots (`make shots`).
+
+5. **Home automation from the Apple** (2026-11-16, first run on the
+   real gateway: "turn out the lights in my office" was refused for want
+   of a tool). OpenClaw withholds its owner-only tools (`nodes`,
+   `terminal`, `computer`, `screen`, `sessions`, `automations`,
+   `gateway`, ...) from a sender not in `commands.ownerAllowFrom`, and
+   the Apple is not in it. Listing `a2:<device-id>` there made the
+   scratch gateway treat the device as owner (its slash commands, which
+   a non-owner loses once an owner list exists, answered again); not yet
+   tried on the real gateway. Deferred by you for now. When taken up:
+   document it in INSTALL.md, perhaps `openclaw a2 pair --owner`, and
+   weigh it with the passphrase (item 6), since an owner device at an
+   unlocked //e can reach a shell on the gateway host.
+6. **Lock and passphrase** (planned for milestone 7; moved here
+   2026-11-16, since eavesdroppers and interlopers at home are not a
+   worry for now). The design, ready to build: the card's flash holds the
+   device key XORed with a hash of the passphrase (a second mark byte says
+   so); Twoegram asks for it at start-up and unscrambles the key in
+   memory, never storing it. The gateway keeps the same key: no protocol
+   change, no re-pairing. A wrong passphrase makes a wrong device id,
+   which the gateway refuses as unknown (no bad-signature lockout).
+   Open-Apple-L wipes the key and session key from memory and blanks the
+   screen until the passphrase is typed again, checked on the Apple by
+   re-deriving the device id (no network call). The set-up screen gets an
+   optional passphrase field. Perhaps an idle auto-lock. Weakness: with
+   the card and a recording of LAN traffic, passphrases can be tried
+   offline, so a long one matters.
 
 ## 10. Risks to settle at milestone 2
 
@@ -781,3 +808,46 @@ All checks passed again, against the same server (`569147e+`).
 - **Not yet seen:** a real model's answer, and replies arriving in
   several parts from a long answer; both need your gateway.
   [docs/INSTALL.md](docs/INSTALL.md) has the steps.
+
+### Milestone 7 notes
+
+- **Scope.** The agent list and unread marks were done in b010, and the
+  lock and passphrase moved to section 9 (item 6), so this milestone is
+  what happens when a request fails.
+- **One place decides** (`link_trouble`, link.c): every failed request
+  is one of four kinds, as PROTOCOL.md section 4 asks:
+  - *passing* (no network, the gateway down or restarting, `BUSY`, a
+    session lost again right after a new hello): the session and the
+    conversation stay; the status bar's middle field says `NO NETWORK`,
+    `GATEWAY NOT ANSWERING` or `GATEWAY BUSY`; polls back off to 5, 10,
+    20, 40, then 60 s; the first good reply puts the bar right. Not
+    signed in at all (started while the gateway was down) works the
+    same way: hello is retried on the same back-off, without the 20 s
+    wait for a network, and the conversation opens when it answers.
+  - *this request only* (`BAD_REQUEST`, `TOO_LARGE`, a reply too long):
+    said, the compose text kept.
+  - *the agent has gone* (`UNKNOWN_AGENT`): hello again for the new list.
+  - *needs you* (`UNKNOWN_DEVICE` mid-conversation, i.e. revoked;
+    `BAD_SIGNATURE`; `LOCKED`; a reply that does not check; not a
+    gateway; no card): offline, never retried by itself, the reason
+    from `ses_strerror`, and Open-Apple-K or -R as before.
+- **The open agent is followed by name.** Any hello may bring a new
+  agent list (the gateway restarted with agents added, removed or
+  reordered), so the conversation screen keeps the open agent's name and
+  finds it again, else opens the first. Open-Apple-K and -R, start-up and
+  every failure share one `restart()` in convo.c.
+- **Memory.** About 520 bytes: 2,133 bytes of heap left (2,657 in b010).
+  A first version with its own sentence for each failure cost twice
+  that; reusing `ses_strerror`'s messages saved half.
+- **Tests:** the screen test makes the model gateway time out, refuse,
+  go busy, restart with its agents reordered, drop an agent, revoke the
+  key, lock it out and forge a reply, and checks for each what is on the
+  screen, whether the conversation survives, how often it retries (6 or
+  so requests in 200 s while down, against 40 when well), and that it
+  recovers (or stays stopped). The model gateway gained a refusal switch
+  and a request counter.
+- **For the card** (docs/PROBE.md, b013): the gateway stopped and
+  started, sending while it is down, starting while it is down, a
+  restart mid-conversation, and (optionally) revoking. Not knowable on
+  the Mac: how long the card takes to give up on a stopped gateway, which
+  is how long the keyboard waits (type-ahead keeps what is typed).

@@ -17,6 +17,30 @@ extern char    link_err[64];        /* why there is no session, if there is none
  * link_err saying why. */
 void link_start(void);
 
+/*
+ * After a request fails: what it means, with link_sec and link_err set to
+ * match (docs/PROTOCOL.md section 4 says what each refusal asks for).
+ *
+ *   LT_NOTE     this request only (too long, malformed): say it, go on
+ *   LT_RETRY    passing (no network, gateway down or busy): the session,
+ *               if any, is kept and the status bar says what is wrong;
+ *               try again later, waiting longer each time (link_fails)
+ *   LT_AGENTS   the agent has gone: say hello again for the new list
+ *   LT_OFFLINE  nothing more until the user acts: link_err says what
+ */
+#define LT_NOTE     0
+#define LT_RETRY    1
+#define LT_AGENTS   2
+#define LT_OFFLINE  3
+uint8_t link_trouble(uint8_t rc);
+
+/* After a request succeeds: 1 if that ends a spell of trouble (redraw the
+ * status bar). */
+uint8_t link_ok(void);
+
+extern uint8_t link_fails;          /* passing failures in a row */
+extern uint8_t link_waiting;        /* no session, but hello is retried by itself */
+
 /* Before each request: restart the backstop clock the card's waits run
  * against (30 s; the card's own timeouts come first). */
 void link_begin(void);

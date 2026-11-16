@@ -137,6 +137,14 @@ When Twoegram has something to tell you, such as `SENDING` or
 `FETCHING OLDER MESSAGES`, its message takes over the status bar until
 you press the next key.
 
+If the gateway stops answering, perhaps because it is being restarted,
+the middle of the status bar says `GATEWAY NOT ANSWERING` (or
+`NO NETWORK`, or `GATEWAY BUSY`) in place of `SIGNED, NOT ENCRYPTED`.
+Your conversation stays on the screen, and Twoegram keeps trying by
+itself: after 5 seconds, then less and less often, but at least once a
+minute. When the gateway answers again, the status bar goes back to
+normal. You don't need to do anything.
+
 > **By the way:** The pictures in this guide were made on a modern
 > computer, because the Apple IIe simulator used for them has no CoGS
 > card. The pictures of a conversation were drawn by Twoegram's own
@@ -595,16 +603,22 @@ the address, especially the number after the colon.
 
 **THE GATEWAY DOES NOT KNOW THIS KEY**
 **BAD SIGNATURE: IS THE KEY RIGHT?**
-The gateway doesn't recognize your key. Twoegram shows the Set-up
-screen; type the key again, or ask for a new one.
+The gateway doesn't recognize your key. When connecting, Twoegram shows
+the Set-up screen; type the key again, or ask for a new one. If this
+happens in the middle of a conversation, the key has been taken back
+(revoked) on the gateway: pair your Apple again, then press
+OPEN-APPLE-K and type the new key.
 
 **LOCKED OUT AFTER BAD TRIES: WAIT 15 MINUTES**
 The gateway saw too many wrong keys from your Apple. Wait 15 minutes,
 then press OPEN-APPLE-R.
 
-**DNS FAILED**, **TIMED OUT**, **CONNECTION REFUSED**
-The card couldn't reach the gateway. Make sure the gateway is turned on
-and running OpenClaw, and that the address is right.
+**DNS FAILED: TRYING AGAIN**, **TIMED OUT: TRYING AGAIN**,
+**CONNECTION REFUSED: TRYING AGAIN**
+The card couldn't reach the gateway. Twoegram keeps trying by itself,
+less often as time goes by, and opens your conversation as soon as the
+gateway answers. If it doesn't, make sure the gateway is turned on and
+running OpenClaw, and that the address is right.
 
 **CARD STOPPED ANSWERING**
 The CoGS card didn't answer Twoegram. Turn the computer off and on
@@ -627,22 +641,31 @@ There's nothing earlier to show.
 **NOTHING NEW ELSEWHERE**
 You pressed OPEN-APPLE-N, but no other agent has anything new.
 
+**GATEWAY NOT ANSWERING**, **NO NETWORK**, **GATEWAY BUSY** in the status bar
+The gateway can't be reached just now, or is too busy. Twoegram keeps
+trying by itself and puts the status bar right when it can. If you send
+a message meanwhile, the reason takes over the status bar (for example,
+**TIMED OUT**) and your message stays on the compose line; press RETURN
+to send it again once the status bar says `SIGNED, NOT ENCRYPTED`.
+
 **THE SESSION ENDED**
-The gateway was restarted, or you were away for half an hour. Twoegram
-says hello again by itself; if this message stays, press OPEN-APPLE-R.
+The gateway was restarted, or you were away for half an hour, and it
+didn't answer when Twoegram said hello again. Twoegram keeps trying.
 
 **A REPLY WAS NOT SIGNED WITH THIS KEY: STOPPED**
 An answer arrived that your gateway didn't sign. Twoegram didn't show
-it. Something on your network may be interfering; tell whoever looks
-after the gateway.
+it, and stops talking to the gateway until you press OPEN-APPLE-R.
+Something on your network may be interfering; tell whoever looks after
+the gateway.
 
-**THE GATEWAY HAS NO SUCH AGENT**
-The agent was removed from the gateway while you were talking with it.
-Press OPEN-APPLE-R to fetch the list of agents again.
+When an agent is removed from the gateway while you're talking with it,
+Twoegram fetches the list of agents again by itself and opens the first
+one. Agents that are added appear the same way, the next time Twoegram
+says hello.
 
-**TOO LONG FOR THE GATEWAY**, **THE GATEWAY IS BUSY**, **THE GATEWAY REFUSED**
-The gateway couldn't take your message just now. Your message is still
-on the compose line; try again in a moment.
+**TOO LONG FOR THE GATEWAY**, **THE GATEWAY REFUSED**
+The gateway couldn't take that message. Your message is still on the
+compose line; shorten it, or try again.
 
 **(The gateway could not answer: ...)** as an agent's message
 The gateway received your message but couldn't get an answer from the

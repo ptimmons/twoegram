@@ -71,6 +71,9 @@ static int      gw_hellos;
 static int      gw_forge_hello;         /* spoil the hello reply's signature */
 static int      gw_forge_reply;         /* change a reply after signing it */
 static int      gw_drop_session;        /* answer NO_SESSION once */
+static int      gw_refuse;              /* refuse requests (not hello) with this code */
+static int      gw_refuse_left;         /* that many times; -1 until cleared */
+static unsigned http_requests;          /* every HTTP request the card made */
 static char     gw_last_target[256];
 static uint8_t  gw_last_body[2048];
 static unsigned gw_last_blen;
@@ -369,6 +372,17 @@ static void gateway(void)
         return;
     }
     gw_last_seq = seq;
+    if (gw_refuse && gw_refuse_left) {
+        int code = gw_refuse;
+
+        if (gw_refuse_left > 0 && !--gw_refuse_left) {
+            gw_refuse = 0;
+        }
+        /* The protocol signs only these once the request is verified. */
+        gw_reply(code, code == 1 || code == 5 || code == 7 || code == 9 ? gw_sk : NULL,
+                 seq, 0, "why refused by the test\n");
+        return;
+    }
     {
         static char page[2100];
 
@@ -413,7 +427,8 @@ static void http_frame(const uint8_t *p, unsigned len)
         printf("model: HTTP frame length %u, fields %u\n", len, i);
         exit(2);
     }
-    if (gateway_on) {
+    ++http_requests;
+    if (gateway_on && !http_error) {
         gateway();
     }
     if (http_noise) {
@@ -794,6 +809,7 @@ static void gateway_reset(void)
     strcpy(gw_id, "922fadb6");
     gw_hellos = 0;
     gw_forge_hello = gw_forge_reply = gw_drop_session = 0;
+    gw_refuse = gw_refuse_left = 0;
     http_noise = 0;
     http_error = 0;
     qh = qt = 0;
