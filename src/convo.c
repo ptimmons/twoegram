@@ -26,6 +26,8 @@
 #include "session.h"
 #include "store.h"
 #include "history.h"
+#include "tick.h"
+#include "cogs.h"
 
 #define LIST_W      20              /* columns 0..19 */
 #define DIV_COL     20
@@ -114,6 +116,8 @@ static const char *cur_name(void)
 #define WIN_STEP    8               /* messages a window moves forward */
 
 static int16_t win_end = -1;
+static uint16_t since_poll;         /* frames since the last poll */
+static uint8_t  news_below;         /* messages came in below the screen */
 
 static void lay_one(uint16_t i)
 {
@@ -204,7 +208,16 @@ static const char *head_note(void)
             return note;
         }
     }
-    if (scroll) {
+    if (msgs_now == MSGS_LIVE && hist_busy) {
+        return "thinking...";
+    }
+    if (news_below && !scroll && win_end < 0) {
+        news_below = 0;             /* seen: the screen reached them */
+    }
+    if (msgs_now == MSGS_LIVE && (hist_unseen || news_below)) {
+        return "new below";
+    }
+    if (scroll || win_end >= 0) {
         return "scrolled back";
     }
     if (lay_dropped) {
@@ -255,7 +268,7 @@ static const char *pane_note(uint8_t r)
             fmt_str(fmt_str(fmt_str(l1, "Signed in as device "), ses_id), ".");
             return l1;
         case 2: return "Every request and reply is signed; nothing is encrypted.";
-        case 4: return "No messages with this agent yet. Sending comes in milestone 5.";
+        case 4: return "No messages with this agent yet: type one below.";
         }
         return "";
     }
@@ -402,33 +415,33 @@ static void compose_changed(void)
 
 static void send(void)
 {
-    static char reply[96];
-    uint16_t i = msg_count();
-    const char *p;
-    uint16_t n;
+    uint8_t rc;
 
     if (!clen) {
         return;
     }
-    if (msgs_now != MSGS_DEMO) {
-        status_msg("SENDING COMES IN MILESTONE 5");
+    if (msgs_now != MSGS_LIVE || !agent_count()) {
+        status_msg("NOT CONNECTED: NOTHING CAN BE SENT");
         return;
     }
-    fmt_str(fmt_u32(fmt_str(reply,
-        "Milestone 0 has no gateway yet, so nothing was sent. You wrote "),
-        clen), " characters.");
-    if (!msg_add(1, "now", cbuf, clen) || !msg_add(0, "demo", reply, txt_len(reply))) {
-        status_msg("NO ROOM: MILESTONE 0 KEEPS ONLY A FEW MESSAGES");
-        return;
+    /* A message joins the newest end: go there first if scrolled away. */
+    if (!st_newest) {
+        load_current();
     }
-    for (; i < msg_count(); ++i) {
-        p = msg_text(i, &n);
-        lay_msg(i, p, n, msg_mine(i), txt_len(msg_meta(i)));
+    status_msg("SENDING");
+    link_begin();
+    rc = hist_send(agent_name(cur), cbuf, clen);
+    if (rc) {
+        status_msg(ses_strerror(rc));   /* the text stays, to send again */
+        return;
     }
     clen = 0;
     cbuf[0] = 0;
-    scroll = 0;
     crows = compose_rows();
+    win_end = -1;
+    scroll = 0;
+    since_poll = 0;
+    relayout();
     draw_all();
 }
 
@@ -591,6 +604,70 @@ static void scroll_by(int16_t d)
     }
 }
 
+/* ---- polling ---- */
+
+#define POLL_IDLE   (5 * TICKS_PER_SEC)     /* nothing happening */
+#define POLL_BUSY   (1 * TICKS_PER_SEC)     /* the agent is answering */
+
+/* Something new: show it if at the newest, else keep the screen still
+ * and say there is more below. */
+static void poll_now(void)
+{
+    uint16_t anchor = 0;
+    int16_t ofs = 0, k, top_line;
+    uint8_t rc, at_bottom = (uint8_t)(!scroll && win_end < 0);
+    uint8_t was_busy = hist_busy, was_unseen = hist_unseen;
+
+    if (lay_count && !at_bottom) {
+        /* where the screen's top row is, to put it back there */
+        anchor = msg_on_row(0);
+        top_line = lay_count > msg_rows() ? (int16_t)(lay_count - msg_rows() - scroll) : 0;
+        ofs = (int16_t)(top_line - line_of(anchor, 0));
+    }
+    st_shift = 0;
+    link_begin();
+    rc = hist_poll(agent_name(cur));
+    if (rc) {
+        status_msg(ses_strerror(rc));
+        return;
+    }
+    if (hist_added) {
+        if (at_bottom) {
+            relayout();
+            scroll = 0;
+        } else {
+            anchor = (uint16_t)(anchor + st_shift);
+            if (win_end >= 0) {
+                win_end = (int16_t)(win_end + st_shift);
+            }
+            relayout();
+            k = line_of(anchor, 0);
+            put_line((int16_t)((k < 0 ? 0 : k) + ofs), 0);
+            news_below = 1;
+        }
+        draw_msgs();
+    }
+    if (hist_added || was_busy != hist_busy || was_unseen != hist_unseen) {
+        draw_head();
+    }
+}
+
+/* Wait for a key, polling the gateway meanwhile. */
+static uint8_t wait_key(void)
+{
+    while (!key_ready()) {
+        if (tick_poll()) {
+            ++since_poll;
+        }
+        if (msgs_now == MSGS_LIVE && agent_count() &&
+            since_poll >= (hist_busy ? POLL_BUSY : POLL_IDLE)) {
+            since_poll = 0;
+            poll_now();
+        }
+    }
+    return key_get();
+}
+
 /* Open-Apple keys: the same whichever side has the focus. Returns 1 to
  * quit. */
 static uint8_t oa_key(uint8_t k)
@@ -621,12 +698,12 @@ static uint8_t oa_key(uint8_t k)
         scroll = 0;
         relayout();
         draw_all();
-        if (!link_live && msgs_now != MSGS_DEMO) {
+        if (!link_live) {
             status_msg(link_err);
         }
         break;
     case 'r': case 'R':
-        if (msgs_now == MSGS_DEMO) {
+        if (!cogs_slot) {
             status_msg("NO COGS CARD: NOTHING TO CONNECT TO");
             break;
         }
@@ -770,7 +847,7 @@ void convo_run(void)
         status_msg(link_err);
     }
     for (;;) {
-        k = key_get();
+        k = wait_key();
         if (key_oa) {
             if (oa_key(k)) {
                 return;

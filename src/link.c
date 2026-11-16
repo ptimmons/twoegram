@@ -4,6 +4,7 @@
 #include <string.h>
 #include "cogs.h"
 #include "tick.h"
+#include "kbd.h"
 #include "fmt.h"
 #include "session.h"
 #include "keystore.h"
@@ -26,6 +27,7 @@ static uint16_t start;
 static uint8_t idle(void)
 {
     tick_poll();
+    key_poll();                     /* type-ahead: no key lost while waiting */
     return (uint16_t)(ticks - start) > BACKSTOP ? COGS_E_TIMEOUT : 0;
 }
 
@@ -113,11 +115,7 @@ void link_start(void)
     uint8_t have_gw, have_key;
 
     if (!cogs_slot) {
-        /* No card: an emulator. Milestone 0's made-up text, labelled. */
-        link_live = 0;
-        msgs_mode(MSGS_DEMO);
-        fmt_str(link_sec, SEC_DEMO);
-        link_err[0] = 0;
+        offline("NO COGS CARD", "No CoGS card was found in any slot.");
         return;
     }
     /* The disk before any network use; then the card. */

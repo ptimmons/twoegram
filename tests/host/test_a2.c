@@ -157,12 +157,44 @@ static const char *header(const char *name, char *out, unsigned cap)
 
 
 /* The model gateway's conversation: 100 messages, every seventh at the
- * protocol's 1,500-byte limit, so pages are cut by size as well as k. */
-#define CONV_N  100
+ * protocol's 1,500-byte limit, so pages are cut by size as well as k.
+ * Messages sent, and the model agent's answers, are added after them. */
+#define CONV_N      100
+#define EXTRA_MAX   40
+
+static unsigned conv_total = CONV_N;
+static char     extra_text[EXTRA_MAX][300];
+static unsigned extra_len[EXTRA_MAX];
+static unsigned extra_mine[EXTRA_MAX];
+static int      model_busy;                 /* the model agent is "thinking" */
+static int      model_polls_left;           /* polls before it answers */
+static char     model_pending[300];
+static unsigned model_pending_len;
 
 static unsigned conv_len(unsigned n)
 {
+    if (n > CONV_N) return extra_len[n - CONV_N - 1];
     return n % 7 == 0 ? 1500 : 5 + (n * 13) % 200;
+}
+
+static unsigned conv_mine(unsigned n)
+{
+    return n > CONV_N ? extra_mine[n - CONV_N - 1] : (n & 1);
+}
+
+/* Add a message to the conversation; returns its number. */
+static unsigned conv_append(unsigned mine, const char *text, unsigned len)
+{
+    unsigned i = conv_total - CONV_N;
+
+    if (i >= EXTRA_MAX || len >= sizeof extra_text[0]) {
+        printf("model: conversation full\n");
+        exit(2);
+    }
+    memcpy(extra_text[i], text, len);
+    extra_len[i] = len;
+    extra_mine[i] = mine;
+    return ++conv_total;
 }
 
 static void conv_text(unsigned n, char *dst)
@@ -172,6 +204,10 @@ static void conv_text(unsigned n, char *dst)
     char tag[12];
     unsigned t = (unsigned)sprintf(tag, "m%u ", n);
 
+    if (n > CONV_N) {
+        memcpy(dst, extra_text[n - CONV_N - 1], len);
+        return;
+    }
     for (i = 0; i < len; ++i) {
         dst[i] = (char)(i < t ? tag[i] : (i % 61 == 60) ? '\n' : 'a' + (n + i) % 26);
     }
@@ -180,7 +216,7 @@ static void conv_text(unsigned n, char *dst)
 /* One msg record at out; returns its length. */
 static unsigned conv_record(char *out, unsigned n)
 {
-    unsigned k = (unsigned)sprintf(out, "msg %u %u 10:%02u %u\n", n, n & 1, n % 60, conv_len(n));
+    unsigned k = (unsigned)sprintf(out, "msg %u %u 10:%02u %u\n", n, conv_mine(n), n % 60, conv_len(n));
 
     conv_text(n, out + k);
     k += conv_len(n);
@@ -203,9 +239,9 @@ static void conv_page(char *payload, const char *url, int hist)
     unsigned before, after, k, lo, hi, size = 7 + (hist ? 0 : 7), n, pos;
 
     if (hist) {
-        before = query(url, "before=", v, sizeof v)[0] ? (unsigned)atoi(v) : CONV_N + 1;
+        before = query(url, "before=", v, sizeof v)[0] ? (unsigned)atoi(v) : conv_total + 1;
         k = query(url, "k=", v, sizeof v)[0] ? (unsigned)atoi(v) : 20;
-        hi = before > CONV_N + 1 ? CONV_N : before - 1;
+        hi = before > conv_total + 1 ? conv_total : before - 1;
         lo = hi + 1;
         while (lo > 1 && hi + 1 - lo < k && size + conv_size(lo - 1) <= 1900) {
             size += conv_size(--lo);
@@ -215,10 +251,15 @@ static void conv_page(char *payload, const char *url, int hist)
         after = query(url, "after=", v, sizeof v)[0] ? (unsigned)atoi(v) : 0;
         lo = after + 1;
         hi = after;
-        while (hi < CONV_N && size + conv_size(hi + 1) <= 1900) {
+        /* The model agent answers a sent message one poll later. */
+        if (model_busy && model_polls_left-- <= 0) {
+            conv_append(0, model_pending, model_pending_len);
+            model_busy = 0;
+        }
+        while (hi < conv_total && size + conv_size(hi + 1) <= 1900) {
             size += conv_size(++hi);
         }
-        pos = (unsigned)sprintf(payload, "more %d\nbusy 0\n", hi < CONV_N);
+        pos = (unsigned)sprintf(payload, "more %d\nbusy %d\n", hi < conv_total, model_busy);
     }
     for (n = lo; n <= hi; ++n) {
         pos += conv_record(payload + pos, n);
@@ -305,7 +346,14 @@ static void gateway(void)
     {
         static char page[2100];
 
-        if (!strncmp(target, "/a2/hist?", 9)) {
+        if (!strncmp(target, "/a2/send?a=main", 15) && !strcmp(req_method, "POST")) {
+            unsigned n = conv_append(1, (const char *)req_body, req_blen);
+            conv_record(page, n);
+            /* the answer: "echo: " and the text, after one poll */
+            model_pending_len = (unsigned)sprintf(model_pending, "echo: %.*s", (int)req_blen, (const char *)req_body);
+            model_busy = 1;
+            model_polls_left = 1;
+        } else if (!strncmp(target, "/a2/hist?", 9)) {
             conv_page(page, req_url, 1);
         } else if (!strncmp(target, "/a2/poll?a=main&after=", 22)) {
             conv_page(page, req_url, 0);
@@ -718,6 +766,8 @@ static void gateway_reset(void)
     memcpy(ses_key, k, 16);
     strcpy(ses_base, "http://10.0.0.2:8417");
     ses_open = 0;
+    conv_total = CONV_N;
+    model_busy = 0;
 }
 
 static void test_session(void)
@@ -888,7 +938,7 @@ static int held_intact(void)
     for (i = 0; i < st_count; ++i) {
         unsigned n = st[i].n;
         if (i && n != st[i - 1].n + 1u) return 0;
-        if (st[i].len != conv_len(n) || st[i].mine != (n & 1)) return 0;
+        if (st[i].len != conv_len(n) || st[i].mine != conv_mine(n)) return 0;
         conv_text(n, want);
         st_text(i, 0, st[i].len, got);
         if (memcmp(got, want, st[i].len)) return 0;

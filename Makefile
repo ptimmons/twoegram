@@ -35,7 +35,7 @@ APP = \
 	src/net.c \
 	src/convo.c \
 	src/layout.c \
-	src/demo.c \
+	src/msgs.c \
 	src/link.c \
 	src/setup.c \
 	src/config.c \
@@ -168,7 +168,7 @@ build/host/test_store: tests/host/test_store.c src/store.c tests/host/auxmodel.c
 
 # The conversation screen itself, on test_a2.c's model card and gateway,
 # with a text screen and scripted keys in place of the Apple's.
-HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/demo.c src/link.c src/setup.c \
+HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup.c \
              src/help.c src/status.c src/screen.c
 
 build/host/test_convo: tests/host/test_convo.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host

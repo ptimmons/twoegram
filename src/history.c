@@ -8,14 +8,17 @@
 #include "store.h"
 #include "history.h"
 
-/* This file's code runs from the language card, as layout.c's does: it
- * calls the session, card and store code, none of which calls ProDOS or
- * the ROM. */
-#ifdef __CC65__
-#pragma code-name ("LC")
-#endif
+uint8_t  hist_added;
+uint8_t  hist_busy;
+uint16_t hist_latest;
+uint8_t  hist_unseen;
 
-uint8_t hist_added;
+static void note_latest(void)
+{
+    if (st_count && st_newest && st[st_count - 1].n > hist_latest) {
+        hist_latest = st[st_count - 1].n;
+    }
+}
 
 static char target[80];
 
@@ -95,6 +98,9 @@ uint8_t hist_load(const char *agent)
     /* The newest page: everything up to now, so this end is the newest. */
     st_older = take(0);
     st_newest = 1;
+    hist_latest = st_count ? st[st_count - 1].n : 0;
+    hist_unseen = 0;
+    hist_busy = 0;                  /* the next poll says if it is */
     return 0;
 }
 
@@ -142,5 +148,67 @@ uint8_t hist_newer(const char *agent)
     more = take(0);
     st_newest = (uint8_t)!more;
     st_older = (uint8_t)(st_older | was_older);
+    note_latest();
+    if (st_newest) {
+        hist_unseen = 0;
+    }
+    return 0;
+}
+
+uint8_t hist_send(const char *agent, const char *text, uint8_t n)
+{
+    char *p;
+    uint8_t rc;
+
+    hist_added = 0;
+    p = fmt_str(target, "/a2/send?a=");
+    agent_param(p, agent);
+    rc = ses_call("POST", target, (const uint8_t *)text, n);
+    if (rc) {
+        return rc;
+    }
+    take(0);
+    note_latest();
+    hist_busy = 1;                  /* until a poll says otherwise */
+    return 0;
+}
+
+uint8_t hist_poll(const char *agent)
+{
+    a2_iter_t it;
+    a2_item_t item;
+    char *p;
+    uint8_t rc, more = 0, at_end = (uint8_t)(st_newest && st_count);
+
+    hist_added = 0;
+    p = fmt_str(target, "/a2/poll?a=");
+    p = agent_param(p, agent);
+    fmt_u32(fmt_str(p, "&after="), at_end ? st[st_count - 1].n : hist_latest);
+    rc = ses_call("GET", target, NULL, 0);
+    if (rc) {
+        return rc;
+    }
+    a2_iter(&it, &ses_reply);
+    while (a2_next(&it, &item) == 1) {
+        if (item.kind == A2_ITEM_MSG) {
+            if (at_end) {
+                hist_added = (uint8_t)(hist_added +
+                    st_add(item.n, item.mine, item.time, item.text, item.tlen, 0));
+            } else if (item.n > hist_latest) {
+                ++hist_unseen;
+            }
+            if (item.n > hist_latest) {
+                hist_latest = item.n;
+            }
+        } else if (a2_is(&item, "busy") && item.vlen == 1) {
+            hist_busy = (uint8_t)(item.val[0] == '1');
+        } else if (a2_is(&item, "more") && item.vlen == 1) {
+            more = (uint8_t)(item.val[0] == '1');
+        }
+    }
+    if (at_end && more) {
+        st_newest = 0;              /* more than fitted: fetched as scrolled to */
+        ++hist_unseen;
+    }
     return 0;
 }

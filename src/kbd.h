@@ -1,5 +1,5 @@
 /*
- * Keyboard. The //e has no type-ahead buffer: one latched key at $C000.
+ * Keyboard. The //e latches one key at $C000; kbd.c adds type-ahead.
  */
 #ifndef KBD_H
 #define KBD_H
@@ -21,6 +21,7 @@ extern uint8_t key_sa;
 
 uint8_t key_get(void);      /* wait for a key; 7-bit ASCII */
 uint8_t key_ready(void);    /* nonzero if a key is latched */
-void key_flush(void);       /* forget a key pressed before now */
+void key_flush(void);       /* forget keys pressed before now */
+void key_poll(void);        /* while waiting: keep a latched key for later */
 
 #endif

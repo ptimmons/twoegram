@@ -53,8 +53,27 @@ uint8_t key_get(void)
     key_oa = script_oa ? script_oa[script_i] : 0;
     return script[script_i++];
 }
-uint8_t key_ready(void) { return 0; }
+/* A script byte of IDLE means "no key for a while": key_ready() says no
+ * for that many calls, and the screen's polling loop runs meanwhile. */
+#define IDLE        0xFF
+#define IDLE_CALLS  400
+static unsigned idle_left;
+
+uint8_t key_ready(void)
+{
+    if (idle_left) {
+        --idle_left;
+        return 0;
+    }
+    if (script_i < script_n && script[script_i] == IDLE) {
+        ++script_i;
+        idle_left = IDLE_CALLS;
+        return 0;
+    }
+    return 1;
+}
 void key_flush(void) {}
+void key_poll(void) {}
 
 uint16_t ticks;
 void tick_reset(void) { ticks = 0; }
@@ -213,10 +232,92 @@ static void test_screen(void)
     CHECK(on_screen("m100 ") && on_screen("AGENTS"));
 }
 
+/* Type text into the script; returns the count. */
+static unsigned type(uint8_t *keys, const char *text)
+{
+    unsigned n = 0;
+    while (*text) keys[n++] = (uint8_t)*text++;
+    return n;
+}
+
+static void test_send_poll(void)
+{
+    static uint8_t keys[200], oa[200];
+    unsigned n, r, polls_before;
+    char rows[SCR_ROWS][SCR_COLS + 1];
+
+    memset(oa, 0, sizeof oa);
+    /* At the newest (where test_screen left it). */
+    keys[0] = '>'; oa[0] = 1;
+    run(keys, oa, 1);
+    memset(oa, 0, sizeof oa);
+
+    /* Typed and sent: it joins the conversation at the foot, the compose
+     * line empties, and the heading says the agent is thinking. */
+    n = type(keys, "Hello from the test");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    CHECK(on_screen("Hello from the test"));
+    CHECK(on_screen("thinking..."));
+    CHECK(strstr(screen[BOTTOM + 2], "> ") && !strstr(screen[BOTTOM + 2], "Hello"));
+    CHECK(conv_total == CONV_N + 1 && extra_mine[0] == 1);
+    CHECK(!strncmp(extra_text[0], "Hello from the test", 19));
+
+    /* Left alone, it polls; the answer arrives and thinking ends. */
+    polls_before = (unsigned)hashes;
+    keys[0] = IDLE; keys[1] = IDLE;
+    run(keys, oa, 2);
+    CHECK((unsigned)hashes > polls_before);
+    CHECK(on_screen("echo: Hello from the test"));
+    CHECK(!on_screen("thinking..."));
+
+    /* Scrolled back, a message arrives: the screen stays still and the
+     * heading says there is something new below. */
+    for (n = 0; n < 6; ++n) keys[n] = K_UP;
+    run(keys, oa, 6);
+    memcpy(rows, screen, sizeof screen);
+    conv_append(0, "unprompted news", 15);
+    keys[0] = IDLE;
+    run(keys, oa, 1);
+    for (r = TOP; r <= BOTTOM; ++r) {
+        CHECK(!strcmp(screen[r] + 21, rows[r] + 21));
+    }
+    CHECK(on_screen("new below"));
+    CHECK(!on_screen("unprompted news"));
+    for (n = 0; n < 30; ++n) keys[n] = K_DOWN;
+    run(keys, oa, 30);
+    CHECK(on_screen("unprompted news"));
+    CHECK(!on_screen("new below"));
+
+    /* Sending from far back goes to the newest end first. */
+    keys[0] = '<'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(!on_screen("unprompted news"));
+    n = type(keys, "Second one");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    CHECK(on_screen("Second one") && on_screen("unprompted news"));
+    keys[0] = IDLE; keys[1] = IDLE;
+    run(keys, oa, 2);
+    CHECK(on_screen("echo: Second one"));
+
+    /* A long message fills three compose rows and keeps its end in view. */
+    for (n = 0; n < 200; ++n) keys[n] = (uint8_t)('a' + n % 26);
+    run(keys, oa, n);
+    CHECK(strstr(screen[SCR_ROWS - 2], "ijklmnopqr") != NULL);   /* the end typed */
+    CHECK(screen[SCR_ROWS - 5][30] == '_');      /* the rule three rows up */
+    keys[0] = K_RETURN;
+    run(keys, oa, 1);
+    CHECK(extra_len[conv_total - CONV_N - 1] == 200 && extra_mine[conv_total - CONV_N - 1]);
+    CHECK(screen[SCR_ROWS - 3][30] == '_');      /* and back to one row */
+}
+
 int main(void)
 {
     cogs_slot = 4;
     test_screen();
+    test_send_poll();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

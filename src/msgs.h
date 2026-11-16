@@ -1,10 +1,9 @@
 /*
  * The agents and their conversations, as the screen sees them.
  *
- * Milestone 0 serves made-up text from main memory (demo.c). From
- * milestone 3 the agent list comes from the gateway, and from milestone 4
- * the messages live in aux memory; the screen code does not change, since
- * it reaches the text only through these calls.
+ * Served by msgs.c from the gateway's agents (session.c) and the messages
+ * held in aux memory (store.c). The screen reaches the text only through
+ * these calls.
  */
 #ifndef MSGS_H
 #define MSGS_H
@@ -15,8 +14,7 @@
 #define MSG_TEXT_MAX    1500        /* one part of a reply */
 
 /* Where the agents come from. */
-#define MSGS_DEMO   0               /* milestone 0's made-up text (no card) */
-#define MSGS_LIVE   1               /* the gateway's agents; messages from milestone 4 */
+#define MSGS_LIVE   1               /* the gateway's agents and their messages */
 #define MSGS_NONE   2               /* no session: no agents */
 void        msgs_mode(uint8_t m);
 extern uint8_t msgs_now;
@@ -39,9 +37,5 @@ void        msg_copy(uint16_t i, uint16_t off, uint8_t len, char *dst);
 /* The whole text of message i, for laying it out: a pointer that is good
  * until the next msg_ call, and its length. */
 const char *msg_text(uint16_t i, uint16_t *n);
-
-/* Add a message to the current conversation. Returns 0 if there was no
- * room. */
-uint8_t     msg_add(uint8_t mine, const char *meta, const char *text, uint16_t n);
 
 #endif

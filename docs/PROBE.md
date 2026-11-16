@@ -1,5 +1,39 @@
 # Testing on the card
 
+## Milestone 5: sending and replies
+
+The dev server's echo agent answers every message after 0.8 s, and a
+message containing the word "long" gets a long answer in several parts.
+Start the server as for milestone 4 (`--seed 100` is optional now):
+
+```bash
+npm run dev -- --host 0.0.0.0 --seed 100
+```
+
+1. Boot the newest `TWOEGRAM-bNNN.po`.
+2. Type a message and press Return. It appears at the right, the compose
+   line empties, and the heading says `thinking...`. Within a second or
+   two the answer appears at the left, and `thinking...` goes.
+3. Send one with "long" in it: the answer arrives as several messages
+   (parts of at most 1,500 characters), with a code block at the end.
+4. **Type-ahead:** start typing the next message straight after pressing
+   Return, while it is sending; no key should be lost.
+5. **New messages while scrolled back:** scroll up a little, then use the
+   Mac to send a message as the Apple (the test key is in `probe.cfg`):
+
+   ```bash
+   A2_KEY=$(sed -n 's/^KEY=//p' probe.cfg) python3 tools/a2client.py --url http://127.0.0.1:8417 send main "Hello from the Mac"
+   ```
+
+   Within five seconds the heading should say `new below` without the
+   screen moving; scrolling down shows the message and the echo's answer.
+6. **Sending from far back:** Open-Apple-< to the oldest held, then send:
+   it should jump to the newest end and add the message there.
+
+Worth a photo: a sent message with its answer, a long answer's parts,
+and `new below`. Worth noticing: any lost keystroke, and how long an
+answer takes to appear.
+
 ## Milestone 4: messages and scrolling
 
 The dev server can start every conversation with made-up history, so

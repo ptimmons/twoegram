@@ -1,10 +1,10 @@
 #!/bin/bash
-# shots.sh <image.po> <dir> -- capture the screen in each of its states.
+# shots.sh <image.po> <dir> -- capture the screens Virtual ][ can show.
 #
-# Boots the disk in Virtual ][ and walks through milestone 0's made-up
-# conversations, saving a PNG at each step: splash, the two panes, the
-# agent list with the focus, a code block, the list hidden, a message
-# typed and sent, and help.
+# Virtual ][ has no CoGS card, so it shows what Twoegram shows without
+# one: the splash, the conversation screen saying there is no card, help,
+# and the set-up screen. The conversation itself is tested on the Mac
+# (tests/host/test_convo.c) and photographed on the real card.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,30 +26,14 @@ snap splash
 
 "$V" text " " >/dev/null
 "$V" await "AGENTS" 10
-snap chat
+snap no-card
 
-# The list, with the focus on it, the bar on coder.
-"$V" tab >/dev/null
-"$V" key "down arrow" >/dev/null
-snap list-focus
-
-"$V" ret >/dev/null
-"$V" await "Want a version" 10
-snap code
-
-"$V" oa b >/dev/null
-"$V" await "new elsewhere" 10
-snap list-hidden
-
-"$V" text "And one that clears a range of pages, with the first page and the count in A and X?" >/dev/null
-sleep 3
-snap compose
-"$V" ret >/dev/null
-"$V" await "nothing was sent" 10
-snap sent
-
-"$V" oa b >/dev/null
 "$V" oa "?" >/dev/null
 "$V" await "KEYBOARD COMMANDS" 10
 snap help
 "$V" text " " >/dev/null
+
+"$V" oa k >/dev/null
+"$V" await "Twoegram set-up" 10
+snap setup
+"$V" key esc >/dev/null

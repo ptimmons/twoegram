@@ -258,7 +258,7 @@ gateway's address and port.
 | 2 | `A2PROBE.SYSTEM` on the real card, against the stand-alone server on the LAN: `HTTP` with headers and a body, the reply from `DATA` events, keep-alive reuse, HMAC timing, `PREFS` round trip, then a ProDOS read | host tests ✅, Virtual ][ no-card paths ✅, **real card ✅** (b001 and b002, all checks; [docs/PROBE.md](docs/PROBE.md)) |
 | 3 ✅ | `hmac.c`, `auth.c`, key entry, handshake | host tests ✅, Virtual ][ ✅, **real card ✅** (b005: set-up, sign-in) |
 | 4 ✅ | Conversation view, store, scrolling, history | host tests ✅ (the screen too), Virtual ][ ✅, **real card ✅** (b007) |
-| 5 | Compose, send, type-ahead, polling, replies arriving in parts | Virtual ][, real card with the echo agent |
+| 5 ✅ | Compose, send, type-ahead, polling, replies arriving in parts | host tests ✅ (the screen too), Virtual ][ ✅, real card ✅ (b008) |
 | 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | **your gateway**, Python client, then the real card |
 | 7 | Agent list, unread marks, lock and passphrase, error states | real card |
 | 8 | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | real card, your gateway |
@@ -672,3 +672,42 @@ All checks passed again, against the same server (`569147e+`).
   opening it. Fetches took "a few seconds at most".
 - Two requests came out of it, now section 9: one key to the very
   beginning and end, and saving the conversation to disk.
+
+### Milestone 5 notes
+
+- **Memory first.** Milestone 0's made-up conversations went
+  (`demo.c`: 1.2K of text, 1K of code and a 2K pool), replaced by
+  `msgs.c`, which serves only the gateway's agents and the store. With no
+  card the screen now says so ("No CoGS card was found in any slot") and
+  offers Open-Apple-K. The text buffer moved into the freed LOWBSS. The
+  history code grew past the language card and went back to main
+  memory. Now: 34.4K, 3.2K of heap, 1.2K of the language card free.
+- **Sending** (`hist_send`): Return posts the compose text; the message
+  as the gateway stored it comes back and joins the conversation at its
+  newest end (loading the newest page first if scrolled far back). On a
+  failure the text stays in the compose area to send again.
+- **Polling** (`hist_poll`, `convo.c`'s `wait_key`): while no key is
+  pressed, a poll every 5 s, or every second while the agent is
+  answering. New messages are added when the window holds the newest;
+  at the foot the screen follows them; scrolled back, the screen stays
+  exactly still and the heading says `new below` until the foot is
+  reached. `busy` from the gateway shows as `thinking...`. Short polls,
+  not long ones: the keyboard is never left for more than a round trip.
+- **Type-ahead** (`kbd.c`): the //e latches only one key, so while a
+  request waits on the card, its idle hook moves keys into a 32-key ring
+  that `key_get()` drains first.
+- **The model gateway** (host tests) accepts sends and answers each one
+  poll later, `echo:` and the text, with `busy 1` meanwhile; a test hook
+  adds messages as if the agent spoke unprompted.
+- **Tests:** the screen test adds sending (the message at the foot, the
+  compose line emptied, `thinking...`), the answer arriving by polling
+  and `thinking...` ending, a message arriving while scrolled back (the
+  pane identical, `new below`, then found by scrolling down), sending from
+  the oldest held, and a 200-character message on three compose rows.
+  It caught one bug: a message added below the screen while scrolled back
+  was not announced.
+- **Screenshots:** `make shots` now captures what the emulator can show
+  (splash, the no-card screen, help, set-up); the milestone 0 pictures of
+  made-up conversations are retired.
+- **Not testable off the card:** type-ahead (the host test stubs the
+  keyboard) and the timing of polls.
