@@ -39,7 +39,6 @@ static const char *const help_text[] = {
     "",
     "The key comes from pairing this Apple on the gateway:",
     "      openclaw a2 pair",
-    "(until the channel is in OpenClaw: npm run pair, in its plugin folder).",
     "Type it as shown; dashes are optional. A slip is caught before",
     "anything is sent.",
     "",

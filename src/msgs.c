@@ -11,6 +11,7 @@
 #include "msgs.h"
 #include "session.h"
 #include "store.h"
+#include "history.h"
 
 uint8_t msgs_now = MSGS_NONE;
 
@@ -42,13 +43,14 @@ const char *agent_name(uint8_t a)
 
 uint8_t agent_unread(uint8_t a)
 {
-    (void)a;
-    return 0;
+    return msgs_now == MSGS_LIVE && a < SES_AGENTS_MAX ? hist_unread[a] : 0;
 }
 
 void msg_select(uint8_t a)
 {
-    (void)a;
+    if (a < SES_AGENTS_MAX) {
+        hist_unread[a] = 0;         /* about to be read */
+    }
     st_reset();
 }
 

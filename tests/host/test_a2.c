@@ -162,30 +162,42 @@ static const char *header(const char *name, char *out, unsigned cap)
 #define CONV_N      100
 #define EXTRA_MAX   40
 
+/* A demo conversation in place of the made-up one, for the manual's
+ * pictures (tests/host/shots.c): message texts, yours marked by a
+ * leading '>', with times. */
+typedef struct { const char *time; const char *text; } demo_msg_t;
+static const demo_msg_t *conv_demo;
+static unsigned conv_base = CONV_N;         /* messages before any added */
+static const char *gw_agents = "agent main\nagent coder\n";
+static const char *model_answer;            /* else "echo: " and the text */
+
 static unsigned conv_total = CONV_N;
 static char     extra_text[EXTRA_MAX][300];
 static unsigned extra_len[EXTRA_MAX];
 static unsigned extra_mine[EXTRA_MAX];
 static int      model_busy;                 /* the model agent is "thinking" */
+static unsigned gw_unread_coder;            /* reported on main's polls */
 static int      model_polls_left;           /* polls before it answers */
 static char     model_pending[300];
 static unsigned model_pending_len;
 
 static unsigned conv_len(unsigned n)
 {
-    if (n > CONV_N) return extra_len[n - CONV_N - 1];
+    if (n > conv_base) return extra_len[n - conv_base - 1];
+    if (conv_demo) return (unsigned)strlen(conv_demo[n - 1].text + (conv_demo[n - 1].text[0] == '>'));
     return n % 7 == 0 ? 1500 : 5 + (n * 13) % 200;
 }
 
 static unsigned conv_mine(unsigned n)
 {
-    return n > CONV_N ? extra_mine[n - CONV_N - 1] : (n & 1);
+    if (n > conv_base) return extra_mine[n - conv_base - 1];
+    return conv_demo ? conv_demo[n - 1].text[0] == '>' : (n & 1);
 }
 
 /* Add a message to the conversation; returns its number. */
 static unsigned conv_append(unsigned mine, const char *text, unsigned len)
 {
-    unsigned i = conv_total - CONV_N;
+    unsigned i = conv_total - conv_base;
 
     if (i >= EXTRA_MAX || len >= sizeof extra_text[0]) {
         printf("model: conversation full\n");
@@ -204,8 +216,12 @@ static void conv_text(unsigned n, char *dst)
     char tag[12];
     unsigned t = (unsigned)sprintf(tag, "m%u ", n);
 
-    if (n > CONV_N) {
-        memcpy(dst, extra_text[n - CONV_N - 1], len);
+    if (n > conv_base) {
+        memcpy(dst, extra_text[n - conv_base - 1], len);
+        return;
+    }
+    if (conv_demo) {
+        memcpy(dst, conv_demo[n - 1].text + (conv_demo[n - 1].text[0] == '>'), len);
         return;
     }
     for (i = 0; i < len; ++i) {
@@ -216,7 +232,13 @@ static void conv_text(unsigned n, char *dst)
 /* One msg record at out; returns its length. */
 static unsigned conv_record(char *out, unsigned n)
 {
-    unsigned k = (unsigned)sprintf(out, "msg %u %u 10:%02u %u\n", n, conv_mine(n), n % 60, conv_len(n));
+    unsigned k;
+
+    if (conv_demo && n <= conv_base) {
+        k = (unsigned)sprintf(out, "msg %u %u %s %u\n", n, conv_mine(n), conv_demo[n - 1].time, conv_len(n));
+    } else {
+        k = (unsigned)sprintf(out, "msg %u %u 10:%02u %u\n", n, conv_mine(n), n % 60, conv_len(n));
+    }
 
     conv_text(n, out + k);
     k += conv_len(n);
@@ -255,11 +277,15 @@ static void conv_page(char *payload, const char *url, int hist)
         if (model_busy && model_polls_left-- <= 0) {
             conv_append(0, model_pending, model_pending_len);
             model_busy = 0;
+    gw_unread_coder = 0;
         }
         while (hi < conv_total && size + conv_size(hi + 1) <= 1900) {
             size += conv_size(++hi);
         }
         pos = (unsigned)sprintf(payload, "more %d\nbusy %d\n", hi < conv_total, model_busy);
+        if (gw_unread_coder) {
+            pos += (unsigned)sprintf(payload + pos, "unread coder %u\n", gw_unread_coder);
+        }
     }
     for (n = lo; n <= hi; ++n) {
         pos += conv_record(payload + pos, n);
@@ -307,7 +333,7 @@ static void gateway(void)
         hmac_c(gw_key, 16, msg, 39, gw_sk);
         gw_last_seq = 0;
         hexs(want, sn, 16);
-        sprintf(payload, "sid %s\nsn %s\nver 1\ntime 0\nagent main\nagent coder\nserver model 1\n", gw_sid, want);
+        sprintf(payload, "sid %s\nsn %s\nver 1\ntime 0\n%sserver model 1\n", gw_sid, want, gw_agents);
         gw_reply(0, gw_sk, 0, 1, payload);
         return;
     }
@@ -350,7 +376,11 @@ static void gateway(void)
             unsigned n = conv_append(1, (const char *)req_body, req_blen);
             conv_record(page, n);
             /* the answer: "echo: " and the text, after one poll */
-            model_pending_len = (unsigned)sprintf(model_pending, "echo: %.*s", (int)req_blen, (const char *)req_body);
+            if (model_answer) {
+                model_pending_len = (unsigned)sprintf(model_pending, "%s", model_answer);
+            } else {
+                model_pending_len = (unsigned)sprintf(model_pending, "echo: %.*s", (int)req_blen, (const char *)req_body);
+            }
             model_busy = 1;
             model_polls_left = 1;
         } else if (!strncmp(target, "/a2/hist?", 9)) {
@@ -358,6 +388,10 @@ static void gateway(void)
         } else if (!strncmp(target, "/a2/poll?a=main&after=", 22)) {
             conv_page(page, req_url, 0);
         } else {
+            /* the coder agent: nothing in it, and polling it reads it */
+            if (!strncmp(target, "/a2/poll?a=coder", 16)) {
+                gw_unread_coder = 0;
+            }
             strcpy(page, "more 0\nbusy 0\n");
         }
         gw_reply(0, gw_sk, seq, 0, page);
@@ -766,7 +800,7 @@ static void gateway_reset(void)
     memcpy(ses_key, k, 16);
     strcpy(ses_base, "http://10.0.0.2:8417");
     ses_open = 0;
-    conv_total = CONV_N;
+    conv_total = conv_base;
     model_busy = 0;
 }
 

@@ -160,6 +160,17 @@ static void relayout_from_start(void)
 
 /* ---- drawing ---- */
 
+/* Whether the open conversation has messages below what is on the screen
+ * that have not been seen: the diamond beside its name. Reaching the
+ * newest end clears it. */
+static uint8_t cur_news(void)
+{
+    if (news_below && !scroll && win_end < 0) {
+        news_below = 0;
+    }
+    return (uint8_t)(msgs_now == MSGS_LIVE && (hist_unseen || news_below));
+}
+
 /* Start a body row: clear it, and draw the list's cell and the divider. */
 static void row_begin(uint8_t row)
 {
@@ -180,47 +191,46 @@ static void row_begin(uint8_t row)
     }
     if (a == cur) {
         linebuf[0] = sc_char('>', bar);
-    } else if (agent_unread(a)) {
-        linebuf[0] = has_mousetext ? MT_DIAMOND : sc_char('*', bar);
     }
     n = txt_len(agent_name(a));
-    lb_textn(1, agent_name(a), n > NAME_MAX ? NAME_MAX : n, bar);
+    if (n > NAME_MAX) {
+        n = NAME_MAX;
+    }
+    lb_textn(1, agent_name(a), n, bar);
+    /* The diamond: something new, below the screen here, or elsewhere. */
+    if (a == cur ? cur_news() : agent_unread(a)) {
+        linebuf[2 + n] = sc_char(GL_DIAMOND, bar);
+    }
     if ((n = agent_unread(a)) != 0 && a != cur) {
         fmt_u32(num, n);
         lb_text((uint8_t)(LIST_W - 1 - txt_len(num)), num, bar);
     }
 }
 
-/* What the heading says at the right of the pane. */
+/* What the heading says at the right of the pane, before the arrow. */
 static const char *head_note(void)
 {
     static char note[24];
     uint8_t a, u = 0;
 
     if (!list_on) {
+        /* No list to put the diamonds in: the heading counts them. */
         for (a = 0; a < agent_count(); ++a) {
             if (a != cur) {
                 u = (uint8_t)(u + agent_unread(a));
             }
         }
         if (u) {
-            fmt_str(fmt_u32(note, u), " new elsewhere");
+            note[0] = GL_DIAMOND;
+            note[1] = ' ';
+            fmt_str(fmt_u32(note + 2, u), " new elsewhere");
             return note;
         }
     }
     if (msgs_now == MSGS_LIVE && hist_busy) {
         return "thinking...";
     }
-    if (news_below && !scroll && win_end < 0) {
-        news_below = 0;             /* seen: the screen reached them */
-    }
-    if (msgs_now == MSGS_LIVE && (hist_unseen || news_below)) {
-        return "new below";
-    }
-    if (scroll || win_end >= 0) {
-        return "scrolled back";
-    }
-    if (lay_dropped) {
+    if (lay_dropped && !scroll && win_end < 0) {
         return "older not shown";
     }
     return "";
@@ -229,13 +239,22 @@ static const char *head_note(void)
 static void draw_head(void)
 {
     const char *note = head_note();
+    uint8_t x, right = SCR_COLS - 2;        /* the text area's last column */
 
     lb_clear(SC_SPACE);
     if (list_on) {
         lb_text(1, "AGENTS", 0);
     }
-    lb_text(text_x(), cur_name(), 0);
-    lb_text((uint8_t)(SCR_COLS - 1 - txt_len(note)), note, 0);
+    x = lb_text(text_x(), cur_name(), 0);
+    if (cur_news()) {
+        linebuf[x + 1] = sc_char(GL_DIAMOND, 0);
+    }
+    /* Scrolled back: a down arrow, there is more below. */
+    if (scroll || win_end >= 0) {
+        linebuf[right] = sc_char(GL_DOWN, 0);
+        right -= 2;
+    }
+    lb_text((uint8_t)(right + 1 - txt_len(note)), note, 0);
     scr_blit(HEAD_ROW);
 
     lb_clear(SC_SPACE);
@@ -617,6 +636,9 @@ static void poll_now(void)
     int16_t ofs = 0, k, top_line;
     uint8_t rc, at_bottom = (uint8_t)(!scroll && win_end < 0);
     uint8_t was_busy = hist_busy, was_unseen = hist_unseen;
+    uint8_t was_unread[SES_AGENTS_MAX];
+
+    memcpy(was_unread, hist_unread, sizeof was_unread);
 
     if (lay_count && !at_bottom) {
         /* where the screen's top row is, to put it back there */
@@ -646,8 +668,12 @@ static void poll_now(void)
             news_below = 1;
         }
         draw_msgs();
+    } else if (list_on && (was_unseen != hist_unseen ||
+                           memcmp(was_unread, hist_unread, sizeof was_unread))) {
+        draw_msgs();                /* the list's diamonds */
     }
-    if (hist_added || was_busy != hist_busy || was_unseen != hist_unseen) {
+    if (hist_added || was_busy != hist_busy || was_unseen != hist_unseen ||
+        (!list_on && memcmp(was_unread, hist_unread, sizeof was_unread))) {
         draw_head();
     }
 }

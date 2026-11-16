@@ -9,6 +9,7 @@
 #define HISTORY_H
 
 #include "port.h"
+#include "session.h"
 
 #define HIST_PAGE   20              /* messages asked for at a time */
 
@@ -16,6 +17,9 @@ extern uint8_t  hist_added;
 extern uint8_t  hist_busy;          /* the agent is working on an answer */
 extern uint16_t hist_latest;        /* the newest message number known */
 extern uint8_t  hist_unseen;        /* newer messages than the window holds */
+/* Each other agent's messages not yet fetched, by its index in
+ * ses_agents: from the gateway's unread lines, every poll. */
+extern uint8_t  hist_unread[SES_AGENTS_MAX];
 
 uint8_t hist_load(const char *agent);
 uint8_t hist_older(const char *agent);

@@ -8,15 +8,16 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** plan only. Nothing is built.
+**Status:** milestones 0 to 5 built and passed on the real card; milestone 6 (the plugin inside OpenClaw) built and run in a scratch gateway, waiting for yours.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
 9.10, 10 and Appendix A; `~/repos/a2chat/a2chat/docs/COGS.md`; and the
 OpenClaw documentation at docs.openclaw.ai on 2026-11-15 (channel
 plugins, gateway routes, pairing, access control, network exposure).
-OpenClaw is not installed on this Mac, so nothing here has been tried
-against a gateway.
+At milestone 6 the plugin was written against the SDK declarations and
+docs in the OpenClaw 2026.11.3 package and run in a scratch gateway on
+the Mac.
 
 ## 1. Target
 
@@ -130,11 +131,11 @@ OpenClaw version it was tested on.
 
 | Piece | How |
 |---|---|
-| Routes | its own LAN listener, or `api.registerHttpRoute({ path: "/a2", match: "prefix", auth: "plugin", ... })` behind a proxy (section 2). With `auth: "plugin"` the plugin does its own checks and receives no operator scopes. |
-| Inbound | a verified message goes to the agent through the SDK's direct-message path (`dispatchInboundDirectDm`) |
-| Outbound | `sendText` puts the reply in that device's queue; the Apple collects it on its next poll. Block replies are queued as they come, so a long answer appears in parts. |
+| Routes | its own LAN listener, started by the channel's `gateway.startAccount` and closed when the account stops (built at milestone 6; no route on the gateway, which stays on loopback) |
+| Inbound | a verified message goes to the agent through the SDK's direct-message path (`dispatchInboundDirectDm`); its `deliver` callback brings the reply back |
+| Outbound | replies arrive through `deliver` and join the device's conversation for its next poll; a message the agent starts goes through `sendText` to `a2:<device>.<agent>` |
 | Who may talk | the device list is the allowlist; `dmPolicy` is `allowlist`, never `open` |
-| Sessions | each device is one sender; `session.dmScope: "per-channel-peer"` keeps its conversation out of the shared main session |
+| Sessions | each device and agent pair is one peer, `<device>.<agent>`, routed by a binding the plugin adds per message, carrying `dmScope: "per-channel-peer"`: never the shared main session |
 | Text | Markdown to plain text, Unicode folded to ASCII, emoji to names, code blocks kept line for line, replies cut into parts of at most 1,500 bytes |
 | CLI | `openclaw a2 pair`, `list`, `revoke` |
 
@@ -259,7 +260,7 @@ gateway's address and port.
 | 3 ✅ | `hmac.c`, `auth.c`, key entry, handshake | host tests ✅, Virtual ][ ✅, **real card ✅** (b005: set-up, sign-in) |
 | 4 ✅ | Conversation view, store, scrolling, history | host tests ✅ (the screen too), Virtual ][ ✅, **real card ✅** (b007) |
 | 5 ✅ | Compose, send, type-ahead, polling, replies arriving in parts | host tests ✅ (the screen too), Virtual ][ ✅, real card ✅ (b008) |
-| 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | **your gateway**, Python client, then the real card |
+| 6 | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | Vitest ✅, scratch OpenClaw 2026.11.3 on the Mac ✅ (no model), **your gateway: waiting**, then the real card |
 | 7 | Agent list, unread marks, lock and passphrase, error states | real card |
 | 8 | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | real card, your gateway |
 | later | Encryption, by one of the two routes in section 2 | |
@@ -283,6 +284,25 @@ otherwise interrupt:
    who said what and when, never during a request (the network-disk
    rule), retried on $27. Main memory is the obstacle (milestone 4
    notes), so it likely belongs in an overlay loaded from disk.
+3. **Marks instead of words** (2026-11-15, after milestone 6), done in
+   build b010: a MouseText down arrow at the heading's right replaces
+   "scrolled back"; a diamond beside the agent's name, in the heading and
+   the list, replaces "new below" and clears at the newest end; other
+   agents' diamonds and counts come from the `unread` lines every poll
+   already carried (only the open agent is polled); thumbs-up and check
+   marks arrive as byte `$02` and are drawn as MouseText's check mark.
+   Glyph bytes 1-4 (screen.h) carry MouseText through strings and
+   message text, with plain stand-ins on a //e without it. Not yet seen
+   on the card: the check mark ($44) and down arrow ($4A) codes are from
+   the MouseText table, not probed like the others.
+4. **A user's guide in the style of a 1980s Apple manual, with
+   screenshots** (same day), as Newsiie's: [docs/MANUAL.md](docs/MANUAL.md).
+   The emulator has no card, so the conversation figures are drawn by
+   the real screen code on the Mac (`make convo-shots`:
+   tests/host/shots.c, a demo conversation on the model gateway) with
+   the glyphs Virtual ][ draws (tools/charset/charset.png, captured from
+   CHARSET.SYSTEM by `make charset`), pixel for pixel like its own
+   screenshots (`make shots`).
 
 ## 10. Risks to settle at milestone 2
 
@@ -711,3 +731,53 @@ All checks passed again, against the same server (`569147e+`).
   made-up conversations are retired.
 - **Not testable off the card:** type-ahead (the host test stubs the
   keyboard) and the timing of polls.
+
+### Milestone 6 notes
+
+- **Read from the real thing.** The OpenClaw 2026.11.3 npm package ships
+  its docs and the SDK's type declarations; the plugin was written against
+  those, type-checks against them (`npm run typecheck:openclaw`, after
+  `npm run sdk` puts the SDK in `../.sdk`, outside the plugin), and was
+  run inside a scratch gateway on the Mac (isolated home, loopback, Node
+  24 from nodejs.org in the scratch folder: OpenClaw refuses Node 25 for
+  some commands).
+- **Shape:** `index.ts` (`defineChannelPluginEntry`, the CLI),
+  `setup-entry.ts`, `openclaw.plugin.json` (channel `a2`, its config
+  schema), `src/channel.ts` (the only file importing the SDK),
+  `src/openclaw-agent.ts` (the bridge, SDK-free so it can be tested with a
+  fake dispatcher), `src/commands.ts` (`openclaw a2 pair | list |
+  revoke`), `src/convstore.ts`.
+- **Choosing the agent.** OpenClaw picks an agent by bindings, so each
+  message's config gets one more binding, first, sending peer
+  `<device>.<agent>` to that agent with `dmScope: "per-channel-peer"`.
+  Seen working: `agent:main:a2:direct:d13361f8.main` and
+  `agent:coder:a2:direct:d13361f8.coder`. Agents are listed by the SDK's
+  own `listAgentIds` (2026.11 keeps them in `agents.entries`; `agents.list`
+  is the legacy form), read from the live config, so agents added later
+  appear without a restart.
+- **Devices.** The device file re-reads itself when another process
+  changes it, so `openclaw a2 pair` and `revoke` work while the gateway
+  runs. A revoked device's sessions end at its next request, the SDK's
+  `assertAuthority` check stops a turn already under way, and its saved
+  conversations are deleted.
+- **Conversations survive restarts:** one JSON file per device and agent
+  under `~/.openclaw/a2/conversations/`, mode 0600.
+- **Errors reach the Apple.** If the gateway cannot answer (in the
+  scratch gateway: no model), its notice arrives as the agent's reply.
+- **Install findings:** the install scan refuses a `node_modules` symlink
+  that leaves the plugin, so the SDK used for type-checking lives outside
+  it; the manifest category is `channels`; installing needs `--force`
+  (not from ClawHub) and `--accept-capabilities`.
+- **Folding:** emoji without a name now become `*`, since OpenClaw's
+  `/status` uses them as line markers; other unknown characters are
+  still `?`.
+- **Tests:** 61 in Vitest (43 before): the bridge with a fake dispatcher
+  (routing, ids, failures, revocation mid-turn), revocation by another
+  process, pairing without a restart, history across a restart, messages
+  the agent starts. In the scratch gateway: install, start-up, the CLI,
+  sign-in, sends to two agents, replies, `/status`, revoking while
+  running, history after a restart, and `openclaw security audit` (no
+  finding against `a2` once a device is paired).
+- **Not yet seen:** a real model's answer, and replies arriving in
+  several parts from a long answer; both need your gateway.
+  [docs/INSTALL.md](docs/INSTALL.md) has the steps.

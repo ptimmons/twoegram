@@ -13,11 +13,46 @@
     "pair": "node src/cli.ts pair",
     "devices": "node src/cli.ts list",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sdk": "npm install --prefix ../.sdk --ignore-scripts --no-audit --no-fund --no-save openclaw@2026.11.3",
+    "typecheck:openclaw": "tsc --noEmit -p tsconfig.openclaw.json"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.12"
-  }
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.11.3 <2026.12.0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "setupEntry": "./setup-entry.ts",
+    "channel": {
+      "id": "a2",
+      "label": "Apple //e (Twoegram)",
+      "blurb": "Chat with your agents from an Apple //e running Twoegram."
+    },
+    "compat": {
+      "pluginApi": ">=2026.11.3",
+      "minGatewayVersion": "2026.11.3"
+    },
+    "build": {
+      "openclawVersion": "2026.11.3",
+      "pluginSdkVersion": "2026.11.3"
+    }
+  },
+  "files": [
+    "index.ts",
+    "setup-entry.ts",
+    "openclaw.plugin.json",
+    "src/"
+  ]
 }

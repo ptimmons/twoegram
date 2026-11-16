@@ -141,7 +141,7 @@ Each line is a word, a space, and its value, ended by `\n`:
 then `\n`. *n* numbers the messages of one device's conversation with
 one agent, from 1, rising. *mine* is 1 for the Apple's own, 0 for the
 agent's. The time is the gateway's local time. The text is printable
-ASCII and `\n`, at most 1,500 bytes: the plugin folds Unicode and
+ASCII, `\n`, and the glyph byte `$02` (section 5), at most 1,500 bytes: the plugin folds Unicode and
 Markdown to that (section 5) and cuts a longer answer into parts, each
 its own message. Every message fits a reply, so a reply always carries
 at least one when one is waiting.
@@ -152,8 +152,14 @@ The plugin turns the agent's text into what the //e can draw: Markdown
 emphasis, headings and links to plain text (`[text](url)` becomes
 `text (url)`), code blocks kept line for line without their fences,
 curly quotes, dashes, ellipses and accented letters to their ASCII
-neighbours, common emoji to a word in colons (`:thumbs-up:`), anything
-else to `?`, tabs to spaces, and CR LF to LF.
+neighbours, thumbs-up and check marks to the byte `$02`, other common
+emoji to a word in colons (`:thumbs-down:`), other emoji to `*` (they
+are mostly line markers), anything else to `?`, tabs to spaces, and CR
+LF to LF.
+
+`$02` is the one glyph byte: the Apple draws it as MouseText's check
+mark (a `+` on a //e without MouseText). Only the gateway sends it; text
+from the Apple is printable ASCII and `\n` only.
 
 ## 6. Limits and lockouts
 

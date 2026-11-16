@@ -4,3 +4,5 @@ tools/ac
 tools/ac-mac-*
 .DS_Store
 probe.cfg
+.sdk/
+*.o

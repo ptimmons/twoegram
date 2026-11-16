@@ -2,13 +2,14 @@
 // will: verify every reply before believing it.
 
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, statSync } from "node:fs";
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EchoAgent, type AgentPort, type ReplySink } from "../src/agent.ts";
+import { FileConvStore } from "../src/convstore.ts";
 import { DeviceStore } from "../src/devices.ts";
 import {
   Code,
@@ -94,11 +95,14 @@ function pair(): Buffer {
   return parseKey(store.pair("test").written)!;
 }
 
-async function start(agents: AgentPort = new EchoAgent(["main", "coder"], 20)) {
-  const dir = mkdtempSync(join(tmpdir(), "a2-"));
+let dir: string;
+
+async function start(agents: AgentPort = new EchoAgent(["main", "coder"], 20), opts: { keep?: boolean; convs?: boolean } = {}) {
+  if (!opts.keep) dir = mkdtempSync(join(tmpdir(), "a2-"));
   store = new DeviceStore(join(dir, "devices.json"));
   clock = Date.UTC(2026, 10, 15, 14, 1);
-  a2 = new A2Server({ devices: store, agents, now: () => clock });
+  const convs = opts.convs ? new FileConvStore(join(dir, "conversations")) : undefined;
+  a2 = new A2Server({ devices: store, agents, now: () => clock, convs });
   http = createServer((req, res) => void a2.handle(req, res));
   await new Promise<void>((r) => http.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;
@@ -254,7 +258,7 @@ describe("the conversation", () => {
     expect(p.genuine).toBe(true);
     expect(p.msgs.length).toBe(1);
     expect(p.msgs[0]).toMatchObject({ n: 2, mine: false });
-    expect(p.msgs[0].text).toBe('main heard you -- "Hello\nthere" :thumbs-up:');
+    expect(p.msgs[0].text).toBe('main heard you -- "Hello\nthere" \x02');
   });
 
   it("says when the agent is busy, and when it has finished", async () => {
@@ -297,7 +301,7 @@ describe("the conversation", () => {
       expect(r.payload.length).toBeLessThanOrEqual(MAX_PAYLOAD);
       for (const m of r.msgs) {
         expect(m.text.length).toBeLessThanOrEqual(1500);
-        expect([...m.text].every((ch) => ch === "\n" || (ch >= " " && ch <= "~"))).toBe(true);
+        expect([...m.text].every((ch) => ch === "\n" || ch === "\x02" || (ch >= " " && ch <= "~"))).toBe(true);
         texts.push(m.text);
         after = m.n;
       }
@@ -335,5 +339,75 @@ describe("the conversation", () => {
     await other.hello();
     const h = await other.call("GET", "/a2/hist?a=main&k=50");
     expect(h.msgs).toEqual([]);
+  });
+});
+
+describe("revoking, restarting, and messages the agent starts", () => {
+  it("ends a revoked device's sessions at once, even when revoked by another process", async () => {
+    await start();
+    const c = new Client(pair());
+    await c.hello();
+    expect((await c.call("GET", "/a2/poll?a=main")).code).toBe(Code.OK);
+    // The CLI is another process with its own copy of the file.
+    await new Promise((r) => setTimeout(r, 20)); // a later mtime
+    expect(new DeviceStore(store.path).revoke(c.id)).toBe(true);
+    expect((await c.call("GET", "/a2/poll?a=main")).code).toBe(Code.NO_SESSION);
+    expect((await c.hello()).code).toBe(Code.UNKNOWN_DEVICE);
+  });
+
+  it("sees a device paired by another process without a restart", async () => {
+    await start();
+    const written = new DeviceStore(store.path).pair("later").written;
+    const c = new Client(parseKey(written)!);
+    expect((await c.hello()).code).toBe(Code.OK);
+  });
+
+  it("keeps conversations across a restart, numbering on from the last", async () => {
+    await start(undefined, { convs: true });
+    const key = pair();
+    let c = new Client(key);
+    await c.hello();
+    await c.call("POST", "/a2/send?a=main", "before the restart");
+    await new Promise((r) => setTimeout(r, 100));
+    const file = join(dir, "conversations", `${c.id}.main.json`);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+
+    http.closeAllConnections();
+    await new Promise((r) => http.close(r));
+    await start(undefined, { keep: true, convs: true });
+    c = new Client(key);
+    await c.hello();
+    const h = await c.call("GET", "/a2/hist?a=main&k=50");
+    expect(h.msgs.map((m) => m.text)).toEqual(["before the restart", expect.stringContaining("before the restart")]);
+    const sent = await c.call("POST", "/a2/send?a=main", "after");
+    expect(sent.msgs[0].n).toBe(3);
+  });
+
+  it("drops a device's conversations when asked (on revoke)", async () => {
+    await start(undefined, { convs: true });
+    const c = new Client(pair());
+    await c.hello();
+    await c.call("POST", "/a2/send?a=coder", "x");
+    await new Promise((r) => setTimeout(r, 100));
+    const convs = new FileConvStore(join(dir, "conversations"));
+    expect(readdirSync(convs.dir).some((n) => n.startsWith(c.id))).toBe(true);
+    convs.drop(c.id);
+    expect(existsSync(join(convs.dir, `${c.id}.coder.json`))).toBe(false);
+  });
+
+  it("delivers a message the agent starts on the next poll, folded and cut into parts", async () => {
+    await start();
+    const c = new Client(pair());
+    await c.hello();
+    const n = a2.post(c.id, "main", "**Reminder:** water the plants \u{1F331}\n\n" + "More. ".repeat(400));
+    expect(n).toBeGreaterThan(1); // more than one part
+    const p = await c.call("GET", "/a2/poll?a=main&after=0");
+    expect(p.lines).toContainEqual(["more", "1"]); // the rest on the next poll
+    expect(p.msgs[0].text.startsWith("Reminder: water the plants")).toBe(true);
+    const rest = await c.call("GET", `/a2/poll?a=main&after=${p.msgs[p.msgs.length - 1].n}`);
+    expect(rest.msgs[rest.msgs.length - 1].n).toBe(n);
+    expect([...p.msgs, ...rest.msgs].every((m) => !m.mine)).toBe(true);
+    expect(() => a2.post("00000000", "main", "hi")).toThrow(/no device/);
+    expect(() => a2.post(c.id, "nobody", "hi")).toThrow(/no agent/);
   });
 });

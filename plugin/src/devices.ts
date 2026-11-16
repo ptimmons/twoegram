@@ -1,7 +1,7 @@
 // The devices the plugin knows: one 16-byte key each, kept in a JSON
 // file that only its owner may read.
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { deviceId, formatKey, newKey } from "./protocol.ts";
 
@@ -12,6 +12,7 @@ type Stored = { version: 1; devices: { id: string; key: string; name: string; cr
 export class DeviceStore {
   readonly path: string;
   private devices = new Map<string, Device>();
+  private mtime = -1;
 
   constructor(path: string) {
     this.path = path;
@@ -20,6 +21,7 @@ export class DeviceStore {
 
   private load(): void {
     this.devices.clear();
+    this.mtime = mtimeOf(this.path);
     if (!existsSync(this.path)) return;
     const data = JSON.parse(readFileSync(this.path, "utf8")) as Stored;
     for (const d of data.devices) {
@@ -42,10 +44,17 @@ export class DeviceStore {
     writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
     chmodSync(tmp, 0o600);
     renameSync(tmp, this.path);
+    this.mtime = mtimeOf(this.path);
+  }
+
+  /** Read the file again if another process (the CLI) changed it since. */
+  private fresh(): void {
+    if (mtimeOf(this.path) !== this.mtime) this.load();
   }
 
   /** Make a device; returns it and its key in written form, shown once. */
   pair(name: string): { device: Device; written: string } {
+    this.fresh();
     let key = newKey();
     while (this.devices.has(deviceId(key))) key = newKey();
     const device = { id: deviceId(key), key, name: name || "Apple //e", created: new Date().toISOString() };
@@ -55,21 +64,32 @@ export class DeviceStore {
   }
 
   revoke(id: string): boolean {
+    this.fresh();
     const had = this.devices.delete(id);
     if (had) this.save();
     return had;
   }
 
   get(id: string): Device | undefined {
+    this.fresh();
     return this.devices.get(id);
   }
 
   list(): Device[] {
+    this.fresh();
     return [...this.devices.values()];
   }
 
   /** Read the file again, after another process (the CLI) changed it. */
   reload(): void {
     this.load();
+  }
+}
+
+function mtimeOf(path: string): number {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return 0;
   }
 }

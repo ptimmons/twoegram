@@ -15,14 +15,20 @@ const PUNCT: Record<string, string> = {
   "←": "<-", "→": "->", "↑": "^", "↓": "v", "⇒": "=>", "≤": "<=", "≥": ">=",
   "≠": "!=", "≈": "~", "ß": "ss", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE",
   "ø": "o", "Ø": "O", "ł": "l", "Ł": "L", "ð": "d", "Ð": "D", "þ": "th",
-  "✓": "v", "✔": "v", "✗": "x", "✘": "x",
+  "✗": "x", "✘": "x",
 };
 
+/** The byte the Apple draws as MouseText's check mark (PROTOCOL.md 5). */
+export const CHECK = "\x02";
+
+/** Drawn as the check mark: thumbs-up and the check marks. */
+const CHECKS = new Set(["\u{1F44D}", "\u{2705}", "\u{2714}", "\u{2713}", "\u{2611}"]);
+
 const EMOJI: Record<string, string> = {
-  "\u{1F44D}": "thumbs-up", "\u{1F44E}": "thumbs-down", "\u{1F600}": "grin", "\u{1F603}": "smile",
+  "\u{1F44E}": "thumbs-down", "\u{1F600}": "grin", "\u{1F603}": "smile",
   "\u{1F604}": "smile", "\u{1F642}": "smile", "\u{1F60A}": "smile", "\u{1F609}": "wink",
   "\u{1F602}": "laugh", "\u{1F923}": "laugh", "\u{1F622}": "sad", "\u{1F641}": "sad",
-  "\u{1F914}": "thinking", "\u{1F389}": "party", "\u{1F680}": "rocket", "\u{2705}": "done",
+  "\u{1F914}": "thinking", "\u{1F389}": "party", "\u{1F680}": "rocket",
   "\u{274C}": "no", "\u{26A0}": "warning", "\u{2757}": "!", "\u{2753}": "?", "\u{1F4A1}": "idea",
   "\u{1F525}": "fire", "\u{2764}": "heart", "\u{1F64F}": "thanks", "\u{1F44B}": "wave",
   "\u{1F4C5}": "calendar", "\u{1F4E7}": "email", "\u{1F4CC}": "pin", "\u{1F4DD}": "note",
@@ -67,6 +73,8 @@ export function foldAscii(s: string): string {
     const c = ch.codePointAt(0)!;
     if (c === 10 || (c >= 32 && c < 127)) {
       out += ch;
+    } else if (CHECKS.has(ch)) {
+      out += CHECK;
     } else if (ch in PUNCT) {
       out += PUNCT[ch];
     } else if (ch in EMOJI) {
@@ -75,8 +83,10 @@ export function foldAscii(s: string): string {
       const base = ch.normalize("NFKD").replace(/[̀-ͯ]/g, "");
       if (base.length && [...base].every((b) => b.codePointAt(0)! >= 32 && b.codePointAt(0)! < 127)) {
         out += base;
-      } else if (c >= 0x1f000 || (c >= 0x2600 && c < 0x2800)) {
-        out += "?";
+      } else if (c >= 0x1f000 || (c >= 0x2300 && c < 0x2400) || (c >= 0x2600 && c < 0x2800) || (c >= 0x2b00 && c < 0x2c00)) {
+        // An emoji without a name: usually a line's marker (OpenClaw's
+        // /status starts each line with one), so drawn as a bullet.
+        out += "*";
       } else if (c < 32 || (c >= 127 && c < 160)) {
         // control characters: dropped
       } else {

@@ -1,5 +1,25 @@
 # Testing on the card
 
+## Build b010: the new marks
+
+Against the dev server (or your gateway, once milestone 6 is
+installed), boot `build/TWOEGRAM-b010.po` and look for:
+
+1. **The check mark.** Send a message: the echo agent's answer ends with
+   a check mark (it sends a thumbs-up). If it shows as some other
+   symbol, the MouseText code is wrong; a photo says which.
+2. **The down arrow.** Press UP ARROW a few times: a down arrow appears
+   at the top right, and goes when you come back to the bottom.
+3. **The diamond for news below.** While scrolled back, send a message
+   from the Mac as in step 5 of milestone 5 below: a diamond appears
+   beside `main` at the top and in the list, and goes when you scroll
+   down to it.
+4. **Another agent's news.** Open `coder`, send it something, then
+   switch back to `main` before the answer comes: within five seconds
+   `coder` gets a diamond and a 1 in the list. Open-Apple-N goes to it.
+5. **The help box** (Open-Apple-?) explains the diamond and the arrow
+   on its last lines.
+
 ## Milestone 5: sending and replies
 
 The dev server's echo agent answers every message after 0.8 s, and a

@@ -12,6 +12,25 @@ uint8_t  hist_added;
 uint8_t  hist_busy;
 uint16_t hist_latest;
 uint8_t  hist_unseen;
+uint8_t  hist_unread[SES_AGENTS_MAX];
+
+/* "unread coder 2": the count for that agent. */
+static void take_unread(const a2_item_t *item)
+{
+    uint8_t i, n;
+
+    for (n = 0; n < item->vlen && item->val[n] != ' '; ++n) {
+    }
+    if (n >= item->vlen) {
+        return;
+    }
+    for (i = 0; i < ses_nagents; ++i) {
+        if (strlen(ses_agents[i]) == n && !memcmp(ses_agents[i], item->val, n)) {
+            hist_unread[i] = (uint8_t)a2_num(item->val + n + 1, (uint8_t)(item->vlen - n - 1));
+            return;
+        }
+    }
+}
 
 static void note_latest(void)
 {
@@ -188,6 +207,7 @@ uint8_t hist_poll(const char *agent)
     if (rc) {
         return rc;
     }
+    memset(hist_unread, 0, sizeof hist_unread);     /* the reply lists the others */
     a2_iter(&it, &ses_reply);
     while (a2_next(&it, &item) == 1) {
         if (item.kind == A2_ITEM_MSG) {
@@ -202,6 +222,8 @@ uint8_t hist_poll(const char *agent)
             }
         } else if (a2_is(&item, "busy") && item.vlen == 1) {
             hist_busy = (uint8_t)(item.val[0] == '1');
+        } else if (a2_is(&item, "unread")) {
+            take_unread(&item);
         } else if (a2_is(&item, "more") && item.vlen == 1) {
             more = (uint8_t)(item.val[0] == '1');
         }

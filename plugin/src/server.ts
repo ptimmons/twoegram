@@ -5,6 +5,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import type { AgentPort } from "./agent.ts";
+import type { ConvStore } from "./convstore.ts";
 import type { DeviceStore } from "./devices.ts";
 import {
   AGENT_NAME,
@@ -39,6 +40,8 @@ export type Options = {
   /** For testing the client: each conversation starts with this many
    * made-up messages. */
   seed?: number;
+  /** Where conversations are kept between restarts; in memory if absent. */
+  convs?: ConvStore;
 };
 
 type Session = { sid: string; device: string; sk: Buffer; lastSeq: number; lastUsed: number };
@@ -75,7 +78,7 @@ export class A2Server {
   private ipRefusals = new Map<string, { count: number; start: number; until: number }>();
 
   constructor(options: Options) {
-    this.o = { now: Date.now, log: () => {}, ident: "", connOf: () => undefined, seed: 0, ...options };
+    this.o = { now: Date.now, log: () => {}, ident: "", connOf: () => undefined, seed: 0, convs: memoryOnly, ...options };
   }
 
   // ---- the handler ----
@@ -113,6 +116,11 @@ export class A2Server {
     const mac = header(req, "x-a2-mac");
     const s = sid ? this.sessions.get(sid) : undefined;
     if (!s) throw new Refusal(Code.NO_SESSION, "no such session");
+    if (!this.o.devices.get(s.device)) {
+      // Revoked since the hello: its sessions end now.
+      this.endSessions(s.device);
+      throw new Refusal(Code.NO_SESSION, "device revoked");
+    }
     if (now - s.lastUsed > SESSION_IDLE_MS) {
       this.sessions.delete(s.sid);
       throw new Refusal(Code.NO_SESSION, "session expired");
@@ -194,6 +202,10 @@ export class A2Server {
     return id ? `server ${id}\n` : "";
   }
 
+  private endSessions(device: string): void {
+    for (const x of [...this.sessions.values()]) if (x.device === device) this.sessions.delete(x.sid);
+  }
+
   // ---- the conversation ----
 
   private conv(device: string, agent: string): Conversation {
@@ -202,6 +214,18 @@ export class A2Server {
     if (!c) {
       c = { msgs: [], next: 1, busy: 0, seen: 0 };
       this.convs.set(k, c);
+      let saved;
+      try {
+        saved = this.o.convs.load(device, agent);
+      } catch (e) {
+        this.o.log(`a2: could not read the log of ${device}.${agent}: ${String(e)}`);
+      }
+      if (saved) {
+        c.msgs = saved.msgs;
+        c.next = saved.next;
+        c.seen = c.next - 1;
+        return c;
+      }
       for (const [mine, text] of seedMessages(agent, this.o.seed)) {
         c.msgs.push({ n: c.next, mine, time: hhmm(this.o.now() - (this.o.seed - c.next + 1) * 60_000), text });
         c.next++;
@@ -216,8 +240,29 @@ export class A2Server {
     const m: Msg = { n: c.next++, mine, time: hhmm(this.o.now()), text };
     c.msgs.push(m);
     if (c.msgs.length > LOG_KEEP) c.msgs.splice(0, c.msgs.length - LOG_KEEP);
+    // A reply still arriving for a revoked device is not written back.
+    if (this.o.devices.get(device)) try {
+      this.o.convs.save(device, agent, { msgs: c.msgs, next: c.next });
+    } catch (e) {
+      this.o.log(`a2: could not save the log of ${device}.${agent}: ${String(e)}`);
+    }
     this.wake(device);
     return m;
+  }
+
+  /**
+   * A message the agent sends on its own (a reminder, a cron job's
+   * report): added to the conversation for the Apple's next poll. Returns
+   * the number of its last part.
+   */
+  post(device: string, agent: string, text: string): number {
+    if (!this.o.devices.get(device)) throw new Error(`a2: no device ${device}`);
+    if (!this.o.agents.agents().includes(agent)) throw new Error(`a2: no agent ${agent}`);
+    const folded = forApple(text);
+    if (!folded) throw new Error("a2: nothing to send");
+    let n = 0;
+    for (const part of split(folded)) n = this.append(device, agent, false, part).n;
+    return n;
   }
 
   private wake(device: string): void {
@@ -416,3 +461,5 @@ function seedMessages(agent: string, n: number): [boolean, string][] {
   }
   return out;
 }
+
+const memoryOnly: ConvStore = { load: () => undefined, save: () => {}, drop: () => {} };

@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { foldAscii, forApple, plainMarkdown, split } from "../src/text.ts";
 
-const printable = (s: string) => [...s].every((c) => c === "\n" || (c >= " " && c <= "~"));
+const printable = (s: string) => [...s].every((c) => c === "\n" || c === "\x02" || (c >= " " && c <= "~"));
 
 describe("folding to ASCII", () => {
   it("handles punctuation, accents and emoji", () => {
     expect(foldAscii("“It’s café time” — naïve…")).toBe('"It\'s cafe time" -- naive...');
     expect(foldAscii("Straße æon")).toBe("Strasse aeon");
-    expect(foldAscii("ok \u{1F44D}\u{FE0F}")).toBe("ok :thumbs-up:");
-    expect(foldAscii("\u{1FAE0}\u{1F9D1}")).toBe("??");
+    expect(foldAscii("ok \u{1F44D}\u{FE0F}")).toBe("ok \x02"); // the Apple's check mark
+    expect(foldAscii("\u{2705} done \u{2713} \u{2714}\u{FE0F}")).toBe("\x02 done \x02 \x02");
+    expect(foldAscii("\u{1F44E}")).toBe(":thumbs-down:");
+    expect(foldAscii("\u{1FAE0}\u{1F9D1}")).toBe("**");
     // A joined emoji folds part by part; the joiner itself vanishes.
-    expect(foldAscii("\u{1F9D1}‍\u{1F680}")).toBe("?:rocket:");
+    expect(foldAscii("\u{1F9D1}‍\u{1F680}")).toBe("*:rocket:");
     expect(foldAscii("中文")).toBe("??");
     expect(foldAscii("a\tb\r\nc\x07")).toBe("a    b\nc");
   });
@@ -69,5 +71,8 @@ describe("splitting", () => {
     const parts = split(text, 1500);
     expect(parts.join(" ")).toBe(text);
     expect(parts.every((p) => p.length <= 1500)).toBe(true);
+  });
+  it("draws an emoji it has no name for as a bullet, other unknowns as ?", () => {
+    expect(foldAscii("\u{1F99E} OpenClaw\n\u{23F1}\u{FE0F} Uptime\n\u{6F22}")).toBe("* OpenClaw\n* Uptime\n?");
   });
 });

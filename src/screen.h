@@ -30,9 +30,16 @@
 #define MT_VERT     0x5F        /* stroke down the LEFT edge of the cell */
 #define MT_VERT_R   0x5A        /* stroke down the RIGHT edge of the cell */
 #define MT_DIAMOND  0x5B
+#define MT_CHECK    0x44        /* check mark */
+#define MT_DOWN     0x4A        /* down arrow */
 
-/* In strings, this byte draws the Open Apple glyph. */
-#define OA          "\x01"
+/* Glyph bytes: in strings and in message text, these draw MouseText
+ * (with plain stand-ins on a //e without it). GL_CHECK also arrives from
+ * the gateway (PROTOCOL.md section 5). */
+#define OA          "\x01"     /* the Open Apple */
+#define GL_CHECK    0x02
+#define GL_DOWN     0x03
+#define GL_DIAMOND  0x04
 
 extern uint8_t linebuf[SCR_COLS];
 extern uint8_t has_mousetext;

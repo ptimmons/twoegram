@@ -1,0 +1,33 @@
+{
+  "id": "a2",
+  "channels": ["a2"],
+  "name": "Apple //e (Twoegram)",
+  "description": "Chat with your agents from an Apple //e running Twoegram, over the LAN, signed",
+  "categories": ["channels"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "channelConfigs": {
+    "a2": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "host": { "type": "string" },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "agents": { "type": "array", "items": { "type": "string" } },
+          "commands": { "type": "boolean" }
+        }
+      },
+      "uiHints": {
+        "host": { "label": "Listen address (a LAN address; never forward it to the internet)" },
+        "port": { "label": "Port" },
+        "agents": { "label": "Agents the Apple may talk to (all if empty)" },
+        "commands": { "label": "Allow slash commands from the Apple" }
+      }
+    }
+  }
+}

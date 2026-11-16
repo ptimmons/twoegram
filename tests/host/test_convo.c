@@ -271,10 +271,14 @@ static void test_send_poll(void)
     CHECK(on_screen("echo: Hello from the test"));
     CHECK(!on_screen("thinking..."));
 
-    /* Scrolled back, a message arrives: the screen stays still and the
-     * heading says there is something new below. */
+    /* Scrolled back: a down arrow at the heading's right. */
+    CHECK(screen[0][78] != '#');
     for (n = 0; n < 6; ++n) keys[n] = K_UP;
     run(keys, oa, 6);
+    CHECK(screen[0][78] == '#' && !on_screen("scrolled back"));
+    /* A message arrives: the screen stays still, and a diamond goes
+     * beside the agent's name, in the heading and in the list. */
+    CHECK(screen[0][27] == ' ' && screen[2][6] == ' ');
     memcpy(rows, screen, sizeof screen);
     conv_append(0, "unprompted news", 15);
     keys[0] = IDLE;
@@ -282,12 +286,42 @@ static void test_send_poll(void)
     for (r = TOP; r <= BOTTOM; ++r) {
         CHECK(!strcmp(screen[r] + 21, rows[r] + 21));
     }
-    CHECK(on_screen("new below"));
+    CHECK(!strncmp(screen[0] + 22, "main #", 6));     /* heading: main, diamond */
+    CHECK(!strncmp(screen[2], ">main #", 7));          /* list */
     CHECK(!on_screen("unprompted news"));
     for (n = 0; n < 30; ++n) keys[n] = K_DOWN;
     run(keys, oa, 30);
     CHECK(on_screen("unprompted news"));
-    CHECK(!on_screen("new below"));
+    /* At the newest: seen, so the diamonds and the arrow go. */
+    CHECK(screen[0][27] == ' ' && screen[2][6] == ' ' && screen[0][78] != '#');
+
+    /* Another agent's news comes with the poll of this one: a diamond
+     * and a count beside it in the list. Open-Apple-N goes there, and
+     * the marks go. */
+    gw_unread_coder = 2;
+    keys[0] = IDLE;
+    run(keys, oa, 1);
+    CHECK(!strncmp(screen[3], " coder #", 8) && screen[3][18] == '2');
+    CHECK(screen[0][27] == ' ');                        /* main has nothing new */
+    keys[0] = 'n'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(!strncmp(screen[3], ">coder  ", 8) && screen[3][18] == ' ');
+    CHECK(!strncmp(screen[0] + 22, "coder", 5));
+    keys[0] = IDLE;
+    run(keys, oa, 1);
+    CHECK(gw_unread_coder == 0 && !strncmp(screen[3], ">coder  ", 8));
+    keys[0] = 'n'; oa[0] = 1;
+    run(keys, oa, 1);                                   /* nothing new: stays */
+    CHECK(!strncmp(screen[0] + 22, "coder", 5));
+    /* back to main for the rest */
+    keys[0] = K_TAB; keys[1] = K_UP; keys[2] = K_RETURN;
+    oa[0] = oa[1] = oa[2] = 0;
+    run(keys, oa, 3);
+    CHECK(!strncmp(screen[0] + 22, "main", 4));
+    keys[0] = '>'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
 
     /* Sending from far back goes to the newest end first. */
     keys[0] = '<'; oa[0] = 1;
@@ -313,9 +347,23 @@ static void test_send_poll(void)
     CHECK(screen[SCR_ROWS - 3][30] == '_');      /* and back to one row */
 }
 
+/* The glyph bytes: MouseText, or plain stand-ins without it. */
+static void test_glyphs(void)
+{
+    has_mousetext = 1;
+    CHECK(sc_char(GL_CHECK, 0) == MT_CHECK && sc_char(GL_DOWN, 1) == MT_DOWN);
+    CHECK(sc_char(GL_DIAMOND, 0) == MT_DIAMOND && sc_char(OA[0], 0) == MT_OAPPLE);
+    has_mousetext = 0;
+    CHECK(sc_char(GL_CHECK, 0) == ('+' | 0x80) && sc_char(GL_DOWN, 0) == ('v' | 0x80));
+    CHECK(sc_char(GL_DIAMOND, 1) == '*' && sc_char(OA[0], 0) == MT_OAPPLE);
+    CHECK(sc_char(0x05, 0) == ('?' | 0x80));
+    has_mousetext = 1;
+}
+
 int main(void)
 {
     cogs_slot = 4;
+    test_glyphs();
     test_screen();
     test_send_poll();
     printf("convo: %d checks, %d failed\n", checks, fails);

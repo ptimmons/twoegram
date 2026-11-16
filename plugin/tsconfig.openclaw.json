@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "openclaw/plugin-sdk/*": [
+        "../.sdk/node_modules/openclaw/dist/plugin-sdk/*.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "index.ts",
+    "setup-entry.ts",
+    "src",
+    "test"
+  ],
+  "exclude": []
+}

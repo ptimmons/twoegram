@@ -131,7 +131,8 @@ def show(msgs):
     for n, mine, hhmm, text in msgs:
         who = "you" if mine else "agent"
         print(f"[{n} {hhmm} {who}]")
-        for line in text.split("\n"):
+        # byte 2 is the check mark the Apple draws in MouseText
+        for line in text.replace("\x02", "✓").split("\n"):
             print(("        " if mine else "  ") + line)
 
 

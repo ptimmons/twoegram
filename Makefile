@@ -80,7 +80,7 @@ $(shell mkdir -p build; t='#define BUILD_ID "$(BUILD_ID)"'; [ "$$(cat build/buil
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk run shots host-test clean
+.PHONY: all disk run shots convo-shots charset host-test clean
 
 all: $(BIN) $(PRBIN)
 
@@ -173,6 +173,29 @@ HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup
 
 build/host/test_convo: tests/host/test_convo.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -Wno-unused-function -Itests/host -Ibuild -o $@ tests/host/test_convo.c $(HOST_CONVO)
+
+# The manual's pictures of the conversation (docs/MANUAL.md): the real
+# screen code on the model gateway, with a demo conversation, drawn with
+# the glyphs captured from Virtual ][ (tools/charset). `make shots` takes
+# the ones the emulator can show itself.
+build/host/shots: tests/host/shots.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -Wno-unused-function -Itests/host -Ibuild -o $@ tests/host/shots.c $(HOST_CONVO)
+
+convo-shots: build/host/shots tools/render.py tools/charset/charset.png
+	mkdir -p build/shots
+	build/host/shots
+	python3 -I tools/render.py tools/charset/charset.png build/shots/*.scr docs/images
+
+# CHARSET.SYSTEM shows every screen code; its Virtual ][ screenshot is
+# tools/charset/charset.png. Only needed again if that is lost.
+charset: build/charset.po
+build/charset.po: tools/charset/charset.c src/screen.c src/blit.s $(CFG)
+	$(CL65) -t $(TARGET) -Or -Isrc -C $(CFG) -o build/CHARSET.SYSTEM tools/charset/charset.c src/screen.c src/blit.s
+	VOL=CHARSET tools/mkdisk.sh $@ build/CHARSET.SYSTEM
+	tools/vii.sh boot $@
+	tools/vii.sh await "CHARSET READY" 30
+	sleep 1
+	tools/vii.sh snap tools/charset/charset.png
 
 host-test: build/host/test_cogs build/host/test_layout build/host/test_a2 build/host/test_store build/host/test_convo
 	build/host/test_cogs
