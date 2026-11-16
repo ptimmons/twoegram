@@ -369,6 +369,12 @@ signed but not encrypted for now, encryption later; OpenClaw
 **2026.11.3** is the version the plugin targets and pins; the name stays
 **Twoegram**.
 
+2026.11.4 (2026-11-16, a fixes release): the plugin type-checks against
+its SDK and ran in a scratch 2026.11.4 gateway (install, listener,
+sign-in, `/whoami`, a message dispatched to the agent, the name from
+IDENTITY.md). The plugin's range, `>=2026.11.3 <2026.12.0`, already
+admits it.
+
 Still open, neither blocks milestones 0 to 5:
 
 1. **Key in the card's flash** (recommended) or typed at every start.
