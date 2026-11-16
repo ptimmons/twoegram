@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** milestones 0 to 6 built and passed on the real card and your gateway; milestone 7 (error states) and agent names built as b017 and tested on the Mac, waiting for the card.
+**Status:** milestones 0 to 7 built and passed on the real card and your gateway (b017, 2026-11-16); next, milestone 8 (release).
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -261,7 +261,7 @@ gateway's address and port.
 | 4 ✅ | Conversation view, store, scrolling, history | host tests ✅ (the screen too), Virtual ][ ✅, **real card ✅** (b007) |
 | 5 ✅ | Compose, send, type-ahead, polling, replies arriving in parts | host tests ✅ (the screen too), Virtual ][ ✅, real card ✅ (b008) |
 | 6 ✅ | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | Vitest ✅, scratch OpenClaw 2026.11.3 on the Mac ✅ (no model), **your gateway and the real card ✅** (2026-11-16, b010) |
-| 7 | Error states: every failure said plainly, and recovered from where it can be (the agent list and unread marks were done in b010; the lock and passphrase moved to section 9, item 6) | host tests, real card |
+| 7 ✅ | Error states: every failure said plainly, and recovered from where it can be (the agent list and unread marks were done in b010; the lock and passphrase moved to section 9, item 6) | host tests ✅, **real card and your gateway ✅** (b017) |
 | 8 | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | real card, your gateway |
 | later | Encryption, by one of the two routes in section 2 | |
 
@@ -872,3 +872,26 @@ All checks passed again, against the same server (`569147e+`).
   restart mid-conversation, and (optionally) revoking. Not knowable on
   the Mac: how long the card takes to give up on a stopped gateway, which
   is how long the keyboard waits (type-ahead keeps what is typed).
+
+### Milestone 7 on the card (2026-11-16, build b017)
+
+All passed, on the real gateway (OpenClaw 2026.11.3, agent "Pinchy"):
+
+- Gateway stopped mid-conversation: `GATEWAY NOT ANSWERING` in the
+  status bar, the conversation kept; started again, the bar put itself
+  right with nothing pressed.
+- Sent while it was down: `CONNECTION REFUSED` said, the text kept on the
+  compose line, and sent once the gateway was back.
+- Twoegram started while the gateway was stopped: the trouble shown,
+  then signed in by itself when the gateway started, every message
+  loaded.
+- `openclaw gateway restart` mid-conversation: a moment's trouble, then
+  on by itself.
+- No pause in typing was noticed while the tries failed (a stopped
+  gateway on a running host refuses at once).
+- From earlier builds, now seen on hardware: MouseText's check mark
+  ($44) for a thumbs-up, and the down arrow ($4A) when scrolled back.
+- Not yet seen: a long answer from a real model arriving in parts, and
+  revoking (optional). During the tests the agent said its replies had
+  been "interrupted before they finish": most likely its turns cut off
+  by the gateway stops and restarts. Worth watching for in ordinary use.
