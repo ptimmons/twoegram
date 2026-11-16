@@ -14,15 +14,19 @@
 // binding itself: never the shared main session, whatever the gateway's
 // own session.dmScope says.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentPort, ReplySink } from "./agent.ts";
 import { AGENT_NAME } from "./protocol.ts";
 
 export const CHANNEL = "a2";
 export const ACCOUNT = "default";
 
+type AgentEntry = { identity?: { name?: unknown } };
+
 /** The few config fields read here; the real type is OpenClawConfig. */
 export type Cfg = {
-  agents?: { entries?: Record<string, unknown>; list?: { id?: string }[] };
+  agents?: { entries?: Record<string, AgentEntry | undefined>; list?: ({ id?: string } & AgentEntry)[] };
   bindings?: unknown[];
   [k: string]: unknown;
 };
@@ -63,6 +67,10 @@ export type BridgeOptions = {
   allow?: string[];
   /** The gateway's own agent lister (the SDK's listAgentIds). */
   listAgents?: (cfg: Cfg) => string[];
+  /** The agent's workspace (the SDK's resolveAgentWorkspaceDir), for its IDENTITY.md. */
+  workspaceDir?: (cfg: Cfg, agent: string) => string;
+  /** Read a file, or throw (default: node's readFileSync). */
+  readFile?: (path: string) => string;
   /** Whether the device is still paired: checked again before each effect. */
   paired: (device: string) => boolean;
   deviceName?: (device: string) => string | undefined;
@@ -93,6 +101,26 @@ export function agentIds(cfg: Cfg, allow?: string[], list?: (cfg: Cfg) => string
     out.push(id);
   }
   return out;
+}
+
+// IDENTITY.md template lines not yet filled in (OpenClaw skips these too).
+const PLACEHOLDERS = new Set(["not set yet", "pick something you like"]);
+
+/**
+ * The Name line of an agent's IDENTITY.md, as OpenClaw reads it:
+ * `Name: Pinchy`, `- **Name:** Pinchy`, `**Name**: _Pinchy_`.
+ */
+export function identityName(md: string): string | undefined {
+  for (const line of md.split(/\r?\n/)) {
+    const cleaned = line.trim().replace(/^-\s*/, "").replace(/^([*_`]+)([A-Za-z]+):\1/, "$2:");
+    const colon = cleaned.indexOf(":");
+    if (colon < 0 || cleaned.slice(0, colon).replace(/[*_`]/g, "").trim().toLowerCase() !== "name") continue;
+    let v = cleaned.slice(colon + 1).trim();
+    for (let m; (m = /^(\*{1,2}|_{1,2}|`+)([\s\S]+)\1$/.exec(v)); ) v = m[2].trim();
+    const plain = v.replace(/^\((.*)\)$/, "$1").trim().toLowerCase();
+    if (v && !PLACEHOLDERS.has(plain)) return v;
+  }
+  return undefined;
 }
 
 export function peerOf(device: string, agent: string): string {
@@ -128,6 +156,24 @@ export class OpenClawAgents implements AgentPort {
 
   agents(): string[] {
     return agentIds(this.o.cfg(), this.o.allow, this.o.listAgents);
+  }
+
+  /** As `openclaw agents list` shows it: the config's identity.name, else
+   * the Name in the agent's IDENTITY.md. */
+  displayName(agent: string): string | undefined {
+    const cfg = this.o.cfg();
+    const entry =
+      cfg.agents?.entries?.[agent] ??
+      (cfg.agents?.list ?? []).find((a) => String(a?.id ?? "").toLowerCase() === agent);
+    const configured = entry?.identity?.name;
+    if (typeof configured === "string" && configured.trim()) return configured.trim();
+    if (!this.o.workspaceDir) return undefined;
+    try {
+      const read = this.o.readFile ?? ((p: string) => readFileSync(p, "utf8"));
+      return identityName(read(join(this.o.workspaceDir(cfg, agent), "IDENTITY.md")));
+    } catch {
+      return undefined; // no workspace, or no IDENTITY.md: the id it is
+    }
   }
 
   deliver(device: string, agent: string, text: string, out: ReplySink): void {

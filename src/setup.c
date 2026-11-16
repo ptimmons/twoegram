@@ -7,6 +7,7 @@
  * typed copy is wiped once parsed.
  */
 #include <string.h>
+#include "cogs.h"
 #include "screen.h"
 #include "kbd.h"
 #include "fmt.h"
@@ -182,7 +183,8 @@ static uint8_t save(void)
         } else if (rc == KS_INUSE) {
             warn(WHY_ROW, "The card's spare memory is in use: the key is not kept there.");
         } else if (rc) {
-            warn(WHY_ROW, "The key could not be kept on the card.");
+            fmt_str(fmt_str(note, "The key could not be kept on the card: "), cogs_strerror(rc));
+            warn(WHY_ROW, note);
         }
     }
     memset(key, 0, sizeof key);

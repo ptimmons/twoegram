@@ -51,7 +51,19 @@ not the gateway's reason. With the gateway stopped, any problem is
 reported as it is.
 
 - `-l` links the folder rather than copying it, so a later `rsync` and a
-  gateway restart is all an update needs.
+  gateway restart is all an update needs. Keep the folder where it is:
+  if it moves, OpenClaw quietly skips the plugin (the Apple then gets
+  `CONNECTION REFUSED`, and `openclaw plugins list` warns that a load
+  path is unavailable). To link the new place, with the gateway
+  stopped, install again from it, then drop the old path and refresh:
+
+  ```bash
+  openclaw config set plugins.load.paths '["/home/you/twoegram-plugin"]' --strict-json
+  ```
+
+  ```bash
+  openclaw plugins registry --refresh
+  ```
 - `--force` confirms a source that is not on ClawHub.
 - `--accept-capabilities` accepts that it is a channel.
 
@@ -144,6 +156,10 @@ Revoke it afterwards with `openclaw a2 revoke <id>`.
 - **Which agent:** the Apple's agent list is the gateway's agents, or
   `channels.a2.agents`. Agents added later show up at the Apple's next
   sign-in.
+- **Names:** the Apple shows each agent's name as `openclaw agents list`
+  does: `identity.name` in the agent's config, else the `Name:` line of
+  `IDENTITY.md` in its workspace, else its id. Rename an agent there;
+  the Apple picks the new name up at its next sign-in (Open-Apple-R).
 - **The agent starting a conversation** (a reminder, a cron report): it
   can send to `a2:<device>.<agent>`. The message waits for the Apple's
   next poll.

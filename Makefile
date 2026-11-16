@@ -121,8 +121,17 @@ disk: $(DISK)
 #
 # Given once, URL= and KEY= are kept in probe.cfg (gitignored, never
 # committed: it holds a key) and every later disk carries them too.
+#
+# TWOEGRAM.CFG gets GATEWAY= from probe.cfg when it has one (the real
+# gateway: make disk GATEWAY=http://192.168.1.20:8417, kept like URL=),
+# else the probe's URL (the dev server).
 $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	VOL=$(VOLUME) tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN)
+	@if [ -n "$(GATEWAY)" ] && [ -f probe.cfg ]; then \
+	    grep -v '^GATEWAY=' probe.cfg > probe.cfg.new; \
+	    printf 'GATEWAY=%s\n' "$(GATEWAY)" >> probe.cfg.new; \
+	    mv probe.cfg.new probe.cfg; chmod 600 probe.cfg; \
+	fi
 	@if [ -n "$(URL)" ] && [ -n "$(KEY)" ]; then \
 	    printf 'URL=%s\nKEY=%s\n%s' "$(URL)" "$(KEY)" "$(if $(AGENT),AGENT=$(AGENT)\n,)" > probe.cfg; \
 	    chmod 600 probe.cfg; \
@@ -130,8 +139,9 @@ $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	@if [ -f probe.cfg ]; then \
 	    tr '\n' '\r' < probe.cfg | tools/ac -ptx $(DISK) A2PROBE.CFG; \
 	    echo "A2PROBE.CFG: $$(sed -n 's/^URL=//p' probe.cfg), with a key (from probe.cfg)"; \
-	    printf '# Twoegram: the gateway%ss address\rGATEWAY=%s\r' "'" "$$(sed -n 's/^URL=//p' probe.cfg)" | tools/ac -ptx $(DISK) TWOEGRAM.CFG; \
-	    echo "TWOEGRAM.CFG: the same address, no key (the key stays on the card)"; \
+	    gw=$$(sed -n 's/^GATEWAY=//p' probe.cfg); gw=$${gw:-$$(sed -n 's/^URL=//p' probe.cfg)}; \
+	    printf '# Twoegram: the gateway%ss address\rGATEWAY=%s\r' "'" "$$gw" | tools/ac -ptx $(DISK) TWOEGRAM.CFG; \
+	    echo "TWOEGRAM.CFG: $$gw, no key (the key stays on the card)"; \
 	else \
 	    echo "no A2PROBE.CFG (give URL= and KEY= once for the probe)"; \
 	fi

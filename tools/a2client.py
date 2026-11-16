@@ -168,7 +168,9 @@ def main():
 
     if a.cmd == "hello":
         d = c.hello()
-        print(f"session {c.sid}, device {c.id}, agents: {' '.join(c.agents)}, gateway time {d['time'][0]}")
+        names = dict(n.split(" ", 1) for n in d.get("name", []) if " " in n)
+        shown = " ".join(f"{a} ({names[a]})" if a in names else a for a in c.agents)
+        print(f"session {c.sid}, device {c.id}, agents: {shown}, gateway time {d['time'][0]}")
     elif a.cmd == "send":
         agent, text = a.args[0], " ".join(a.args[1:])
         _, msgs = c.call("POST", f"/a2/send?a={agent}", text.encode("ascii"))

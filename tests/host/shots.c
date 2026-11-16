@@ -130,7 +130,7 @@ int main(void)
 
     conv_demo = demo;
     conv_base = sizeof demo / sizeof demo[0];
-    gw_agents = "agent main\nagent coder\nagent research\n";
+    gw_agents = "agent main\nagent coder\nagent research\nname main Juniper\n";
     model_answer = "It starts at 18:00 in the library's community room. "
                    "I'll remind you at 17:30, as you asked.";
     cogs_slot = 4;

@@ -52,8 +52,9 @@ works, and a list of Twoegram's limits.
 
 An **agent** is a helper program that runs on your **gateway**: a modern
 computer on your home network, running a program called OpenClaw. Each
-agent has a name, such as `main` or `coder`, and its own way of working:
-one may look after your day, another may help you write software.
+agent has a name, such as `Juniper` or `coder`, and its own way of
+working: one may look after your day, another may help you write
+software.
 
 Twoegram doesn't think for itself. It carries your words to the gateway,
 and brings the agent's answer back to your Apple.
@@ -373,8 +374,8 @@ top of the screen and in the list.
 
 ![Figure 4-2. Something new below](images/new-below.png)
 
-**Figure 4-2.** The diamond beside `main` says something new has arrived
-below.
+**Figure 4-2.** The diamond beside `Juniper` says something new has
+arrived below.
 
 Scroll down to the bottom, or press OPEN-APPLE->, to read it. The
 diamond disappears once you've reached it.
@@ -416,6 +417,24 @@ number of new messages appear beside its name in the list.
 Press **OPEN-APPLE-N** to go straight to the next agent with news. If
 there's none, the status bar says `NOTHING NEW ELSEWHERE`. The diamond
 disappears once you've opened the agent.
+
+### Your Agents' Names
+
+Twoegram shows each agent by the name it has on the gateway: the one
+OpenClaw shows in `openclaw agents list`. If an agent has no name of its
+own, Twoegram shows its **id**, the short word OpenClaw knows it by,
+such as `main` or `coder`. In the pictures in this guide, the agent with
+the id `main` is called `Juniper`.
+
+To rename an agent, change its name on the gateway: either the `Name:`
+line in the `IDENTITY.md` file in the agent's workspace, or the agent's
+`identity.name` in OpenClaw's settings, which comes first if both are
+set. Twoegram shows the new name the next time it says hello to the
+gateway (press OPEN-APPLE-R to say hello now).
+
+> **By the way:** Names are shown in plain letters, so an emoji in a
+> name is left out, and accented letters lose their accents. The list
+> shows the first 13 characters of a long name.
 
 ### Hiding the List
 

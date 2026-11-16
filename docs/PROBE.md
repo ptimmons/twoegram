@@ -1,8 +1,16 @@
 # Testing on the card
 
-## Build b013: milestone 7, when things go wrong
+## Build b017: milestone 7, when things go wrong, and agents by name
 
-On your gateway, boot `build/TWOEGRAM-b013.po` and open a conversation.
+First update the plugin on the gateway (its `rsync` from INSTALL.md
+step 1, then `openclaw gateway restart`), so it sends the names.
+
+0. **Names.** Boot `build/TWOEGRAM-b017.po`: the list, the heading and
+   the status bar say `Pinchy` (or whatever `openclaw agents list` shows
+   as the agent's identity), not `main`, and messages still reach it. An
+   agent with no name of its own still shows its id.
+
+Then, on your gateway with a conversation open:
 The commands are on the gateway host. Steps 1 to 4 matter most; 5 needs
 re-pairing, so it is optional.
 

@@ -46,7 +46,10 @@ uint8_t ks_save(const uint8_t key[A2_KEY_LEN])
     if (!rc) {
         rc = cogs_prefs_get(back, &n2);
     }
-    if (!rc && (n2 != COGS_PREFS_MAX || memcmp(back, blob, COGS_PREFS_MAX))) {
+    /* Only our part is checked: the card may tidy its own settings
+     * (bytes 0-14) as it stores them. */
+    if (!rc && (n2 != COGS_PREFS_MAX ||
+                memcmp(back + COGS_PREFS_FREE, blob + COGS_PREFS_FREE, COGS_PREFS_MAX - COGS_PREFS_FREE))) {
         rc = COGS_E_PROTO;
     }
     memset(blob, 0, sizeof blob);

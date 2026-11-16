@@ -20,7 +20,8 @@ void        msgs_mode(uint8_t m);
 extern uint8_t msgs_now;
 
 uint8_t     agent_count(void);
-const char *agent_name(uint8_t a);
+const char *agent_name(uint8_t a);  /* its id, which requests name */
+const char *agent_label(uint8_t a); /* what it calls itself, else its id */
 uint8_t     agent_unread(uint8_t a);
 
 /* Make agent a's conversation the current one; clears its unread count. */

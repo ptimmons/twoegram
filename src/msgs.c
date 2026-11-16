@@ -41,6 +41,11 @@ const char *agent_name(uint8_t a)
     return ses_agents[a];
 }
 
+const char *agent_label(uint8_t a)
+{
+    return ses_labels[a][0] ? ses_labels[a] : ses_agents[a];
+}
+
 uint8_t agent_unread(uint8_t a)
 {
     return msgs_now == MSGS_LIVE && a < SES_AGENTS_MAX ? hist_unread[a] : 0;

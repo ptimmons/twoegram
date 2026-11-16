@@ -26,6 +26,9 @@ extern char    ses_sid[9];          /* the session's id */
 extern uint8_t ses_open;            /* a session is up */
 extern uint8_t ses_nagents;
 extern char    ses_agents[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
+/* What each agent calls itself, from the hello's name lines (OpenClaw's
+ * identity name); empty where it has none but its id. */
+extern char    ses_labels[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
 extern char    ses_server[61];      /* the server's own name and build, if it said */
 extern uint32_t ses_seq;            /* the last sequence number used */
 
@@ -58,6 +61,10 @@ uint8_t ses_request(const char *method, const char *target,
 /* ses_request, saying hello again first if the session has gone. */
 uint8_t ses_call(const char *method, const char *target,
                  const uint8_t *body, uint16_t nbody);
+
+/* A line value that starts with an agent's id ("coder 2"): its index in
+ * ses_agents and where the rest starts; SES_AGENTS_MAX if none. */
+uint8_t ses_agent_at(const char *val, uint8_t vlen, uint8_t *rest);
 
 /* A line from the last reply's payload: 1 and its value, or 0. */
 uint8_t ses_line(const char *word, const char **val, uint8_t *vlen);

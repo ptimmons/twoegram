@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ReplySink } from "../src/agent.ts";
-import { OpenClawAgents, agentIds, parseTarget, routedCfg, type Cfg, type DirectDmParams } from "../src/openclaw-agent.ts";
+import { OpenClawAgents, agentIds, identityName, parseTarget, routedCfg, type Cfg, type DirectDmParams } from "../src/openclaw-agent.ts";
 
 function sink() {
   const texts: string[] = [];
@@ -141,5 +141,49 @@ describe("a message to an agent", () => {
     b.deliver("1a2b3c4d", "main", "hi", s.out);
     await s.finished;
     expect(s.texts[0]).toMatch(/no longer paired/);
+  });
+});
+
+describe("an agent's name", () => {
+  it("is read from IDENTITY.md as OpenClaw writes it", () => {
+    expect(identityName("# IDENTITY.md - Who Am I?\n\n- **Name:** Pinchy\n- **Emoji:** 🦞\n")).toBe("Pinchy");
+    expect(identityName("Name: Robbie")).toBe("Robbie");
+    expect(identityName("**Name**: _Hal_")).toBe("Hal");
+    expect(identityName("- **Name:**\n  (pick something you like)\n")).toBeUndefined();
+    expect(identityName("- **Name:** (not set yet)")).toBeUndefined();
+    expect(identityName("- **Creature:** a lobster")).toBeUndefined();
+  });
+
+  function named(cfg: Cfg, files: Record<string, string>) {
+    return new OpenClawAgents({
+      cfg: () => cfg,
+      dispatch: async () => undefined,
+      paired: () => true,
+      workspaceDir: (_c, agent) => `/ws/${agent}`,
+      readFile: (p) => {
+        if (p in files) return files[p];
+        throw new Error("ENOENT");
+      },
+    });
+  }
+
+  it("comes from the config first, then IDENTITY.md, else there is none", () => {
+    const b = named(
+      { agents: { entries: { main: { identity: { name: "Configured" } }, coder: {}, home: {} } } },
+      { "/ws/main/IDENTITY.md": "- **Name:** Filed", "/ws/coder/IDENTITY.md": "- **Name:** Pinchy" },
+    );
+    expect(b.displayName("main")).toBe("Configured");
+    expect(b.displayName("coder")).toBe("Pinchy");
+    expect(b.displayName("home")).toBeUndefined();
+  });
+
+  it("is read from the legacy list too, and absent without a workspace lookup", () => {
+    const b = new OpenClawAgents({
+      cfg: () => ({ agents: { list: [{ id: "Main", identity: { name: "Old Style" } }, { id: "coder" }] } }),
+      dispatch: async () => undefined,
+      paired: () => true,
+    });
+    expect(b.displayName("main")).toBe("Old Style");
+    expect(b.displayName("coder")).toBeUndefined();
   });
 });

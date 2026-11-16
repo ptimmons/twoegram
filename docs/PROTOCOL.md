@@ -71,7 +71,7 @@ higher than the last it accepted.
 
 | Request | Body | Payload of a good reply |
 |---|---|---|
-| `GET /a2/hello?d=<id>&c=<client nonce, 32 hex>&m=<hello proof>` | | `sid`, `sn`, `ver`, `time`, one `agent` line each |
+| `GET /a2/hello?d=<id>&c=<client nonce, 32 hex>&m=<hello proof>` | | `sid`, `sn`, `ver`, `time`, one `agent` line each, then a `name` line for each agent that has a name |
 | `POST /a2/send?a=<agent>` | the message, 1 to 1,024 bytes of printable ASCII and `\n` | one `msg` record: the message as stored |
 | `GET /a2/poll?a=<agent>&after=<n>&w=<ms>` | | `busy`, `more`, `unread` lines, then `msg` records numbered above *n* |
 | `GET /a2/hist?a=<agent>&before=<n>&k=<count>` | | `more`, then up to *k* `msg` records numbered below *n*, oldest first |
@@ -125,7 +125,8 @@ Each line is a word, a space, and its value, ended by `\n`:
 | `sn <32 hex>` | the server nonce |
 | `ver 1` | protocol version |
 | `time 1763215200` | the gateway's clock, Unix seconds |
-| `agent main` | an agent the Apple may talk to; names are 1 to 16 of `a-z 0-9 - _` |
+| `agent main` | an agent the Apple may talk to; its id, which requests use: 1 to 16 of `a-z 0-9 - _` |
+| `name main Pinchy` | what an agent listed above calls itself (OpenClaw's identity name), for showing only: 1 to 16 printable ASCII characters, spaces allowed, emoji removed; sent only when it differs from the id. A client that does not know the line ignores it |
 | `busy 1` | the agent is working on an answer |
 | `more 1` | there were more messages than fit; ask again |
 | `unread coder 2` | messages the Apple has not fetched, for another agent |

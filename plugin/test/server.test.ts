@@ -25,7 +25,7 @@ import {
   sessionKey,
   type Parsed,
 } from "../src/protocol.ts";
-import { A2Server } from "../src/server.ts";
+import { A2Server, displayLabel } from "../src/server.ts";
 
 type Raw = { status: number; body: Buffer };
 
@@ -127,6 +127,27 @@ describe("pairing and hello", () => {
     expect(r.code).toBe(Code.OK);
     expect(c.sid).toMatch(/^[0-9a-f]{8}$/);
     expect(c.agents).toEqual(["main", "coder"]);
+    // The echo agent calls main "Echo"; coder has no name of its own.
+    expect(r.lines.filter(([k]) => k === "name").map(([, v]) => v)).toEqual(["main Echo"]);
+  });
+
+  it("sends each agent's name as the //e can show it", async () => {
+    http.closeAllConnections();
+    await new Promise((r) => http.close(r));
+    await start(
+      new EchoAgent(["main", "coder", "home", "same"], 20, {
+        main: "Pinchy ✨",
+        coder: "  Señor\nCódigo  the Magnificent",
+        home: "🏠",
+        same: "same",
+      }),
+    );
+    const c = new Client(pair());
+    const r = await c.hello();
+    expect(r.lines.filter(([k]) => k === "name").map(([, v]) => v)).toEqual([
+      "main Pinchy",
+      "coder Senor Codigo the",
+    ]);
   });
 
   it("refuses an unknown device and a wrong proof, unsigned", async () => {
@@ -409,5 +430,17 @@ describe("revoking, restarting, and messages the agent starts", () => {
     expect([...p.msgs, ...rest.msgs].every((m) => !m.mine)).toBe(true);
     expect(() => a2.post("00000000", "main", "hi")).toThrow(/no device/);
     expect(() => a2.post(c.id, "nobody", "hi")).toThrow(/no agent/);
+  });
+});
+
+describe("display names", () => {
+  it("are printable ASCII on one line, at most 16 characters", () => {
+    expect(displayLabel(undefined)).toBe("");
+    expect(displayLabel("   ")).toBe("");
+    expect(displayLabel("Pinchy")).toBe("Pinchy");
+    expect(displayLabel("Café\tBot")).toBe("Cafe Bot");
+    expect(displayLabel("A very long agent name indeed")).toBe("A very long agen");
+    expect(displayLabel("Fifteen chars x yz")).toBe("Fifteen chars x");
+    expect(displayLabel("🦞 Pinchy 👍🏽")).toBe("Pinchy");
   });
 });

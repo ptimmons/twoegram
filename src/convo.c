@@ -100,7 +100,7 @@ static const char *cur_name(void)
     if (!agent_count()) {
         return "(no agents)";
     }
-    return agent_name(cur);
+    return agent_label(cur);
 }
 
 /* ---- the conversation's lines ---- */
@@ -192,11 +192,11 @@ static void row_begin(uint8_t row)
     if (a == cur) {
         linebuf[0] = sc_char('>', bar);
     }
-    n = txt_len(agent_name(a));
+    n = txt_len(agent_label(a));
     if (n > NAME_MAX) {
         n = NAME_MAX;
     }
-    lb_textn(1, agent_name(a), n, bar);
+    lb_textn(1, agent_label(a), n, bar);
     /* The diamond: something new, below the screen here, or elsewhere. */
     if (a == cur ? cur_news() : agent_unread(a)) {
         linebuf[2 + n] = sc_char(GL_DIAMOND, bar);

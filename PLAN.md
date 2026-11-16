@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** milestones 0 to 6 built and passed on the real card and your gateway; milestone 7 (error states) built as b013 and tested on the Mac, waiting for the card.
+**Status:** milestones 0 to 6 built and passed on the real card and your gateway; milestone 7 (error states) and agent names built as b017 and tested on the Mac, waiting for the card.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -330,6 +330,21 @@ otherwise interrupt:
    optional passphrase field. Perhaps an idle auto-lock. Weakness: with
    the card and a recording of LAN traffic, passphrases can be tried
    offline, so a long one matters.
+
+7. **Agents by name** (2026-11-16, done in b016; seen on the card in b017, "Pinchy" from IDENTITY.md): the list, heading and
+   status bar show what OpenClaw calls each agent (`identity.name` in its
+   config, else the `Name:` line of the workspace's `IDENTITY.md`, as
+   `openclaw agents list` shows it), and requests still go by id. The
+   hello reply carries `name <id> <label>` lines after the `agent` lines
+   (PROTOCOL.md; older clients ignore them): at most 16 printable ASCII
+   characters, emoji dropped, accents folded, sent only when it differs
+   from the id. Renaming is done in OpenClaw; the Apple sees it at its
+   next hello. On the Apple: `ses_labels`, in LOWBSS since every hello
+   clears it before it is read, and `ses_agent_at`, now shared with the
+   unread counts; about 300 bytes in all (1,837 bytes of heap left).
+   Tests: 5 more in Vitest (66), IDENTITY.md parsing as OpenClaw writes
+   it, config before file; the screen test checks the list, heading and
+   status bar, the 13-character cut, and that requests still name `main`.
 
 ## 10. Risks to settle at milestone 2
 
@@ -846,7 +861,7 @@ All checks passed again, against the same server (`569147e+`).
   so requests in 200 s while down, against 40 when well), and that it
   recovers (or stays stopped). The model gateway gained a refusal switch
   and a request counter.
-- **For the card** (docs/PROBE.md, b013): the gateway stopped and
+- **For the card** (docs/PROBE.md, b017): the gateway stopped and
   started, sending while it is down, starting while it is down, a
   restart mid-conversation, and (optionally) revoking. Not knowable on
   the Mac: how long the card takes to give up on a stopped gateway, which

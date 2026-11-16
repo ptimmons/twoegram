@@ -478,6 +478,32 @@ static void test_errors(void)
     gw_agents = "agent main\nagent coder\n";
 }
 
+/* Agents named in OpenClaw: the list, the heading and the status bar
+ * show the name; requests still go by id. */
+static void test_names(void)
+{
+    static uint8_t keys[8], oa[8];
+    unsigned before_n;
+
+    gw_agents = "agent main\nagent coder\nname main Pinchy\n"
+                "name coder A very long name x\nname ghost Nobody\n";
+    keys[0] = 'r'; oa[0] = 1;
+    run(keys, oa, 1);
+    CHECK(link_live && !strcmp(ses_labels[0], "Pinchy") && !ses_labels[1][0]);  /* 17: too long */
+    CHECK(!strcmp(agent_label(0), "Pinchy") && !strcmp(agent_label(1), "coder"));
+    CHECK(!strncmp(screen[0] + 22, "Pinchy", 6) && !strncmp(screen[2], ">Pinchy", 7));
+    CHECK(strstr(screen[SCR_ROWS - 1], " PINCHY ") != NULL);
+    before_n = http_requests;
+    keys[0] = IDLE;
+    run(keys, NULL, 1);
+    CHECK(http_requests > before_n && strstr(gw_last_target, "a=main&") != NULL);
+    gw_agents = "agent main\nagent coder\nname coder Thirteen chars\n";
+    keys[0] = 'r'; oa[0] = 1;
+    run(keys, oa, 1);
+    CHECK(!strncmp(screen[3], " Thirteen char ", 15) && !ses_labels[0][0]);   /* cut to 13 */
+    gw_agents = "agent main\nagent coder\n";
+}
+
 /* The glyph bytes: MouseText, or plain stand-ins without it. */
 static void test_glyphs(void)
 {
@@ -498,6 +524,7 @@ int main(void)
     test_screen();
     test_send_poll();
     test_errors();
+    test_names();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

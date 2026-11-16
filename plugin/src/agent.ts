@@ -10,6 +10,8 @@ export interface ReplySink {
 
 export interface AgentPort {
   agents(): string[];
+  /** What the agent calls itself, if anything besides its id. */
+  displayName?(agent: string): string | undefined;
   deliver(device: string, agent: string, text: string, out: ReplySink): void;
 }
 
@@ -21,14 +23,20 @@ export interface AgentPort {
 export class EchoAgent implements AgentPort {
   private names: string[];
   private delayMs: number;
+  private labels: Record<string, string>;
 
-  constructor(names = ["main", "coder"], delayMs = 800) {
+  constructor(names = ["main", "coder"], delayMs = 800, labels: Record<string, string> = { main: "Echo" }) {
     this.names = names;
     this.delayMs = delayMs;
+    this.labels = labels;
   }
 
   agents(): string[] {
     return this.names;
+  }
+
+  displayName(agent: string): string | undefined {
+    return this.labels[agent];
   }
 
   deliver(_device: string, agent: string, text: string, out: ReplySink): void {

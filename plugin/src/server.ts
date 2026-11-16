@@ -10,6 +10,7 @@ import type { DeviceStore } from "./devices.ts";
 import {
   AGENT_NAME,
   Code,
+  DISPLAY_NAME_MAX,
   MAX_BODY,
   MAX_PAYLOAD,
   MAX_TARGET,
@@ -25,7 +26,7 @@ import {
   sessionKey,
   type Msg,
 } from "./protocol.ts";
-import { forApple, split } from "./text.ts";
+import { foldAscii, forApple, split } from "./text.ts";
 
 export type Options = {
   devices: DeviceStore;
@@ -183,7 +184,12 @@ export class A2Server {
     while (mine.length > SESSIONS_PER_DEVICE) this.sessions.delete(mine.shift()!.sid);
 
     const lines = [`sid ${sid}`, `sn ${sn.toString("hex")}`, `ver ${VERSION}`, `time ${Math.floor(now / 1000)}`];
-    for (const a of this.o.agents.agents()) lines.push(`agent ${a}`);
+    const agents = this.o.agents.agents();
+    for (const a of agents) lines.push(`agent ${a}`);
+    for (const a of agents) {
+      const label = displayLabel(this.o.agents.displayName?.(a));
+      if (label && label !== a) lines.push(`name ${a} ${label}`);
+    }
     const payload = Buffer.concat([
       Buffer.from(lines.join("\n") + "\n" + this.serverLine(), "latin1"),
       this.connLine(req),
@@ -463,3 +469,14 @@ function seedMessages(agent: string, n: number): [boolean, string][] {
 }
 
 const memoryOnly: ConvStore = { load: () => undefined, save: () => {}, drop: () => {} };
+
+/** An agent's name as the Apple shows it: printable ASCII, one line, at
+ * most DISPLAY_NAME_MAX characters, without emoji; empty if nothing is
+ * left. */
+export function displayLabel(name: string | undefined): string {
+  if (!name) return "";
+  // Emoji go (in a name, `*` or `:house:` reads as noise); the rest folds.
+  const bare = name.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "");
+  const flat = foldAscii(bare).replace(/[^\x20-\x7e]+/g, " ").replace(/ +/g, " ").trim();
+  return flat.slice(0, DISPLAY_NAME_MAX).trimEnd();
+}

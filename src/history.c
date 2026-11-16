@@ -17,18 +17,10 @@ uint8_t  hist_unread[SES_AGENTS_MAX];
 /* "unread coder 2": the count for that agent. */
 static void take_unread(const a2_item_t *item)
 {
-    uint8_t i, n;
+    uint8_t rest, i = ses_agent_at(item->val, item->vlen, &rest);
 
-    for (n = 0; n < item->vlen && item->val[n] != ' '; ++n) {
-    }
-    if (n >= item->vlen) {
-        return;
-    }
-    for (i = 0; i < ses_nagents; ++i) {
-        if (strlen(ses_agents[i]) == n && !memcmp(ses_agents[i], item->val, n)) {
-            hist_unread[i] = (uint8_t)a2_num(item->val + n + 1, (uint8_t)(item->vlen - n - 1));
-            return;
-        }
+    if (i < SES_AGENTS_MAX && rest < item->vlen) {
+        hist_unread[i] = (uint8_t)a2_num(item->val + rest, (uint8_t)(item->vlen - rest));
     }
 }
 

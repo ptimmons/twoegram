@@ -14,6 +14,15 @@ char     ses_sid[9];
 uint8_t  ses_open;
 uint8_t  ses_nagents;
 char     ses_agents[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
+/* In LOWBSS ($0800-$1FFF, never zeroed): cleared by every hello, and
+ * read only while a hello's agents are listed. */
+#ifdef __CC65__
+#pragma bss-name (push, "LOWBSS")
+#endif
+char     ses_labels[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
+#ifdef __CC65__
+#pragma bss-name (pop)
+#endif
 char     ses_server[61];
 uint32_t ses_seq;
 a2_reply_t ses_reply;
@@ -102,17 +111,35 @@ static void copy_line(const char *word, char *dst, uint8_t cap)
     }
 }
 
+uint8_t ses_agent_at(const char *val, uint8_t vlen, uint8_t *rest)
+{
+    uint8_t i, n;
+
+    for (n = 0; n < vlen && val[n] != ' '; ++n) {
+    }
+    *rest = (uint8_t)(n + 1);
+    if (n < vlen) {
+        for (i = 0; i < ses_nagents; ++i) {
+            if (strlen(ses_agents[i]) == n && !memcmp(ses_agents[i], val, n)) {
+                return i;
+            }
+        }
+    }
+    return SES_AGENTS_MAX;
+}
+
 uint8_t ses_hello(void)
 {
     static uint8_t cn[16], sn[16];
     a2_iter_t it;
     a2_item_t item;
     char *u;
-    uint8_t rc, have_sn = 0;
+    uint8_t rc, i, n, rest, have_sn = 0;
 
     ses_open = 0;
     ses_nagents = 0;
     ses_sid[0] = 0;
+    memset(ses_labels, 0, sizeof ses_labels);
     rc = cogs_random(cn, 16);
     if (!rc) {
         rc = ses_device_id();
@@ -153,6 +180,14 @@ uint8_t ses_hello(void)
             memcpy(ses_agents[ses_nagents], item.val, item.vlen);
             ses_agents[ses_nagents][item.vlen] = 0;
             ++ses_nagents;
+        } else if (a2_is(&item, "name")) {
+            /* "name main Pinchy", after the agent lines */
+            i = ses_agent_at(item.val, item.vlen, &rest);
+            n = (uint8_t)(item.vlen - rest);
+            if (i < SES_AGENTS_MAX && n && n <= SES_AGENT_LEN) {
+                memcpy(ses_labels[i], item.val + rest, n);
+                ses_labels[i][n] = 0;
+            }
         }
     }
     if (rc == A2_ITER_BAD || !have_sn || !ses_sid[0]) {

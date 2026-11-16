@@ -9,6 +9,8 @@ export const MAX_TEXT = 1500;
 export const MAX_BODY = 1024;
 export const MAX_TARGET = 512;
 export const MAX_WAIT_MS = 4000;
+/** An agent's display name, in a hello's `name` line. */
+export const DISPLAY_NAME_MAX = 16;
 
 export const Code = {
   OK: 0,
