@@ -1,5 +1,35 @@
 # Testing on the card
 
+## Release 1.0: milestone 8
+
+`make release` has made `build/release/`: `TWOEGRAM-1.0.po`, the plugin
+package `openclaw-twoegram-1.0.0.tgz`, and `SHA256SUMS`.
+
+1. **The plugin from the package.** Your gateway runs the plugin from a
+   linked folder today. Switch it to the package as docs/INSTALL.md
+   says ("Coming from a linked folder", then steps 1 to 3): with the
+   gateway stopped, drop the folder's load path, refresh, install the
+   package, start. `openclaw plugins list` shows `a2` at version 1.0.0,
+   from `dist/index.js`, with no warning; the log has the `[a2]
+   listening` line.
+2. **The release disk, as a newcomer sees it.** Boot `TWOEGRAM-1.0.po`.
+   The title says 1.0. With no address on the disk, the set-up screen
+   comes first: type the gateway's address, leave the key empty (the
+   card has it), Return. Pinchy's conversation opens, as before.
+3. **The audit.** On the gateway host:
+
+   ```bash
+   openclaw security audit
+   ```
+
+   Nothing about the a2 channel is expected. After step 1, two general
+   findings name the plugin (`plugins.extensions_no_allowlist` and
+   `plugins.tools_reachable_permissive_policy`); docs/INSTALL.md step 5
+   says what they mean. Please paste the output.
+4. **Still open from milestone 6:** ask for a long answer ("explain the
+   6502's addressing modes in detail") and see it arrive as several
+   messages, in order.
+
 ## Build b017: milestone 7, when things go wrong, and agents by name
 
 First update the plugin on the gateway (its `rsync` from INSTALL.md

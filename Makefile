@@ -80,7 +80,7 @@ $(shell mkdir -p build; t='#define BUILD_ID "$(BUILD_ID)"'; [ "$$(cat build/buil
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk run shots convo-shots charset host-test clean
+.PHONY: all disk release run shots convo-shots charset host-test clean
 
 all: $(BIN) $(PRBIN)
 
@@ -149,6 +149,27 @@ $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	@echo "==> $(DISK): build $(BUILD_ID), volume /$(VOLUME)"
 
 FORCE:
+
+# The release: build/release/ holds the disk (TWOEGRAM.SYSTEM and
+# A2PROBE.SYSTEM, volume /TWOEGRAM, and no .CFG file: no test key, no
+# address; the set-up screen asks), the plugin package (npm pack, only
+# the files OpenClaw loads), and their SHA-256 sums. The build number
+# goes up as for any disk, so the release's is its own.
+VERSION := $(shell sed -n 's/.*TWOEGRAM_VERSION "\(.*\)".*/\1/p' src/ui.h)
+REL      = build/release
+
+release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
+	rm -rf $(REL)
+	mkdir -p $(REL)
+	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(PRBIN)
+	@if tools/ac -ll $(REL)/TWOEGRAM-$(VERSION).po | grep -q '\.CFG'; then \
+	    echo "release: a .CFG file is on the release disk" >&2; exit 1; \
+	fi
+	cd plugin && npm pack --pack-destination ../$(REL) >/dev/null
+	cd $(REL) && shasum -a 256 *.po *.tgz > SHA256SUMS
+	@echo $$(( $(BUILD) + 1 )) > BUILDNUM
+	@echo "==> $(REL): Twoegram $(VERSION) (build $(BUILD_ID)) and the a2 plugin"
+	@cat $(REL)/SHA256SUMS
 
 run: $(DISK)
 	tools/vii.sh boot $(DISK)

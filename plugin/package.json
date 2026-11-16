@@ -1,6 +1,6 @@
 {
   "name": "openclaw-twoegram",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The a2 channel: OpenClaw agents for the Apple //e Twoegram client, signed over the LAN",
   "license": "MIT",
   "private": true,
@@ -15,7 +15,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sdk": "npm install --prefix ../.sdk --ignore-scripts --no-audit --no-fund --no-save openclaw@2026.11.3",
-    "typecheck:openclaw": "tsc --noEmit -p tsconfig.openclaw.json"
+    "typecheck:openclaw": "tsc --noEmit -p tsconfig.openclaw.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -53,6 +55,17 @@
     "index.ts",
     "setup-entry.ts",
     "openclaw.plugin.json",
-    "src/"
+    "dist/",
+    "src/agent.ts",
+    "src/channel.ts",
+    "src/commands.ts",
+    "src/convstore.ts",
+    "src/devices.ts",
+    "src/openclaw-agent.ts",
+    "src/protocol.ts",
+    "src/server.ts",
+    "src/text.ts",
+    "README.md",
+    "LICENSE"
   ]
 }

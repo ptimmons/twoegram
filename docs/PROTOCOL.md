@@ -132,7 +132,7 @@ Each line is a word, a space, and its value, ended by `\n`:
 | `unread coder 2` | messages the Apple has not fetched, for another agent |
 | `why bad seq` | an error's reason |
 | `conn 3` | dev server only, in every reply: the number of the TCP connection the request came on, so a probe can see whether the card reused one |
-| `server twoegram-dev 0.1.0 569147e` | in every `hello` reply, refusals too: which server and build answered, for diagnostics only (in an unsigned reply it proves nothing) |
+| `server twoegram-dev 1.0.0 569147e` | in every `hello` reply, refusals too: which server and build answered, for diagnostics only (in an unsigned reply it proves nothing) |
 
 ### Message records
 

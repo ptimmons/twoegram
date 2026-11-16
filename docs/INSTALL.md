@@ -1,75 +1,68 @@
 # Installing the a2 channel on your OpenClaw gateway
 
 The `a2` plugin lets Twoegram on the Apple //e talk to your gateway's
-agents. It needs OpenClaw 2026.11.3 and Node 24.16+ or 26.1+, which your
+agents. It needs OpenClaw 2026.11.3 or later (before 2026.12; checked
+with 2026.11.3 and 2026.11.4) and Node 24.16+ or 26.1+, which your
 gateway already has. It has no npm dependencies.
 
-It was tested in a scratch OpenClaw 2026.11.3 on the Mac (an isolated home
-directory, gateway on loopback, no model provider). That run covered
-install, start-up, pairing, sign-in, sending to two agents, replies coming
-back, slash commands, revoking, and history surviving a restart. What it
-could not cover is a real model's answers: that needs your gateway.
+The release (`make release`, in `build/release/`) is two files and their
+checksums:
+
+- `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
+  It carries no address and no key; the set-up screen asks for both.
+- `openclaw-twoegram-1.0.0.tgz`: the plugin, compiled, with only the
+  files OpenClaw loads.
 
 ## 1. Copy the plugin to the gateway host
 
-Only the `plugin/` folder is needed, without `node_modules`. From the Mac:
+From the Mac:
 
 ```bash
-rsync -a --exclude node_modules --exclude .dev ~/repos/twoegram/plugin/. GATEWAY-HOST:twoegram-plugin/
+scp build/release/openclaw-twoegram-1.0.0.tgz build/release/SHA256SUMS GATEWAY-HOST:
 ```
 
-The `/.` at the end of the source means "the folder's contents". A
-plain trailing slash means the same to rsync, but zsh removes a slash
-that tab completion added as soon as you type a space, and then rsync
-copies the folder itself, to `~/twoegram-plugin/plugin/`. Afterwards
-`~/twoegram-plugin` should hold `package.json`, `openclaw.plugin.json`,
-`index.ts` and `src/` directly.
+On the gateway host, check it arrived whole:
 
-(Or `git clone` the repository on the gateway host. The plugin is then
-the clone's `plugin/` folder, so give that path to the install below.)
+```bash
+grep tgz SHA256SUMS | sha256sum -c
+```
 
-## 2. Install and enable it
+## 2. Install it
 
-On the gateway host, with the gateway stopped:
+With the gateway stopped:
 
 ```bash
 openclaw gateway stop
 ```
 
 ```bash
-openclaw plugins install -l ~/twoegram-plugin --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.0.0.tgz --force --accept-capabilities
 ```
 
 It should end with `Saved for the next Gateway start.` Leave the gateway
 stopped until step 3 has set the channel up; step 3 starts it.
 
-With the gateway running, the CLI asks the gateway to do the install
-instead. If the gateway refuses, the CLI retries the folder as a hook
-pack, which needs the gateway stopped, and you see only that retry's
-error ("This operation requires exclusive offline state ownership"),
-not the gateway's reason. With the gateway stopped, any problem is
-reported as it is.
-
-- `-l` links the folder rather than copying it, so a later `rsync` and a
-  gateway restart is all an update needs. Keep the folder where it is:
-  if it moves, OpenClaw quietly skips the plugin (the Apple then gets
-  `CONNECTION REFUSED`, and `openclaw plugins list` warns that a load
-  path is unavailable). To link the new place, with the gateway
-  stopped, install again from it, then drop the old path and refresh:
+- `--force` confirms a source that is not on ClawHub.
+- `--accept-capabilities` accepts that it is a channel.
+- **Why stopped:** with the gateway running, the CLI asks the gateway to
+  do the install instead. If the gateway refuses, the CLI retries the
+  package as a hook pack, which needs the gateway stopped, and you see
+  only that retry's error ("This operation requires exclusive offline
+  state ownership"), not the gateway's reason. With the gateway stopped,
+  any problem is reported as it is.
+- **Updating** to a newer package: the same, with the new file.
+- **Coming from a linked folder** (the development install below):
+  first, with the gateway stopped, drop the folder from OpenClaw's load
+  paths (`[]` if it was the only one) and refresh, then install the
+  package as above. Your `channels.a2` settings and paired Apples stay.
 
   ```bash
-  openclaw config set plugins.load.paths '["/home/you/twoegram-plugin"]' --strict-json
+  openclaw config set plugins.load.paths '[]' --strict-json
   ```
 
   ```bash
   openclaw plugins registry --refresh
   ```
-- `--force` confirms a source that is not on ClawHub.
-- `--accept-capabilities` accepts that it is a channel.
-
-OpenClaw's install scan checks the folder first. It refuses a
-`node_modules` that points outside the plugin, which is why step 1 leaves
-it out.
 
 ## 3. Configure the channel
 
@@ -96,10 +89,8 @@ Then start the gateway:
 openclaw gateway start
 ```
 
-(Later, after an `rsync` of a new version, `openclaw gateway restart`
-is enough.)
-
-Its log should show a line like this:
+Its log should show a line like this, and `openclaw plugins list` should
+show `a2` with no warning:
 
 ```
 [a2] listening on http://0.0.0.0:8417/a2/ for 0 device(s); agents main
@@ -125,11 +116,25 @@ openclaw a2 revoke <device-id>
 
 `revoke` also deletes that device's saved conversations.
 
-On the Apple: start Twoegram, press Open-Apple-K, and enter the gateway
-address (for example `http://192.168.1.20:8417`) and the new key. The key
-replaces the dev server's key in the card's flash.
+On the Apple: start Twoegram from `TWOEGRAM-1.0.po`. The set-up screen
+asks for the gateway's address (for example `192.168.1.20:8417`) and the
+key. If the card already holds a key that this gateway knows, leave the
+key empty to keep it.
 
-## 5. Optional: try it from the Mac first
+## 5. Check the gateway's security
+
+```bash
+openclaw security audit
+```
+
+It has no finding about the a2 channel itself. A plugin installed from a
+package does show in two general findings, which apply to every
+installed plugin: `plugins.extensions_no_allowlist` (set `plugins.allow`
+to the plugin ids you trust, `a2` among them, and every other plugin you
+use, or they stop loading) and `plugins.tools_reachable_permissive_policy`
+(a2 gives agents no tools, so for a2 there is nothing to restrict).
+
+## 6. Optional: try it from the Mac first
 
 Pair a second device for the Python client, so the Apple's key stays
 unseen:
@@ -144,11 +149,57 @@ A2_URL=http://GATEWAY-HOST:8417 A2_KEY=<that key> python3 tools/a2client.py chat
 
 Revoke it afterwards with `openclaw a2 revoke <id>`.
 
+## For development: a linked folder
+
+Instead of the package, OpenClaw can run the plugin's TypeScript
+straight from a folder, so an update is an `rsync` and a gateway restart.
+From the Mac:
+
+```bash
+rsync -a --exclude node_modules --exclude .dev --exclude dist ~/repos/twoegram/plugin/. GATEWAY-HOST:twoegram-plugin/
+```
+
+The `/.` at the end of the source means "the folder's contents". A
+plain trailing slash means the same to rsync, but zsh removes a slash
+that tab completion added as soon as you type a space, and then rsync
+copies the folder itself, to `~/twoegram-plugin/plugin/`. Afterwards
+`~/twoegram-plugin` should hold `package.json`, `openclaw.plugin.json`,
+`index.ts` and `src/` directly. (`dist/`, the compiled copy, stays out:
+an old one would be loaded in place of the newer source.)
+
+With the gateway stopped:
+
+```bash
+openclaw plugins install -l ~/twoegram-plugin --force --accept-capabilities
+```
+
+OpenClaw's install scan checks the folder first. It refuses a
+`node_modules` that points outside the plugin, which is why the `rsync`
+leaves it out.
+
+**If the folder moves**, OpenClaw quietly skips the plugin (the Apple
+then gets `CONNECTION REFUSED`, and `openclaw plugins list` warns that a
+load path is unavailable). With the gateway stopped, install again from
+the new place, then drop the old path and refresh:
+
+```bash
+openclaw config set plugins.load.paths '["/home/you/twoegram-plugin"]' --strict-json
+```
+
+```bash
+openclaw plugins registry --refresh
+```
+
 ## How it fits into OpenClaw
 
 - **Who may talk:** only paired devices. A request whose signature does
   not check out never reaches OpenClaw. In OpenClaw's terms the channel's
   DM policy is `allowlist`, and the allowlist is the device list.
+- **What the Apple may do:** the Apple is not an owner
+  (`commands.ownerAllowFrom`), so OpenClaw keeps its owner-only tools
+  (`nodes`, `terminal`, `computer` and others) from agents answering it.
+  Adding `a2:<device-id>` to that list changes this; see PLAN.md
+  section 9, item 5, before doing so.
 - **Sessions:** each device and agent pair is its own direct-message
   session, `agent:<agent>:a2:direct:<device>.<agent>`, whatever the
   gateway's `session.dmScope` is. Talking to `main` from the Apple does

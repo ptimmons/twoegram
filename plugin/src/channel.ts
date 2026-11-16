@@ -58,12 +58,18 @@ export function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): 
   };
 }
 
+// package.json is one folder up from src/channel.ts, and two from the
+// compiled dist/src/channel.js in the package.
 const VERSION = (() => {
-  try {
-    return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version as string;
-  } catch {
-    return "?";
+  for (const up of ["../package.json", "../../package.json"]) {
+    try {
+      const pkg = JSON.parse(readFileSync(new URL(up, import.meta.url), "utf8"));
+      if (pkg.name === "openclaw-twoegram") return pkg.version as string;
+    } catch {
+      // not there: the next
+    }
   }
+  return "?";
 })();
 
 const listAgents = (cfg: Cfg) => listAgentIds(cfg as unknown as OpenClawConfig);

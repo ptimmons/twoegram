@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.openclaw.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "index.ts",
+    "setup-entry.ts",
+    "src"
+  ],
+  "exclude": [
+    "src/cli.ts",
+    "src/dev-server.ts"
+  ]
+}

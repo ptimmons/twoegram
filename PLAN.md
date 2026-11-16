@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** milestones 0 to 7 built and passed on the real card and your gateway (b017, 2026-11-16); next, milestone 8 (release).
+**Status:** milestones 0 to 7 built and passed on the real card and your gateway (b017, 2026-11-16); milestone 8, release 1.0, built and checked in scratch gateways, waiting for your gateway and the card.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -895,3 +895,46 @@ All passed, on the real gateway (OpenClaw 2026.11.3, agent "Pinchy"):
   revoking (optional). During the tests the agent said its replies had
   been "interrupted before they finish": most likely its turns cut off
   by the gateway stops and restarts. Worth watching for in ordinary use.
+
+### Milestone 8 notes
+
+- **Version 1.0:** the Apple program (`TWOEGRAM_VERSION`, on the title
+  and help screens), the manual, and the plugin package (1.0.0). The
+  protocol stays version 1.
+- **`make release`** makes `build/release/`: `TWOEGRAM-1.0.po` (volume
+  /TWOEGRAM; TWOEGRAM.SYSTEM and A2PROBE.SYSTEM; no .CFG file, which the
+  target refuses, so no test key and no address: the set-up screen asks),
+  `openclaw-twoegram-1.0.0.tgz`, and `SHA256SUMS`. The disk image carries
+  ProDOS 2.4.3, as every disk here has.
+- **Packages need compiled JavaScript.** OpenClaw runs a plugin's
+  TypeScript only from a linked development folder; from a package it
+  wants `dist/index.js` beside `./index.ts` ("TypeScript source fallback
+  is only supported for source checkouts and local development paths").
+  `npm run build` (run by `prepack`) compiles to `dist/` with
+  `rewriteRelativeImportExtensions`; the package's files are listed one
+  by one, so the dev server and its pairing tool stay out. The plugin
+  finds its package.json from either `src/` or `dist/src/`.
+- **Checked in scratch gateways:** the package installed into a fresh
+  2026.11.3, loaded from `global:a2/dist/index.js`, listening, sign-in,
+  `/whoami`; switching a linked install to the package (dropping the load
+  path first, then installing, is the clean order; the other way round
+  works but complains); settings and paired devices survive.
+- **`openclaw security audit`:** nothing about the a2 channel. A plugin
+  installed from a package (unlike a linked one) appears in two general
+  findings that every installed plugin raises without `plugins.allow`:
+  `plugins.extensions_no_allowlist` and
+  `plugins.tools_reachable_permissive_policy`. a2 registers no agent
+  tools. Setting `plugins.allow` is the gateway owner's choice, since it
+  must list every plugin they use (INSTALL.md step 5).
+- **Manual:** Chapter 6 is now the security chapter: what is protected;
+  what is not (eavesdroppers on the LAN, and anyone at the Apple, as
+  there is no passphrase yet); what agents can do from the Apple (not an
+  owner: no owner-only tools); what the gateway keeps; the key; and a
+  checklist for whoever looks after the gateway.
+- **Also:** a top-level README.md; docs/INSTALL.md leads with the package
+  and keeps the linked folder as the development install (its `rsync`
+  now leaves out `dist/`, which would otherwise be loaded in place of
+  newer source); plugin/README.md and plugin/LICENSE go in the package.
+- **For the card and your gateway** (docs/PROBE.md, "Release 1.0"):
+  switch the gateway to the package, boot the release disk as a newcomer
+  would, run the audit, and see a long answer arrive in parts.

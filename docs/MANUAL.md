@@ -2,7 +2,7 @@
 
 ### Conversations with Your Agents, for the Apple IIe
 
-#### User's Guide · Version 0.1
+#### User's Guide · Version 1.0
 
 ![The Twoegram title screen](images/splash.png)
 
@@ -457,7 +457,8 @@ in Figure 5-3.
 Your agents can do real work for you: read your calendar, send a
 message, change a file. So it matters that nobody else can talk to them
 pretending to be you, and that nobody can slip a false answer onto your
-screen. Twoegram is built to prevent both.
+screen. Twoegram is built to prevent both. This chapter explains what it
+protects, what it doesn't yet, and the few habits that keep it that way.
 
 ### What Twoegram Protects
 
@@ -479,24 +480,81 @@ That's why the status bar says **SIGNED**.
 
 ### What It Doesn't Yet Protect
 
-Your conversation crosses your home network as plain text. Anyone with
-the right equipment on your network could read it, although they
-couldn't change it or join in. That's why the status bar also says
-**NOT ENCRYPTED**.
+**Eavesdroppers on your network.** Your conversation crosses your home
+network as plain text. Anyone with the right equipment on your network
+could read it, although they couldn't change it or join in. That's why
+the status bar also says **NOT ENCRYPTED**.
+
+**Someone sitting at your Apple.** Twoegram doesn't ask for a password.
+Anyone who turns on your Apple with the Twoegram disk, or finds it
+running, can talk to your agents as you. Treat the Apple as you would
+a computer that's left signed in.
 
 > **Important:** Use Twoegram only on your own home network, and never
-> make your gateway reachable from the Internet. A future version of
-> Twoegram will encrypt the conversation, so that it can't be read on
-> the way.
+> make your gateway reachable from the Internet. When you leave the
+> Apple where others can reach it, press OPEN-APPLE-Q to quit Twoegram.
+> A future version of Twoegram will encrypt the conversation and can ask
+> for a passphrase before it starts.
+
+### What Your Agents Can Do from the Apple
+
+Your gateway decides what an agent may do, not Twoegram. To the
+gateway, your Apple is a trusted acquaintance rather than the gateway's
+owner, so an agent you talk to from the Apple doesn't get the gateway's
+most powerful tools: running commands on the gateway computer, using
+its screen, or changing the gateway itself. If you ask for something
+that needs one, the agent will tell you it can't do it from here.
+
+Whoever looks after the gateway can change that by listing your Apple
+as an owner. Think before asking for it: anyone at your Apple would then
+have those powers too, and Twoegram doesn't yet ask for a passphrase.
+
+OpenClaw's own commands, such as `/status` and `/new`, work from the
+Apple unless the gateway turns them off.
+
+### What the Gateway Keeps
+
+The gateway keeps the newest 500 messages of each conversation, so
+Twoegram can show them to you again, in files that only the gateway's
+own account can read. OpenClaw keeps its own record of each
+conversation too, as it does for every other way of talking to your
+agents. Your Apple keeps nothing on its disks: the conversation lives in
+the Apple's memory only while Twoegram runs.
 
 ### Keeping Your Key Safe
 
-Your key is kept in the CoGS card, not on any disk. If the Apple or the
-card leaves your hands, ask whoever looks after the gateway to remove
-it from the gateway's list (`openclaw a2 revoke`), and press
-OPEN-APPLE-X on the Set-up screen to wipe the key from the card. The
-gateway forgets the conversations it kept for that Apple at the same
-time.
+The key appears only once, when your Apple is paired, and is kept in
+the CoGS card, not on any disk. Once it's typed in, you don't need the
+paper again. Tear it up, or at least don't keep it beside the Apple.
+
+If the Apple or the card leaves your hands:
+
+1. Ask whoever looks after the gateway to remove the Apple from the
+   gateway's list (`openclaw a2 revoke`). From then on, the key is
+   worthless. The gateway forgets the conversations it kept for that
+   Apple at the same time.
+2. Press OPEN-APPLE-K, then OPEN-APPLE-X on the Set-up screen, to wipe
+   the key from the card.
+
+If you lose the paper before typing the key, or type it into another
+Apple by mistake, simply pair again and revoke the old key.
+
+### For Whoever Looks After the Gateway
+
+- Keep the a2 channel's port (8417 unless you changed it) open to your
+  home network only, and never forward it to the Internet. Setting the
+  channel's `host` to the gateway's own address on your home network,
+  rather than `0.0.0.0`, keeps it off any other network the gateway
+  computer is on.
+- Give the Apple only the agents it needs, with the channel's `agents`
+  setting. An agent with fewer tools is the safest one to talk to from
+  the Apple.
+- `openclaw a2 list` shows every paired Apple. Revoke any you don't
+  recognize or no longer use.
+- `openclaw security audit` checks the gateway's settings. It has
+  nothing to say about the a2 channel once an Apple is paired.
+- The gateway's log notes every hello, with the Apple's name and
+  address, and every lockout.
 
 ---
 
