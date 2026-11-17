@@ -1116,6 +1116,6 @@ reach a shell on the gateway all the same, so the lock still matters.)
 - **On the card, 2026-11-17:** setting a passphrase, the lock and
   unlocking passed, and the pause for 64 hashes is negligible.
   `PASS_ROUNDS` stays at 64 for good, since changing it would change
-  what a passphrase makes. Not yet reported: the idle lock, a fresh
-  start, Open-Apple-P.
+  what a passphrase makes. Open-Apple-P passed too. Not yet reported:
+  the idle lock, a fresh start.
 

@@ -12,13 +12,13 @@ plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
 ### 1. The rest of the lock (b028, built 2026-11-16)
 
-Steps: PROBE.md, "Build b028", steps 4 to 6. Setting a passphrase and
-the lock passed on 2026-11-17; these were not mentioned:
+Steps: PROBE.md, "Build b028", steps 4 and 5. Setting a passphrase,
+the lock and Open-Apple-P passed on 2026-11-17; these were not
+mentioned:
 
 - **The idle lock** after 10 minutes.
 - **A fresh start** asks for the passphrase; a wrong one is caught by the
   gateway and asked again.
-- **Open-Apple-P** removes the passphrase.
 
 ### 2. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
 
@@ -30,8 +30,8 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 - **Open-Apple-< goes to the very start** in one request.
 - **Scrolling down from the start** fetches newer messages.
 - **The scroll arrows** in column 80: up at the pane's top when there is
-  more above, down at its foot when there is more below. The up arrow is
-  MouseText $4B, which has not been seen on the card yet.
+  more above, down at its foot when there is more below. (Both glyphs,
+  MouseText $4B and $4A, seen on the card 2026-11-17 and look right.)
 - **No `THE START OF THE CONVERSATION` message** any more.
 - **The narrower list:** 18 columns, names in full up to 16 characters,
   a diamond and no count.
@@ -51,7 +51,8 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 ## Passed
 
 - **The passphrase and the lock** (2026-11-17, b028): the set-up screen
-  from the disk, setting a passphrase, Open-Apple-L and unlocking. The
+  from the disk, setting a passphrase, Open-Apple-L and unlocking,
+  Open-Apple-P. The
   pause for 64 hashes is negligible, so `PASS_ROUNDS` stays at 64.
 - **Lights from the Apple** (2026-11-17): Pinchy switches lights in the
   house when asked from Twoegram, with the Apple not an owner.
