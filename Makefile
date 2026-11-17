@@ -85,7 +85,7 @@ $(shell mkdir -p build; t='#define BUILD_ID "$(BUILD_ID)"'; [ "$$(cat build/buil
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk release run shots convo-shots charset host-test clean
+.PHONY: all disk release run shots convo-shots charset host-test hermes-sdk hermes-test hermes-vectors clean
 
 all: $(BIN) $(PRBIN)
 
@@ -243,6 +243,27 @@ host-test: build/host/test_cogs build/host/test_layout build/host/test_a2 build/
 	build/host/test_a2
 	build/host/test_store
 	build/host/test_convo
+
+# The Hermes Agent plugin (hermes/README.md). Its adapter tests run against
+# Hermes's own source, at the commit the gateway runs.
+HERMES_COMMIT = ae2a81ccc00e9b7c06301523e5bb09608397149c
+HERMES_PY = .sdk/hermes-venv/bin/python
+
+hermes-sdk:
+	test -d .sdk/hermes-agent/.git || (mkdir -p .sdk && git init -q .sdk/hermes-agent && \
+	  git -C .sdk/hermes-agent remote add origin https://github.com/NousResearch/hermes-agent.git)
+	git -C .sdk/hermes-agent fetch -q --depth 1 origin $(HERMES_COMMIT)
+	git -C .sdk/hermes-agent checkout -q FETCH_HEAD
+	test -x $(HERMES_PY) || python3 -m venv .sdk/hermes-venv
+	$(HERMES_PY) -c 'import tomllib; [print(d) for d in tomllib.load(open(".sdk/hermes-agent/pyproject.toml","rb"))["project"]["dependencies"] if not d.startswith("browser-harness")]' > .sdk/hermes-deps.txt
+	$(HERMES_PY) -m pip install -q -r .sdk/hermes-deps.txt pytest pytest-asyncio
+
+hermes-test:
+	cd hermes && ../$(HERMES_PY) -m pytest -q -p no:cacheprovider
+
+hermes-vectors:
+	node hermes/tools/vectors.ts > hermes/tests/vectors.json
+	python3 hermes/tools/tables.py
 
 clean:
 	rm -rf build

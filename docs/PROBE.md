@@ -1,8 +1,23 @@
 # Testing on the card
 
+## Build b034: when the gateway refuses the key
+
+Plugin 1.1.0, as before. Boot `build/TWOEGRAM-b034.po` (or later; b036 is current); it carries
+everything below too (use it for the b033 steps). Optional: it needs a
+spare pairing.
+
+1. On the gateway, `openclaw a2 pair` a second device and type its key
+   on the Apple (Open-Apple-K), so the everyday key is left alone.
+2. With a conversation open, `openclaw a2 list` and `openclaw a2 revoke`
+   that second device. At the next poll the pane says
+   `THE GATEWAY DOES NOT KNOW THIS KEY` and, below it, `Pair this Apple
+   again (openclaw a2 pair), then` Open-Apple-`K.`
+3. Open-Apple-K, and type the everyday key back: connected again, and
+   the line is gone.
+
 ## Build b033: saving the conversation
 
-Plugin 1.1.0, as before. Boot `build/TWOEGRAM-b033.po`; it carries
+Plugin 1.1.0, as before. Boot `build/TWOEGRAM-b033.po` (or b034); it carries
 everything below too. The disk now also has `TWOEGRAM.SAVE`, read from
 the disk when saving.
 

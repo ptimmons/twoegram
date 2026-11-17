@@ -23,6 +23,7 @@ char    link_sec[24];
 char    link_err[64];
 uint8_t link_fails;
 uint8_t link_waiting;
+uint8_t link_badkey;
 
 static uint16_t start;
 
@@ -39,6 +40,7 @@ static void offline(const char *sec, const char *err)
 {
     link_live = 0;
     link_waiting = 0;
+    link_badkey = 0;
     msgs_mode(MSGS_NONE);
     fmt_str(link_sec, sec);
     fmt_str(link_err, err);
@@ -48,6 +50,7 @@ uint8_t link_trouble(uint8_t rc)
 {
     uint8_t code = rc == SES_E_REFUSED ? ses_reply.code : A2_OK;
 
+    link_badkey = 0;
     if (code == A2_UNKNOWN_AGENT) {
         return LT_AGENTS;
     }
@@ -60,6 +63,10 @@ uint8_t link_trouble(uint8_t rc)
     if (code == A2_UNKNOWN_DEVICE || code == A2_BAD_SIGNATURE || code == A2_LOCKED ||
         rc == SES_E_FORGED || rc == SES_E_NOTSERVER || rc == COGS_E_NOCARD) {
         offline("NOT CONNECTED", ses_strerror(rc));
+        /* Revoked, or the card's key bytes changed (a firmware upgrade,
+         * a reset): the key itself is the trouble, and the pane says how
+         * to put it right. */
+        link_badkey = (uint8_t)(code == A2_UNKNOWN_DEVICE || code == A2_BAD_SIGNATURE);
         return LT_OFFLINE;
     }
     /* Passing: busy, a session lost twice over (the gateway in the middle
@@ -137,6 +144,7 @@ uint8_t link_connect(void)
     }
     link_live = 1;
     link_waiting = 0;
+    link_badkey = 0;
     link_fails = 0;
     link_err[0] = 0;
     fmt_str(link_sec, SEC_SIGNED);

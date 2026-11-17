@@ -6,3 +6,5 @@ tools/ac-mac-*
 probe.cfg
 .sdk/
 *.o
+.dev-py/
+__pycache__/

@@ -293,6 +293,7 @@ static const char *pane_note(uint8_t r)
     if (msgs_now == MSGS_NONE) {
         switch (r) {
         case 1: return link_err;
+        case 2: return link_badkey ? "Pair this Apple again on the gateway, then " OA "-K." : "";
         case 3: return OA "-K  set the gateway and key";
         case 4: return OA "-R  try to connect again";
         }

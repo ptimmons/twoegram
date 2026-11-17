@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** release 1.0 done: milestones 0 to 8 built and passed on the real card and your gateway (2026-11-16; the Apple's disk b019, plugin 1.0.1). Next: section 9, the requests for later builds.
+**Status:** release 1.0 done: milestones 0 to 8 built and passed on the real card and your gateway (2026-11-16; the Apple's disk b019, plugin 1.0.1). Section 9's requests are built (2026-11-17). Also built 2026-11-17: the same channel for Hermes Agent (`hermes/`; see "Hermes Agent" below), not yet on the Mac mini.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -363,7 +363,8 @@ otherwise interrupt:
    Tests: 5 more in Vitest (66), IDENTITY.md parsing as OpenClaw writes
    it, config before file; the screen test checks the list, heading and
    status bar, the 13-character cut, and that requests still name `main`.
-8. **Say when the card's key is the trouble** (2026-11-16, low priority).
+8. **Say when the card's key is the trouble** (2026-11-16, low priority;
+   done 2026-11-17 in b034, not yet on the card).
    The key lives in the card's `PREFS` blob, bytes 15-31, which the
    reference does not reserve for us: a firmware upgrade, a factory reset
    or another program could change them. If the mark byte goes, Twoegram
@@ -374,6 +375,22 @@ otherwise interrupt:
    accept this Apple's key. Pair it again." (and the manual's Appendix B
    the same). Fix for the user either way: `openclaw a2 pair`, type the
    new key, revoke the old device.
+
+   **As built (b034):** most of this was already so. The device id is a
+   hash of the key (`ses_device_id`), so changed key bytes make an id
+   the gateway has never seen: UNKNOWN_DEVICE, not BAD_SIGNATURE (that
+   needs a 32-bit id collision). At start-up an unknown key already
+   opened set-up with "The gateway does not know this key. Pair this
+   Apple on the gateway, then type its key." What was missing was the
+   middle of a conversation (a revocation, or the bytes changing while
+   Twoegram runs): the pane said only THE GATEWAY DOES NOT KNOW THIS
+   KEY. Now `link_badkey`, set by `link_trouble` for UNKNOWN_DEVICE or
+   BAD_SIGNATURE and cleared by any other trouble or a good hello, adds
+   a second line to the offline pane: "Pair this Apple again (openclaw
+   a2 pair), then Open-Apple-K." 105 bytes; 2,468 of heap left. The
+   screen test checks the line after a revocation and its absence after
+   a lock-out. The manual's Appendix B says the same and adds revoking
+   the old device.
 
 ## 10. Risks to settle at milestone 2
 
@@ -1171,4 +1188,79 @@ Started 2026-11-17: section 9, item 2.
   replace question and the screen drawn again after. Not seen until the
   card: a file actually written, a long conversation's time, a network
   disk.
+
+### Hermes Agent (2026-11-17, plugin 1.0.0, Apple b036)
+
+The investigation is [docs/HERMES.md](docs/HERMES.md); the plugin is
+[hermes/](hermes/README.md). It is a second gateway-side implementation
+of PROTOCOL.md, a Hermes platform plugin in Python (standard library
+only), so the Apple's disk needs no change beyond words.
+
+- **Port, not rewrite.**
+  - `protocol.py`, `text.py`, `store.py` and `server.py` follow the
+    TypeScript line for line.
+  - `hermes/tests/vectors.json`, made by the TypeScript
+    (`make hermes-vectors`), checks keys, signatures, records, folding,
+    splitting and names against the same bytes. 87 vectors, including a
+    sweep of 2,300 code points, matched on the first run.
+  - The folding tables are generated from `text.ts`.
+  - The device and conversation files have the same format as
+    OpenClaw's.
+- **Agents.**
+  - The server asks the agent to `deliver` and returns at once. The
+    answer comes back later through `post()`, and `set_busy()` says
+    whether the agent is working. That is Hermes's shape: the adapter's
+    `send()` is called once per finished answer.
+  - The HTTP listener is asyncio streams, about 80 lines (Content-Length,
+    keep-alive for 10 s, 404 outside `/a2/`), so no aiohttp is needed.
+- **Hermes glue (`adapter.py`).**
+  - One agent per profile, id `hermes`, name `Hermes`; both can be set.
+  - Chat id `<device>.<agent>`, user id the device id, DM.
+  - Busy runs from the message arriving until
+    `on_processing_complete`, with a 30 s hold if Hermes never starts
+    (a command answered at once).
+  - `display_tier="low"`: no tool progress, streaming or interim
+    messages.
+  - `max_message_length=0`: we cut parts ourselves.
+  - Authorization: Hermes's allowlist check reads the live adapter's
+    `config.extra["allow_from"]`, refreshed with the paired devices at
+    every message. So only signed, paired devices reach Hermes, and
+    neither Hermes's DM pairing nor `trusted_inbound` is involved.
+  - `hermes a2 pair | list | revoke` through
+    `ctx.register_cli_command`.
+- **Tests.**
+  - 130 in all: 34 ported from server.test.ts; 9 with the adapter in
+    Hermes's real base class, including the gateway's own
+    `_is_user_authorized`.
+  - `tools/a2client.py` against the Python dev server.
+  - A scratch Hermes gateway (v0.23.0, the Mac mini's commit) on this
+    Mac:
+    - the plugin was discovered, enabled and listed;
+    - `hermes a2 pair` and `list` worked;
+    - the listener started inside `hermes gateway run`;
+    - a signed hello listed `hermes (Hermes)`;
+    - a message reached Hermes as session `agent:main:a2:dm:<id>.hermes`,
+      and its replies came back to the poll, folded.
+  - That gateway had no model, so the replies were Hermes's own notices
+    (no home channel set; the provider refused). It took
+    `OPENAI_API_KEY` from this Mac's environment, which OpenAI rejected;
+    later runs keep provider keys out of the environment.
+- **On the Apple** (b036): the splash says "Talk to your OpenClaw or
+  Hermes agents", set-up's help names both pair commands, and b034's
+  bad-key line says "Pair this Apple again on the gateway". Screenshots
+  retaken.
+- **Hermes updated** (same day): the Mac mini went from v0.23.0 to
+  v0.23.2, the newest stable release, with `hermes update`. Its model,
+  settings and gateway carried over. The local clone followed
+  (`HERMES_COMMIT`). Every Hermes call the plugin makes is unchanged.
+  The allowlist check was restructured but still reads a DM's
+  `allow_from`. All 130 tests pass again. A scratch v0.23.2 gateway,
+  started with no provider keys in its environment, passed the same
+  hello and message run, and contacted no provider.
+- **Not yet done:**
+  - installing it on the Mac mini, which changes your running Hermes:
+    copy the plugin, enable it, add the config block, restart the
+    gateway;
+  - the real card against it;
+  - a real model's answers and an approval typed from the Apple.
 

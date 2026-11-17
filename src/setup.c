@@ -52,9 +52,9 @@ static char    pass[PASS_MAX + 1], pass1[PASS_MAX + 1];
 static uint8_t pn, p1n;            /* p1n: the first typing, being confirmed */
 
 static const char *const help_text[] = {
-    "The gateway: the machine running OpenClaw with the a2 channel, as an",
+    "The gateway: the machine running OpenClaw or Hermes with a2, as an",
     "address and port, for example 192.168.1.20:8417.",
-    "The key: from pairing this Apple on the gateway (openclaw a2 pair).",
+    "The key: from openclaw a2 pair, or hermes a2 pair, on the gateway.",
     "Type it as shown; dashes are optional. A slip is caught before sending.",
     "It is kept in the CoGS card's own memory, never on a disk.",
     "The passphrase, if you give one, locks the key on the card. It is asked",

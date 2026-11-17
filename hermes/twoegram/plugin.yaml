@@ -1,0 +1,30 @@
+name: twoegram
+label: Apple //e (Twoegram)
+kind: platform
+version: 1.0.0
+description: >
+  The a2 platform: chat with Hermes from an Apple //e running Twoegram, over
+  the LAN. Every request and reply is signed with a key paired by
+  `hermes a2 pair`; nothing is encrypted. Standard library only.
+author: Twoegram
+optional_env:
+  - name: A2_HOST
+    description: "Address to listen on (default 0.0.0.0: every interface)"
+    prompt: "Listen address"
+    password: false
+  - name: A2_PORT
+    description: "Port the Apple connects to (default 8417)"
+    prompt: "Port"
+    password: false
+  - name: A2_AGENT
+    description: "The agent's id on the Apple (default hermes)"
+    prompt: "Agent id"
+    password: false
+  - name: A2_AGENT_NAME
+    description: "What the Apple calls the agent (default Hermes)"
+    prompt: "Agent name"
+    password: false
+  - name: A2_HOME_CHANNEL
+    description: "<device>.<agent> for scheduled messages (hermes a2 list shows devices)"
+    prompt: "Home device"
+    password: false

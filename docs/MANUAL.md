@@ -92,10 +92,11 @@ To use Twoegram, you need
   network.
 - the **Twoegram disk**: on a floppy disk, a hard disk, or the CoGS
   card's own network disk.
-- an **OpenClaw gateway** on the same home network, with Twoegram's
-  channel installed. Whoever looks after your gateway can set this up in
-  a few minutes; the instructions come with Twoegram, in the file
-  `docs/INSTALL.md`.
+- a **gateway** on the same home network, with Twoegram's channel
+  installed: a computer running **OpenClaw**, or one running **Hermes
+  Agent**. Whoever looks after your gateway can set this up in a few
+  minutes; the instructions come with Twoegram, in `docs/INSTALL.md`
+  for OpenClaw and `hermes/README.md` for Hermes.
 
 > **Important:** Set up the CoGS card's network connection before you
 > start Twoegram, using the card's own configuration screen. The CoGS
@@ -187,6 +188,12 @@ this command there:
 
 ```
 openclaw a2 pair "Apple IIe"
+```
+
+or, on a gateway running Hermes Agent:
+
+```
+hermes a2 pair "Apple IIe"
 ```
 
 The gateway answers with two things for you to copy down:
@@ -380,6 +387,29 @@ slash. Two useful ones:
 | `/new` | start a fresh conversation, so the agent forgets what came before |
 
 Your gateway may know more; whoever looks after it can tell you.
+
+### If Your Gateway Runs Hermes Agent
+
+A Hermes gateway gives you one agent, called **Hermes** unless whoever
+looks after it has named it otherwise. Everything in this manual works
+the same way. Hermes's own slash commands work too, such as `/new` and
+`/stop` (which stops the answer it is working on).
+
+Before Hermes runs a command that could change something, it asks you
+first. The question arrives as a message that begins **:warning:
+Hermes wants to run a command that needs your OK**, shows the command,
+and says why it asked. To let it run once, type
+
+```
+/approve
+```
+
+and press RETURN. To refuse, type `/deny`. If you don't answer within
+five minutes, the command doesn't run.
+
+The first time you write, Hermes may say that no home channel is set.
+That is where it sends the results of jobs you schedule. To have them
+come to your Apple, type `/sethome`.
 
 ---
 
@@ -826,8 +856,12 @@ the address, especially the number after the colon.
 The gateway doesn't recognize your key. When connecting, Twoegram shows
 the Set-up screen; type the key again, or ask for a new one. If this
 happens in the middle of a conversation, the key has been taken back
-(revoked) on the gateway: pair your Apple again, then press
-OPEN-APPLE-K and type the new key.
+(revoked) on the gateway, or the copy on the card has changed (a card
+firmware upgrade or reset can do that). Either way the message pane
+says **Pair this Apple again on the gateway, then OPEN-APPLE-K.**
+Do just that: pair your Apple again, then press OPEN-APPLE-K and type
+the new key. Then revoke the old device on the gateway (`openclaw a2
+list` shows it, `openclaw a2 revoke` takes it away).
 
 **LOCKED OUT AFTER BAD TRIES: WAIT 15 MINUTES**
 The gateway saw too many wrong keys from your Apple. Wait 15 minutes,
@@ -967,13 +1001,15 @@ saved on `/RAM` is cleared.
 
 ### The Gateway's Side
 
-On the gateway, Twoegram's channel is an OpenClaw plugin called `a2`.
-It listens on its own port (8417), checks every signature before
+On the gateway, Twoegram's channel is a plugin called `a2`: an OpenClaw
+plugin, or a Hermes Agent plugin that speaks exactly the same way to
+your Apple. It listens on its own port (8417), checks every signature before
 anything reaches an agent, and gives each of your agents a conversation
 of its own, separate from any other way you talk to them. It keeps the
 latest 500 messages of each conversation for your Apple to look back
 through. The file `docs/INSTALL.md` tells whoever looks after the
-gateway how to install it, and `docs/PROTOCOL.md` describes exactly what
+gateway how to install it on OpenClaw, `hermes/README.md` on Hermes
+Agent, and `docs/PROTOCOL.md` describes exactly what
 travels between the Apple and the gateway.
 
 ### Starting from the CoGS Network Disk

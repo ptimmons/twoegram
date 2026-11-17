@@ -7,10 +7,32 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 
 ## Waiting
 
-One disk covers all of this: `build/TWOEGRAM-b033.po` (or later), with
+One disk covers all of this: `build/TWOEGRAM-b036.po` (or later), with
 plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
-### 1. Saving the conversation (b033, built 2026-11-17)
+### 1. Twoegram on Hermes Agent (plugin 1.0.0, built 2026-11-17)
+
+Steps: hermes/README.md, "Install", on the Mac mini (`mini.local`).
+Installing changes your running Hermes, so it waits for you.
+
+- **The Apple connects** to `http://192.168.1.30:8417`, with a key
+  from `hermes a2 pair`. Hermes is listed as the one agent.
+- **A real answer** from Hermes's model, folded to fit the screen.
+- **An approval:** ask for something that needs one, and type
+  `/approve` (and, another time, `/deny`).
+- **`/sethome`**, then a scheduled message arriving on the Apple.
+- **Busy:** the Apple shows Hermes working until the answer comes.
+- **The new words** (b036): the splash, set-up's help, and the bad-key
+  line.
+
+### 2. Saying when the key is refused (b034, built 2026-11-17, optional)
+
+Steps: PROBE.md, "Build b034" (needs a spare pairing to revoke).
+
+- **The pane's second line**, "Pair this Apple again (openclaw a2 pair),
+  then Open-Apple-K", after a revocation mid-conversation.
+
+### 3. Saving the conversation (b033, built 2026-11-17)
 
 Steps: PROBE.md, "Build b033".
 
@@ -20,7 +42,7 @@ Steps: PROBE.md, "Build b033".
 - **Esc** partway stops it and says how much was saved.
 - **A network disk:** writable, or not.
 
-### 2. The rest of the lock (b028, built 2026-11-16)
+### 4. The rest of the lock (b028, built 2026-11-16)
 
 Steps: PROBE.md, "Build b028", steps 4 and 5. Setting a passphrase,
 the lock and Open-Apple-P passed on 2026-11-17; these were not
@@ -30,7 +52,7 @@ mentioned:
 - **A fresh start** asks for the passphrase; a wrong one is caught by the
   gateway and asked again.
 
-### 3. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
+### 5. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
 
 Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
@@ -47,7 +69,7 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 4. Older items, not yet seen
+### 6. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the
@@ -57,6 +79,17 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   its replies had been interrupted, probably because of the gateway
   restarts during testing. Worth noticing if it happens again with no
   restarts.
+
+## To do by hand
+
+- **Delete `~/.hermes` on the Mac Studio (abbeyroad).** Hermes's test
+  setup made it on 2026-11-17 at 12:31, while the plugin was being
+  tested: an empty default skeleton and a default `SOUL.md`, nothing of
+  yours. It is not the Mac mini's.
+
+  ```bash
+  rm -rf ~/.hermes
+  ```
 
 ## Passed
 

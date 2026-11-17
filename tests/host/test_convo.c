@@ -487,6 +487,7 @@ static void test_errors(void)
     idle_for(2, 5);
     CHECK(!link_live && !link_waiting);
     CHECK(on_screen("THE GATEWAY DOES NOT KNOW THIS KEY"));
+    CHECK(link_badkey && on_screen("Pair this Apple again on the gateway, then "));
     CHECK(idle_for(1, 10) == 0);
     /* Paired again (here: the gateway knows it again); Open-Apple-R. */
     strcpy(gw_id, "922fadb6");
@@ -499,6 +500,7 @@ static void test_errors(void)
     gw_refuse = 6; gw_refuse_left = -1;
     idle_for(1, 5);
     CHECK(!link_live && on_screen("WAIT 15 MINUTES"));
+    CHECK(!link_badkey && !on_screen("Pair this Apple again"));
     CHECK(idle_for(1, 10) == 0);
     gw_refuse = 0;
     keys[0] = 'r'; oa[0] = 1;

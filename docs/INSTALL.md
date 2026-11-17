@@ -1,5 +1,8 @@
 # Installing the a2 channel on your OpenClaw gateway
 
+> For a gateway running **Hermes Agent** instead, see
+> [hermes/README.md](../hermes/README.md). The Apple's disk is the same.
+
 The `a2` plugin lets Twoegram on the Apple //e talk to your gateway's
 agents. It needs OpenClaw 2026.11.3 or later (before 2026.12; checked
 with 2026.11.3 and 2026.11.4) and Node 24.16+ or 26.1+, which your

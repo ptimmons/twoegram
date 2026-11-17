@@ -40,6 +40,7 @@ uint8_t link_ok(void);
 
 extern uint8_t link_fails;          /* passing failures in a row */
 extern uint8_t link_waiting;        /* no session, but hello is retried by itself */
+extern uint8_t link_badkey;         /* no session: the gateway refused the key */
 
 /* Before each request: restart the backstop clock the card's waits run
  * against (30 s; the card's own timeouts come first). */
