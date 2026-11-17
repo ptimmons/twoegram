@@ -44,7 +44,15 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 3. Older items, not yet seen
+### 3. Lights from the Apple (2026-11-17)
+
+- **Ask Pinchy to turn a light off from Twoegram.** A test device read a
+  light's state through a2 without being an owner (PLAN.md section 9,
+  item 5); switching one has not been tried. Any build will do.
+- **Remove the test device** paired on claw1 for that check
+  (`openclaw a2 revoke`), and clear its key from `probe.cfg`.
+
+### 4. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the

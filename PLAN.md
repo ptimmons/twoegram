@@ -313,10 +313,21 @@ otherwise interrupt:
    the Apple is not in it. Listing `a2:<device-id>` there made the
    scratch gateway treat the device as owner (its slash commands, which
    a non-owner loses once an owner list exists, answered again); not yet
-   tried on the real gateway. Deferred by you for now. When taken up:
-   document it in INSTALL.md, perhaps `openclaw a2 pair --owner`, and
-   weigh it with the passphrase (item 6), since an owner device at an
-   unlocked //e can reach a shell on the gateway host.
+   tried on the real gateway.
+
+   **2026-11-17: no owner needed.** Pinchy reaches Home Assistant over
+   its REST API with a long-lived token, from its shell tool. `exec` is
+   not among OpenClaw's owner-only tools (`GATEWAY_OWNER_ONLY_CORE_TOOLS`,
+   2026.11.3), and a test device paired on claw1 asked, as an a2 sender,
+   for a light's state: "Candle 12 (light.candle_12) is off", through
+   "gateway_exec", with no approval asked and nothing changed. A real
+   "lights off" is not yet tried, and the earlier refusal is not
+   explained (perhaps Pinchy had not yet been given the token). So the
+   owner work (`a2 owner`, `pair --owner`, the owner list in INSTALL.md)
+   is dropped. The other side: any a2 sender can already run a shell on
+   claw1 and use the token, which is what the passphrase and lock
+   (item 6) guard. If that is too much, the next step would be a narrower
+   tool policy for a2 senders, not an owner switch.
 6. **Lock and passphrase** (planned for milestone 7; moved here
    2026-11-16, since eavesdroppers and interlopers at home are not a
    worry for now; built 2026-11-16 in b028, not yet on the card: see
@@ -1044,6 +1055,8 @@ screenshots are retaken.
 
 Started 2026-11-16 as the first half of home automation from the Apple
 (section 9, items 5 and 6): an owner Apple must be lockable first.
+(Item 5 turned out to need no owner, 2026-11-17, but an a2 sender can
+reach a shell on the gateway all the same, so the lock still matters.)
 
 - **On the card:** byte 15 is `$A3` instead of `$A2` when bytes 16-31
   hold the key XORed with a pad: `H("twoegram-pass" || passphrase)`,
