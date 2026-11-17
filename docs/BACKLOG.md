@@ -48,9 +48,8 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
 - **Ask Pinchy to turn a light off from Twoegram.** A test device read a
   light's state through a2 without being an owner (PLAN.md section 9,
-  item 5); switching one has not been tried. Any build will do.
-- **Remove the test device** paired on claw1 for that check
-  (`openclaw a2 revoke`), and clear its key from `probe.cfg`.
+  item 5); switching one has not been tried. Any build will do. (The
+  test device was revoked on claw1 on 2026-11-17.)
 
 ### 4. Older items, not yet seen
 
