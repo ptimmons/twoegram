@@ -320,9 +320,11 @@ otherwise interrupt:
    not among OpenClaw's owner-only tools (`GATEWAY_OWNER_ONLY_CORE_TOOLS`,
    2026.11.3), and a test device paired on claw1 asked, as an a2 sender,
    for a light's state: "Candle 12 (light.candle_12) is off", through
-   "gateway_exec", with no approval asked and nothing changed. A real
-   "lights off" is not yet tried, and the earlier refusal is not
-   explained (perhaps Pinchy had not yet been given the token). So the
+   "gateway_exec", with no approval asked and nothing changed. Later
+   that day you switched lights from Twoegram itself. Nothing in
+   Twoegram or the plugin changed between the first refusal and this;
+   the refusal is not explained (perhaps Pinchy had not yet been given
+   the token, or had not yet noted how to use it). So the
    owner work (`a2 owner`, `pair --owner`, the owner list in INSTALL.md)
    is dropped. The other side: any a2 sender can already run a shell on
    claw1 and use the token, which is what the passphrase and lock
@@ -330,7 +332,8 @@ otherwise interrupt:
    tool policy for a2 senders, not an owner switch.
 6. **Lock and passphrase** (planned for milestone 7; moved here
    2026-11-16, since eavesdroppers and interlopers at home are not a
-   worry for now; built 2026-11-16 in b028, not yet on the card: see
+   worry for now; built 2026-11-16 in b028, passed on the card
+   2026-11-17: see
    "The passphrase and the lock" below). The design, ready to build: the card's flash holds the
    device key XORed with a hash of the passphrase (a second mark byte says
    so); Twoegram asks for it at start-up and unscrambles the key in
@@ -1110,8 +1113,9 @@ reach a shell on the gateway all the same, so the lock still matters.)
   minutes and not at nine, and its count starting again after; a fresh
   start with a wrong then a right passphrase; Open-Apple-P. The help
   screen gains Open-Apple-L.
-- **Not known until the card:** how long 64 hashes take. If it is much
-  over a second or two, fewer rounds; the count is `PASS_ROUNDS`, and
-  changing it changes what a passphrase makes, so it must be settled
-  before anyone uses one.
+- **On the card, 2026-11-17:** setting a passphrase, the lock and
+  unlocking passed, and the pause for 64 hashes is negligible.
+  `PASS_ROUNDS` stays at 64 for good, since changing it would change
+  what a passphrase makes. Not yet reported: the idle lock, a fresh
+  start, Open-Apple-P.
 

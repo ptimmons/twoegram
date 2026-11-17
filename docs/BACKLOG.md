@@ -10,18 +10,11 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 One disk covers all of this: `build/TWOEGRAM-b028.po` (or later), with
 plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
-### 1. The passphrase and the lock (b028, built 2026-11-16)
+### 1. The rest of the lock (b028, built 2026-11-16)
 
-Steps: PROBE.md, "Build b028".
+Steps: PROBE.md, "Build b028", steps 4 to 6. Setting a passphrase and
+the lock passed on 2026-11-17; these were not mentioned:
 
-- **The set-up screen loads from the disk** (`TWOEGRAM.SETUP`), opens
-  and closes cleanly, and opens again.
-- **Setting a passphrase**, typed twice. **Time the pause** after the
-  second Return: 64 hashes on the card, not yet measured. This has to
-  be settled before you rely on a passphrase, because changing the
-  count changes what a passphrase makes.
-- **Open-Apple-L**, a wrong passphrase refused at once, the right one
-  signs in again.
 - **The idle lock** after 10 minutes.
 - **A fresh start** asks for the passphrase; a wrong one is caught by the
   gateway and asked again.
@@ -44,14 +37,7 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 3. Lights from the Apple (2026-11-17)
-
-- **Ask Pinchy to turn a light off from Twoegram.** A test device read a
-  light's state through a2 without being an owner (PLAN.md section 9,
-  item 5); switching one has not been tried. Any build will do. (The
-  test device was revoked on claw1 on 2026-11-17.)
-
-### 4. Older items, not yet seen
+### 3. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the
@@ -64,6 +50,11 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
 ## Passed
 
+- **The passphrase and the lock** (2026-11-17, b028): the set-up screen
+  from the disk, setting a passphrase, Open-Apple-L and unlocking. The
+  pause for 64 hashes is negligible, so `PASS_ROUNDS` stays at 64.
+- **Lights from the Apple** (2026-11-17): Pinchy switches lights in the
+  house when asked from Twoegram, with the Apple not an owner.
 - **Release 1.0** (2026-11-16, b019, plugin 1.0.1): the package install,
   the newcomer's first boot, a long answer in parts, the security audit.
 - **Milestone 7** (2026-11-16, b017): every error state, agents by name,
