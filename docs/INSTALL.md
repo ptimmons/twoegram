@@ -10,7 +10,7 @@ checksums:
 
 - `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
   It carries no address and no key; the set-up screen asks for both.
-- `openclaw-twoegram-1.0.0.tgz`: the plugin, compiled, with only the
+- `openclaw-twoegram-1.0.1.tgz`: the plugin, compiled, with only the
   files OpenClaw loads.
 
 ## 1. Copy the plugin to the gateway host
@@ -18,7 +18,7 @@ checksums:
 From the Mac:
 
 ```bash
-scp build/release/openclaw-twoegram-1.0.0.tgz build/release/SHA256SUMS GATEWAY-HOST:
+scp build/release/openclaw-twoegram-1.0.1.tgz build/release/SHA256SUMS GATEWAY-HOST:
 ```
 
 On the gateway host, check it arrived whole:
@@ -35,8 +35,25 @@ With the gateway stopped:
 openclaw gateway stop
 ```
 
+**Coming from a linked folder** (the development install below), do
+this first, or the install ends with `Plugin "a2" has no authoritative
+package-owner metadata`: drop the folder from OpenClaw's load paths
+(`[]` if it was the only one; `openclaw config get plugins.load.paths`
+shows them) and refresh. Your `channels.a2` settings and paired Apples
+stay.
+
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.0.0.tgz --force --accept-capabilities
+openclaw config set plugins.load.paths '[]' --strict-json
+```
+
+```bash
+openclaw plugins registry --refresh
+```
+
+Then install:
+
+```bash
+openclaw plugins install ./openclaw-twoegram-1.0.1.tgz --force --accept-capabilities
 ```
 
 It should end with `Saved for the next Gateway start.` Leave the gateway
@@ -51,18 +68,11 @@ stopped until step 3 has set the channel up; step 3 starts it.
   state ownership"), not the gateway's reason. With the gateway stopped,
   any problem is reported as it is.
 - **Updating** to a newer package: the same, with the new file.
-- **Coming from a linked folder** (the development install below):
-  first, with the gateway stopped, drop the folder from OpenClaw's load
-  paths (`[]` if it was the only one) and refresh, then install the
-  package as above. Your `channels.a2` settings and paired Apples stay.
-
-  ```bash
-  openclaw config set plugins.load.paths '[]' --strict-json
-  ```
-
-  ```bash
-  openclaw plugins registry --refresh
-  ```
+- **If it already ended with that message:** the package is saved but
+  the old folder still shadows it. Drop the load path and refresh as
+  above, then run the install again; it ends `Installed plugin: a2`.
+  Ignore its suggestion of `openclaw plugins reload a2`, which needs a
+  running gateway; starting the gateway in step 3 loads the package.
 
 ## 3. Configure the channel
 

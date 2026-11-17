@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** milestones 0 to 7 built and passed on the real card and your gateway (b017, 2026-11-16); milestone 8, release 1.0, built and checked in scratch gateways, waiting for your gateway and the card.
+**Status:** release 1.0 done: milestones 0 to 8 built and passed on the real card and your gateway (2026-11-16; the Apple's disk b019, plugin 1.0.1). Next: section 9, the requests for later builds.
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -262,7 +262,7 @@ gateway's address and port.
 | 5 ✅ | Compose, send, type-ahead, polling, replies arriving in parts | host tests ✅ (the screen too), Virtual ][ ✅, real card ✅ (b008) |
 | 6 ✅ | The plugin inside OpenClaw: install, routes, inbound, outbound, allowlist, sessions, CLI | Vitest ✅, scratch OpenClaw 2026.11.3 on the Mac ✅ (no model), **your gateway and the real card ✅** (2026-11-16, b010) |
 | 7 ✅ | Error states: every failure said plainly, and recovered from where it can be (the agent list and unread marks were done in b010; the lock and passphrase moved to section 9, item 6) | host tests ✅, **real card and your gateway ✅** (b017) |
-| 8 | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | real card, your gateway |
+| 8 ✅ | Manual with a security chapter, release disk, plugin package; `openclaw security audit` clean | scratch gateways ✅, **real card and your gateway ✅** (b019, plugin 1.0.1) |
 | later | Encryption, by one of the two routes in section 2 | |
 
 0 and 1 are independent. 6 needs only 1.
@@ -345,6 +345,17 @@ otherwise interrupt:
    Tests: 5 more in Vitest (66), IDENTITY.md parsing as OpenClaw writes
    it, config before file; the screen test checks the list, heading and
    status bar, the 13-character cut, and that requests still name `main`.
+8. **Say when the card's key is the trouble** (2026-11-16, low priority).
+   The key lives in the card's `PREFS` blob, bytes 15-31, which the
+   reference does not reserve for us: a firmware upgrade, a factory reset
+   or another program could change them. If the mark byte goes, Twoegram
+   already opens set-up. If the mark survives and the key bytes change,
+   the gateway answers BAD_SIGNATURE and the status bar says only NOT
+   CONNECTED. All 17 bytes are used, so there is no room for a checksum;
+   instead, a bad signature at sign-in should say "The gateway did not
+   accept this Apple's key. Pair it again." (and the manual's Appendix B
+   the same). Fix for the user either way: `openclaw a2 pair`, type the
+   new key, revoke the old device.
 
 ## 10. Risks to settle at milestone 2
 
@@ -938,3 +949,34 @@ All passed, on the real gateway (OpenClaw 2026.11.3, agent "Pinchy"):
 - **For the card and your gateway** (docs/PROBE.md, "Release 1.0"):
   switch the gateway to the package, boot the release disk as a newcomer
   would, run the audit, and see a long answer arrive in parts.
+- **Plugin 1.0.1** (same day, the first install on your gateway):
+  - **The install message.** Installing the package while the linked
+    folder was still in `plugins.load.paths` ended with `Plugin "a2" has
+    no authoritative package-owner metadata`. The package was saved, but
+    the folder's copy shadowed it. Dropping the load path, refreshing and
+    installing again fixes it (reproduced in a scratch gateway).
+    INSTALL.md now puts that step before the install.
+  - **A retiring import.** `openclaw plugins doctor` said a2 "Uses
+    OpenClaw APIs that retire on Oct 1, 2026": `resolveAgentWorkspaceDir`
+    from `openclaw/plugin-sdk/agent-runtime`, one of the seven broad
+    barrels OpenClaw means to remove. The same function comes from
+    `openclaw/plugin-sdk/health`, which is not on that list, in 2026.11.3
+    and 2026.11.4; 1.0.1 imports it from there.
+  - **Checked:** 66 Vitest tests; types against 2026.11.3 and 2026.11.4;
+    a scratch 2026.11.3 upgraded from 1.0.0 in place, with the doctor
+    note gone, sign-in, and the agent's name read from IDENTITY.md.
+    The Apple's disk is unchanged, rebuilt as b020.
+
+### Release 1.0 on the card (2026-11-16, b019, plugin 1.0.1)
+
+- **Plugin from the package:** your gateway switched from the linked
+  folder to 1.0.1 smoothly (load path dropped first).
+- **The release disk as a newcomer:** b019 booted, set-up asked for the
+  address, the key left empty kept the card's, and the conversation
+  opened. (b020, from the 1.0.1 release, differs only in its build
+  number.)
+- **A long answer** arrived in several messages, in order: the last
+  open item from milestone 6.
+- **`openclaw security audit`:** a2 listed as installed, no finding
+  about it.
+

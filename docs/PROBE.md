@@ -3,13 +3,13 @@
 ## Release 1.0: milestone 8
 
 `make release` has made `build/release/`: `TWOEGRAM-1.0.po`, the plugin
-package `openclaw-twoegram-1.0.0.tgz`, and `SHA256SUMS`.
+package `openclaw-twoegram-1.0.1.tgz`, and `SHA256SUMS`.
 
 1. **The plugin from the package.** Your gateway runs the plugin from a
    linked folder today. Switch it to the package as docs/INSTALL.md
    says ("Coming from a linked folder", then steps 1 to 3): with the
    gateway stopped, drop the folder's load path, refresh, install the
-   package, start. `openclaw plugins list` shows `a2` at version 1.0.0,
+   package, start. `openclaw plugins list` shows `a2` at version 1.0.1,
    from `dist/index.js`, with no warning; the log has the `[a2]
    listening` line.
 2. **The release disk, as a newcomer sees it.** Boot `TWOEGRAM-1.0.po`.

@@ -19,7 +19,7 @@ import { createChatChannelPlugin } from "openclaw/plugin-sdk/channel-core";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/channel-core";
 import { dispatchInboundDirectDm } from "openclaw/plugin-sdk/channel-inbound";
 import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
-import { resolveAgentWorkspaceDir } from "openclaw/plugin-sdk/agent-runtime";
+import { resolveAgentWorkspaceDir } from "openclaw/plugin-sdk/health";
 import { readRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import { resolveStateDir } from "openclaw/plugin-sdk/state-paths";
 import { DEFAULT_PORT, conversationsDir, devicesPath } from "./commands.ts";
