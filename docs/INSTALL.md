@@ -10,7 +10,7 @@ checksums:
 
 - `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
   It carries no address and no key; the set-up screen asks for both.
-- `openclaw-twoegram-1.0.1.tgz`: the plugin, compiled, with only the
+- `openclaw-twoegram-1.1.0.tgz`: the plugin, compiled, with only the
   files OpenClaw loads.
 
 ## 1. Copy the plugin to the gateway host
@@ -18,7 +18,7 @@ checksums:
 From the Mac:
 
 ```bash
-scp build/release/openclaw-twoegram-1.0.1.tgz build/release/SHA256SUMS GATEWAY-HOST:
+scp build/release/openclaw-twoegram-1.1.0.tgz build/release/SHA256SUMS GATEWAY-HOST:
 ```
 
 On the gateway host, check it arrived whole:
@@ -53,7 +53,7 @@ openclaw plugins registry --refresh
 Then install:
 
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.0.1.tgz --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.1.0.tgz --force --accept-capabilities
 ```
 
 It should end with `Saved for the next Gateway start.` Leave the gateway

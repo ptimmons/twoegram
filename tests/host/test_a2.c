@@ -263,9 +263,18 @@ static void conv_page(char *payload, const char *url, int hist)
     char v[16];
     unsigned before, after, k, lo, hi, size = 7 + (hist ? 0 : 7), n, pos;
 
-    if (hist) {
+    k = query(url, "k=", v, sizeof v)[0] ? (unsigned)atoi(v) : 20;
+    if (hist && query(url, "after=", v, sizeof v)[0]) {
+        /* From a point forward, oldest first: after=0 is the start. */
+        after = (unsigned)atoi(v);
+        lo = after + 1;
+        hi = after;
+        while (hi < conv_total && hi - after < k && size + conv_size(hi + 1) <= 1900) {
+            size += conv_size(++hi);
+        }
+        pos = (unsigned)sprintf(payload, "more %d\n", hi < conv_total);
+    } else if (hist) {
         before = query(url, "before=", v, sizeof v)[0] ? (unsigned)atoi(v) : conv_total + 1;
-        k = query(url, "k=", v, sizeof v)[0] ? (unsigned)atoi(v) : 20;
         hi = before > conv_total + 1 ? conv_total : before - 1;
         lo = hi + 1;
         while (lo > 1 && hi + 1 - lo < k && size + conv_size(lo - 1) <= 1900) {
@@ -1005,7 +1014,7 @@ static void test_history(void)
     CHECK(st_init() == 0);
 
     /* The newest page: it ends at the newest, and there is older. */
-    CHECK(hist_load("main") == 0);
+    CHECK(hist_load("main", 0) == 0);
     CHECK(st_count > 0 && st_count <= HIST_PAGE && hist_added == st_count);
     CHECK(st[st_count - 1].n == CONV_N && st_older && st_newest && held_intact());
     CHECK(strstr(gw_last_target, "/a2/hist?a=main&k=20") == gw_last_target);
@@ -1029,6 +1038,16 @@ static void test_history(void)
 
     /* Every reply was cut to fit, and every page verified. */
     for (i = 0; i + 1 < st_count; ++i) CHECK(st[i].n + 1 == st[i + 1].n);
+
+    /* Straight to the start, in one request; then down from there. */
+    CHECK(hist_load("main", 1) == 0);
+    CHECK(strstr(gw_last_target, "/a2/hist?a=main&after=0&k=20") == gw_last_target);
+    CHECK(st_count > 0 && st[0].n == 1 && !st_older && !st_newest && held_intact());
+    CHECK(hist_latest == CONV_N);           /* still known: the poll counts from it */
+    CHECK(hist_newer("main") == 0 && hist_added > 0 && st[0].n == 1 && held_intact());
+    /* And back to the newest page. */
+    CHECK(hist_load("main", 0) == 0);
+    CHECK(st[st_count - 1].n == CONV_N && st_newest && st_older);
     gateway_on = 0;
 }
 

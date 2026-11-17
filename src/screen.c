@@ -15,16 +15,16 @@ uint8_t has_mousetext;
  *            $20-$3F   space, punctuation, digits
  *            $60-$7F   lowercase
  * $40-$5F is MouseText, so inverse capitals have to move down to $00.
- * The glyph bytes 1-4 (screen.h) are MouseText whatever the attribute.
+ * The glyph bytes 1-5 (screen.h) are MouseText whatever the attribute.
  */
-static const uint8_t glyph_mt[4]   = { MT_OAPPLE, MT_CHECK, MT_DOWN, MT_DIAMOND };
-static const char    glyph_flat[4] = { 0, '+', 'v', '*' };
+static const uint8_t glyph_mt[5]   = { MT_OAPPLE, MT_CHECK, MT_DOWN, MT_DIAMOND, MT_UP };
+static const char    glyph_flat[5] = { 0, '+', 'v', '*', '^' };
 
 uint8_t __fastcall__ sc_char(char c, uint8_t inverse)
 {
     uint8_t b = (uint8_t)c & 0x7F;
 
-    if (b >= 0x01 && b <= 0x04) {
+    if (b >= 0x01 && b <= 0x05) {
         if (b == 0x01 || has_mousetext) {
             return glyph_mt[b - 1];
         }

@@ -273,7 +273,8 @@ Asked for during testing, to fit in after the milestones they would
 otherwise interrupt:
 
 1. **One key to the very beginning and end of the conversation**
-   (2026-11-15, milestone 4's card run: paging there was a nuisance).
+   (2026-11-15, milestone 4's card run: paging there was a nuisance;
+   built 2026-11-16 in b021 with plugin 1.1.0; with the scroll arrows in b022 and the narrower list in b023, not yet on the card).
    Open-Apple-< and -> today reach only the oldest and newest messages
    held. The end is easy (load the newest page). The beginning needs the
    oldest page in one request rather than paging back through every one:
@@ -979,4 +980,62 @@ All passed, on the real gateway (OpenClaw 2026.11.3, agent "Pinchy"):
   open item from milestone 6.
 - **`openclaw security audit`:** a2 listed as installed, no finding
   about it.
+
+
+
+### Straight to the start (b021, plugin 1.1.0)
+
+- **Protocol:** `hist` takes `after=<n>` as well as `before=<n>`: up to
+  *k* messages numbered above *n*, oldest first, filled from the oldest;
+  `more 1` means newer ones exist. `after=0` is the start. Both at once
+  is BAD_REQUEST. Unlike `poll`, it marks nothing seen, so other agents'
+  unread counts and this one's diamond are untouched. A plugin before
+  1.1.0 ignores `after` and sends the newest page: Twoegram b021 then
+  shows the newest as if it were the start, so the plugin goes first.
+- **Apple:** `hist_load(agent, first)`; with `first` the store starts
+  empty, `st_older` is 0, `st_newest` is the gateway's `more` turned
+  round, and `hist_latest` is kept for the poll to count new messages
+  from. Open-Apple-< fetches it only when older messages exist beyond
+  those held. Open-Apple-> already fetched the newest page. Down from
+  the start pages forward through `poll`, as after paging up. 105 bytes:
+  1,705 bytes of heap left.
+- **Tests:** two more in Vitest (68: from the start and forward, both at
+  once refused, nothing counted seen); the host history test goes to
+  the start in one request, down from it, and back; the screen test
+  presses Open-Apple-< from the newest (one `after=0` request, message 1
+  at the top), pages down, jumps back, and at the start presses it
+  again with no request. The model gateway and `a2client.py hist main
+  +0` know `after`. 1.1.0 ran in a scratch 2026.11.3.
+- **For the card:** docs/PROBE.md, "Build b023".
+
+### The scroll arrows (b022)
+
+Asked for on seeing b021 (2026-11-16): `THE START OF THE CONVERSATION`
+stayed in the status bar after scrolling away from the start. In its
+place, a scroll bar of sorts in the 80th column, which the text area
+(to column 79, counting from 1) never uses: an up arrow (MouseText $4B,
+glyph byte 5, `^` without MouseText) on the pane's top row when there
+is more above what is shown, whether on the screen's lines, held, or at
+the gateway (`st_older`); a down arrow ($4A) on its bottom row when
+there is more below (scrolled back, the layout short of the newest
+held, or the gateway has newer: `!st_newest`). The heading's down arrow
+and the start message are gone; Up at the start does nothing, and a
+fetch that finds nothing older redraws. 49 bytes: 1,656 bytes of heap
+left. $4B is from the MouseText table, not yet seen on the card. The
+arrows sat right beside right-aligned text; b023 leaves a column
+between.
+
+### A narrower list, and a gap before the arrows (b023)
+
+Asked for on seeing the b022 screenshots (2026-11-16): text touched the
+arrows, and the list was wider than it needed to be. You chose the
+diamond alone over a count of new messages, so the list is 18 columns
+(the `>`, names in full up to 16 characters, the diamond in column 17,
+counting from 0) and the divider is column 18. The text area ends at
+column 77; 78 stays blank; 79 has the arrows. With the list shown the
+text area is 58 columns (57 before); hidden, 77 (78 before). The
+heading's note ("thinking...", "2 new elsewhere") ends at column 77 too.
+Dropping the count saved more than the change cost: 1,766 bytes of heap
+left. The manual: the count and the 13-character cut are gone, and the
+screenshots are retaken.
 

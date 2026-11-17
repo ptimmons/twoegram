@@ -347,23 +347,27 @@ Press **UP ARROW** to look back through the conversation a line at a
 time, and **DOWN ARROW** to come forward again. To move a whole screen at
 a time, hold down OPEN-APPLE as you press the arrow.
 
-While you're looking back, a small **down arrow** appears at the top
-right of the screen, to remind you there's more below.
+Two small arrows at the right edge of the conversation work like a
+simple scroll bar. An **up arrow** at the top means there's more above,
+and a **down arrow** at the bottom means there's more below. When the
+up arrow is gone, you're at the very start of the conversation; when
+the down arrow is gone, you're at the newest message.
 
 ![Figure 4-1. Looking back to the start of the morning](images/scrolled.png)
 
-**Figure 4-1.** Looking back. The down arrow at the top right means
-there's more below.
+**Figure 4-1.** Looking back. The arrows at the right edge say there's
+more above and more below.
 
 You can go back as far as the conversation goes. Twoegram keeps the
 latest messages in its memory, and when you scroll past the oldest of
 them, it fetches earlier ones from the gateway: the status bar says
-`FETCHING OLDER MESSAGES` for a moment. When there's nothing earlier, it
-says `THE START OF THE CONVERSATION`.
+`FETCHING OLDER MESSAGES` for a moment.
 
-To jump, press **OPEN-APPLE-<** for the oldest message in memory (keep
-pressing UP ARROW to go back further), or **OPEN-APPLE->** to return to
-the newest.
+To jump, press **OPEN-APPLE-<** for the very start of the conversation,
+or **OPEN-APPLE->** to return to the newest. Either one fetches what it
+needs from the gateway in one go, however long the conversation is.
+(The gateway keeps the latest 500 messages of each conversation, so the
+start is the oldest of those.)
 
 ### When Something New Arrives
 
@@ -407,12 +411,12 @@ To go back to typing without changing agents, press TAB or ESC again.
 
 Twoegram asks after the agent you're talking with, but each answer from
 the gateway also says how many new messages are waiting from every other
-agent. When another agent sends you something, a **diamond** and the
-number of new messages appear beside its name in the list.
+agent. When another agent sends you something, a **diamond** appears
+at the right of its name in the list.
 
 ![Figure 5-2. News from another agent](images/unread.png)
 
-**Figure 5-2.** `coder` has two new messages.
+**Figure 5-2.** `coder` has something new.
 
 Press **OPEN-APPLE-N** to go straight to the next agent with news. If
 there's none, the status bar says `NOTHING NEW ELSEWHERE`. The diamond
@@ -433,8 +437,8 @@ set. Twoegram shows the new name the next time it says hello to the
 gateway (press OPEN-APPLE-R to say hello now).
 
 > **By the way:** Names are shown in plain letters, so an emoji in a
-> name is left out, and accented letters lose their accents. The list
-> shows the first 13 characters of a long name.
+> name is left out, and accented letters lose their accents. Names can
+> be up to 16 characters long, and the list has room for all of them.
 
 ### Hiding the List
 
@@ -580,7 +584,7 @@ Apple by mistake, simply pair again and revoke the old key.
 | DELETE | erase the last letter |
 | UP ARROW, DOWN ARROW | scroll a line |
 | OPEN-APPLE-UP ARROW, OPEN-APPLE-DOWN ARROW | scroll a screen |
-| OPEN-APPLE-<, OPEN-APPLE-> | go to the oldest message in memory, or the newest |
+| OPEN-APPLE-<, OPEN-APPLE-> | go to the start of the conversation, or the newest message |
 | TAB, ESC | choose another agent |
 
 ### In the List of Agents
@@ -606,8 +610,8 @@ Apple by mistake, simply pair again and revoke the old key.
 |---|---|
 | > in the list | the agent you're talking with |
 | a diamond beside a name | something new: below the screen, or from that agent |
-| a number beside a name | how many new messages that agent has sent |
-| a down arrow, top right | you're looking back; there's more below |
+| an up arrow, right edge, top | there's more of the conversation above |
+| a down arrow, right edge, bottom | there's more below; you're looking back |
 | **thinking...**, top right | the agent is working on an answer |
 | a check mark in a message | the agent's "thumbs up" or check mark |
 
@@ -712,9 +716,6 @@ Twoegram is sending your message.
 **NOT CONNECTED: NOTHING CAN BE SENT**
 Twoegram isn't connected to the gateway. Press OPEN-APPLE-R to connect.
 
-**THE START OF THE CONVERSATION**
-There's nothing earlier to show.
-
 **NOTHING NEW ELSEWHERE**
 You pressed OPEN-APPLE-N, but no other agent has anything new.
 
@@ -816,7 +817,7 @@ quit Twoegram and choose it from the ProDOS menu. The file
 | Messages in memory at once | 64 | Twoegram forgets the ones furthest from what you're reading, and fetches them again if you scroll back to them. |
 | Messages the gateway keeps for you | the latest 500 for each agent | Earlier ones are forgotten by the gateway, though the agent's own records may keep them. |
 | Agents | 8 | Only the first eight are listed. |
-| An agent's name | 16 characters | The list shows the first 13. |
+| An agent's name | 16 characters | The list shows all 16. |
 | Keys typed ahead | 32 | Keys after the 32nd, pressed while Twoegram is busy, are lost. |
 | Checking for news | every 5 seconds; every second while an agent is thinking | |
 | Being away | 30 minutes | The gateway forgets the session; Twoegram says hello again by itself. |

@@ -32,14 +32,16 @@
 #define MT_DIAMOND  0x5B
 #define MT_CHECK    0x44        /* check mark */
 #define MT_DOWN     0x4A        /* down arrow */
+#define MT_UP       0x4B        /* up arrow */
 
-/* Glyph bytes: in strings and in message text, these draw MouseText
+/* Glyph bytes 1-5: in strings and in message text, these draw MouseText
  * (with plain stand-ins on a //e without it). GL_CHECK also arrives from
  * the gateway (PROTOCOL.md section 5). */
 #define OA          "\x01"     /* the Open Apple */
 #define GL_CHECK    0x02
 #define GL_DOWN     0x03
 #define GL_DIAMOND  0x04
+#define GL_UP       0x05
 
 extern uint8_t linebuf[SCR_COLS];
 extern uint8_t has_mousetext;

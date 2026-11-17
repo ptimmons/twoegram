@@ -354,6 +354,28 @@ describe("the conversation", () => {
     expect(all.lines).toContainEqual(["more", "0"]);
   });
 
+  it("serves history from the start, and forward from a point", async () => {
+    for (let i = 1; i <= 6; i++) await c.call("POST", "/a2/send?a=main", `message ${i}`);
+    await new Promise((r) => setTimeout(r, 100));
+    const first = await c.call("GET", "/a2/hist?a=main&after=0&k=3");
+    expect(first.code).toBe(0);
+    expect(first.msgs.map((m) => m.n)).toEqual([1, 2, 3]);
+    expect(first.lines).toContainEqual(["more", "1"]);
+    const rest = await c.call("GET", "/a2/hist?a=main&after=9&k=50");
+    expect(rest.msgs.map((m) => m.n)).toEqual([10, 11, 12]);
+    expect(rest.lines).toContainEqual(["more", "0"]);
+    const both = await c.call("GET", "/a2/hist?a=main&after=0&before=5");
+    expect(both.code).toBe(1);
+  });
+
+  it("does not count history from the start as seen", async () => {
+    await c.call("POST", "/a2/send?a=coder", "hi coder");
+    await new Promise((r) => setTimeout(r, 100));
+    await c.call("GET", "/a2/hist?a=coder&after=0&k=50");
+    const onMain = await c.call("GET", "/a2/poll?a=main&after=0");
+    expect(onMain.lines).toContainEqual(["unread", "coder 1"]);
+  });
+
   it("keeps each device's conversations apart", async () => {
     await c.call("POST", "/a2/send?a=main", "mine alone");
     const other = new Client(pair());

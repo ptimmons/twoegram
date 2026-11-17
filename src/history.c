@@ -92,26 +92,38 @@ static char *agent_param(char *p, const char *agent)
     return fmt_str(p, agent);       /* names are a-z 0-9 - _: nothing to escape */
 }
 
-uint8_t hist_load(const char *agent)
+uint8_t hist_load(const char *agent, uint8_t first)
 {
     char *p;
-    uint8_t rc;
+    uint8_t rc, more;
 
     hist_added = 0;
     st_reset();
     p = fmt_str(target, "/a2/hist?a=");
     p = agent_param(p, agent);
+    if (first) {
+        p = fmt_str(p, "&after=0");
+    }
     fmt_u32(fmt_str(p, "&k="), HIST_PAGE);
     rc = ses_call("GET", target, NULL, 0);
     if (rc) {
         return rc;
     }
+    more = take(0);
+    hist_busy = 0;                  /* the next poll says if it is */
+    if (first) {
+        /* The first page: nothing before it; "more" means newer. What
+         * is known of the newest stays, for the poll to count from. */
+        st_older = 0;
+        st_newest = (uint8_t)!more;
+        note_latest();
+        return 0;
+    }
     /* The newest page: everything up to now, so this end is the newest. */
-    st_older = take(0);
+    st_older = more;
     st_newest = 1;
     hist_latest = st_count ? st[st_count - 1].n : 0;
     hist_unseen = 0;
-    hist_busy = 0;                  /* the next poll says if it is */
     return 0;
 }
 
@@ -122,7 +134,7 @@ uint8_t hist_older(const char *agent)
 
     hist_added = 0;
     if (!st_count) {
-        return hist_load(agent);
+        return hist_load(agent, 0);
     }
     p = fmt_str(target, "/a2/hist?a=");
     p = agent_param(p, agent);
@@ -146,7 +158,7 @@ uint8_t hist_newer(const char *agent)
 
     hist_added = 0;
     if (!st_count) {
-        return hist_load(agent);
+        return hist_load(agent, 0);
     }
     p = fmt_str(target, "/a2/poll?a=");
     p = agent_param(p, agent);

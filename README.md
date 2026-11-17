@@ -19,6 +19,7 @@ only.
 | [docs/INSTALL.md](docs/INSTALL.md) | installing the plugin on your gateway |
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | the wire protocol, version 1 |
 | [PLAN.md](PLAN.md) | the plan, decisions, and what each milestone found |
+| [docs/BACKLOG.md](docs/BACKLOG.md) | what is built and waiting to be tried on the real Apple |
 | `src/` | the Apple program, C and 6502 assembly for cc65 |
 | `plugin/` | the OpenClaw channel plugin, TypeScript |
 | `tests/host/` | the Apple code's tests, run on the Mac against a model card and gateway |
@@ -43,7 +44,7 @@ make release
 
 `make release` leaves in `build/release/` the Apple's disk
 (`TWOEGRAM-1.0.po`, with no address or key on it), the plugin package
-(`openclaw-twoegram-1.0.1.tgz`), and `SHA256SUMS`. Then follow
+(`openclaw-twoegram-1.1.0.tgz`), and `SHA256SUMS`. Then follow
 [docs/INSTALL.md](docs/INSTALL.md), and the manual's Chapter 2 on the
 Apple.
 

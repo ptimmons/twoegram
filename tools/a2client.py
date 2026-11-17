@@ -181,8 +181,10 @@ def main():
         print(" ".join(f"{k}={v}" for k, v in lines.items()))
         show(msgs)
     elif a.cmd == "hist":
-        before = f"&before={a.args[1]}" if len(a.args) > 1 else ""
-        lines, msgs = c.call("GET", f"/a2/hist?a={a.args[0]}{before}&k=50")
+        # hist main: the newest; hist main 40: before 40; hist main +0: from the start
+        at = a.args[1] if len(a.args) > 1 else ""
+        where = f"&after={at[1:]}" if at.startswith("+") else f"&before={at}" if at else ""
+        lines, msgs = c.call("GET", f"/a2/hist?a={a.args[0]}{where}&k=50")
         print(" ".join(f"{k}={v}" for k, v in lines.items()))
         show(msgs)
     elif a.cmd == "chat":

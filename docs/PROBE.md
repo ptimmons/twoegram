@@ -1,5 +1,39 @@
 # Testing on the card
 
+## Build b023: straight to the start, the scroll arrows, a narrower list
+
+Needs plugin 1.1.0 on the gateway (`build/openclaw-twoegram-1.1.0.tgz`):
+copy it over and install it as docs/INSTALL.md step 2 says (gateway
+stopped, `plugins install ... --force --accept-capabilities`, start).
+`openclaw plugins list` shows `a2` at 1.1.0. Then boot
+`build/TWOEGRAM-b023.po`.
+
+1. **The start, in one go.** In Pinchy's conversation (a long one is
+   best), press Open-Apple-<. The status bar says `FETCHING MESSAGES` for
+   a moment and the conversation's first message is at the top: no
+   paging back. There is no up arrow in the 80th column at the pane's
+   top, and Up arrow does nothing and says nothing.
+2. **Down from the start.** Down arrow and Open-Apple-Down read on,
+   fetching newer messages as they go (`FETCHING NEWER MESSAGES`). One
+   line down, an up arrow appears at the pane's top right (row 3,
+   column 80); a down arrow sits at its bottom right, just above the
+   compose line, all the while there is more below.
+3. **Back to the end.** Open-Apple-> brings the newest back at the foot.
+   The down arrow goes; the up arrow stays. The heading no longer has
+   an arrow of its own. Hide the list (Open-Apple-B): the arrows stay
+   in column 80.
+4. **Nothing lost on the way.** While at the start, ask Pinchy something
+   from another channel (Telegram), or wait for an answer that is still
+   coming: the diamond appears beside its name; Open-Apple-> shows it.
+5. **Sending from the start** goes to the newest end first, as before.
+6. **The narrower list.** The agent list is 18 columns: the `>`, names
+   in full up to 16 characters, and a diamond in the last column when an
+   agent has something new (no count any more). Rename an agent to a
+   16-character name in OpenClaw and press Open-Apple-R to see it whole.
+7. **The gap.** Text, your right-aligned messages and their times
+   included, stops one column short of the arrows, with list shown and
+   hidden.
+
 ## Release 1.0: milestone 8
 
 `make release` has made `build/release/`: `TWOEGRAM-1.0.po`, the plugin

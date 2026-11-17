@@ -33,7 +33,9 @@ void scr_blit(uint8_t row)
         c = linebuf[i];
         if (c >= 0x80) c &= 0x7F;               /* normal */
         else if (c < 0x20) c = (uint8_t)(c + 0x40); /* inverse capitals */
-        else if (c >= 0x40 && c < 0x60) c = '#'; /* MouseText */
+        else if (c == MT_UP) c = '^';           /* MouseText: the arrows, */
+        else if (c == MT_DOWN) c = 'v';
+        else if (c >= 0x40 && c < 0x60) c = '#'; /* the rest */
         screen[row][i] = (char)c;
     }
     screen[row][SCR_COLS] = 0;
@@ -130,8 +132,9 @@ static int moved_one(int dir)
     for (r = TOP; r <= BOTTOM; ++r) {
         int from = r - dir;
         if (from < TOP || from > BOTTOM) continue;
-        if (strcmp(screen[r] + 21, before[from] + 21)) {
-            printf("row %d: [%s]\n   was [%s] on row %d\n", r, screen[r] + 21, before[from] + 21, from);
+        /* columns 19 to 77, the pane: the 80th holds the arrows, which stay put */
+        if (strncmp(screen[r] + 19, before[from] + 19, 59)) {
+            printf("row %d: [%s]\n   was [%s] on row %d\n", r, screen[r] + 19, before[from] + 19, from);
             return 0;
         }
     }
@@ -178,11 +181,21 @@ static void test_screen(void)
     CHECK(fetches > 3);
     printf("convo: %u steps up, %u fetches\n", steps, fetches);
 
-    /* Past the start: it says so, and nothing moves. */
+    /* At the start: no up arrow, the down arrow at the pane's foot. Up
+     * moves nothing and says nothing. */
+    CHECK(screen[TOP][79] == ' ' && screen[BOTTOM][79] == 'v');
     memcpy(before, screen, sizeof screen);
     keys[0] = K_UP;
     run(keys, NULL, 1);
-    CHECK(on_screen("THE START OF THE CONVERSATION"));
+    CHECK(!memcmp(before, screen, sizeof screen));
+    CHECK(!on_screen("THE START OF THE CONVERSATION"));
+    /* A line down: the start is above now, so the up arrow comes. */
+    keys[0] = K_DOWN;
+    run(keys, NULL, 1);
+    CHECK(screen[TOP][79] == '^' && screen[BOTTOM][79] == 'v');
+    keys[0] = K_UP;
+    run(keys, NULL, 1);
+    CHECK(screen[TOP][79] == ' ');
 
     /* Down, one line at a time, back to message 100. */
     fetches = 0;
@@ -204,6 +217,11 @@ static void test_screen(void)
     CHECK(on_screen("m100 ") && st[st_count - 1].n == CONV_N && st_newest);
     CHECK(fetches > 3);
     printf("convo: %u steps down, %u fetches\n", steps, fetches);
+    /* Column 78 stays blank between the text and the arrows. */
+    for (i = TOP; i <= BOTTOM; ++i) CHECK(screen[i][78] == ' ');
+    /* At the newest: the up arrow only; and none in the heading. */
+    CHECK(screen[TOP][79] == '^' && screen[BOTTOM][79] == ' ');
+    CHECK(screen[0][78] != 'v' && screen[0][79] == ' ');
 
     /* Pages: Open-Apple-Up and -Down, a pane less one row at a time. */
     for (i = 0; i < 40; ++i) { keys[i] = K_UP; oa[i] = 1; }
@@ -213,14 +231,30 @@ static void test_screen(void)
     run(keys, oa, 80);
     CHECK(on_screen("m100 "));
 
-    /* Open-Apple-< : the oldest held; Open-Apple-> : the newest. */
+    /* Open-Apple-< : the very start, in one request, however much is
+     * older than held; Open-Apple-> : the newest, the same way. */
+    CHECK(st_older && st[0].n > 1);
+    hellos = (unsigned long)hashes;
     keys[0] = '<'; oa[0] = 1;
     run(keys, oa, 1);
-    {
-        char tag[12];
-        sprintf(tag, "m%u ", st[0].n);
-        CHECK(on_screen(tag));
-    }
+    CHECK(on_screen("m1 ") && st[0].n == 1 && !st_older && !st_newest);
+    CHECK(strstr(gw_last_target, "/a2/hist?a=main&after=0&k=") == gw_last_target);
+    CHECK(!on_screen("m100 "));
+    /* Down from the start fetches newer, as after paging up. */
+    for (i = 0; i < 12; ++i) { keys[i] = K_DOWN; oa[i] = 1; }
+    run(keys, oa, 12);
+    CHECK(!on_screen("m1 ") && st[0].n >= 1);
+    keys[0] = '>'; oa[0] = 1;
+    run(keys, oa, 1);
+    CHECK(on_screen("m100 ") && st_newest);
+    /* At the start already, with nothing older: no request. */
+    keys[0] = '<'; keys[1] = '<'; oa[0] = oa[1] = 1;
+    run(keys, oa, 2);
+    CHECK(on_screen("m1 "));
+    hellos = (unsigned long)hashes;
+    keys[0] = '<'; oa[0] = 1;
+    run(keys, oa, 1);
+    CHECK((unsigned long)hashes == hellos && on_screen("m1 "));
     keys[0] = '>'; oa[0] = 1;
     run(keys, oa, 1);
     CHECK(on_screen("m100 ") && st_newest);
@@ -271,54 +305,54 @@ static void test_send_poll(void)
     CHECK(on_screen("echo: Hello from the test"));
     CHECK(!on_screen("thinking..."));
 
-    /* Scrolled back: a down arrow at the heading's right. */
-    CHECK(screen[0][78] != '#');
+    /* Scrolled back: a down arrow at the pane's foot, in column 80. */
+    CHECK(screen[BOTTOM][79] == ' ');
     for (n = 0; n < 6; ++n) keys[n] = K_UP;
     run(keys, oa, 6);
-    CHECK(screen[0][78] == '#' && !on_screen("scrolled back"));
+    CHECK(screen[BOTTOM][79] == 'v' && !on_screen("scrolled back"));
     /* A message arrives: the screen stays still, and a diamond goes
      * beside the agent's name, in the heading and in the list. */
-    CHECK(screen[0][27] == ' ' && screen[2][6] == ' ');
+    CHECK(screen[0][25] == ' ' && screen[2][17] == ' ');
     memcpy(rows, screen, sizeof screen);
     conv_append(0, "unprompted news", 15);
     keys[0] = IDLE;
     run(keys, oa, 1);
     for (r = TOP; r <= BOTTOM; ++r) {
-        CHECK(!strcmp(screen[r] + 21, rows[r] + 21));
+        CHECK(!strcmp(screen[r] + 19, rows[r] + 19));
     }
-    CHECK(!strncmp(screen[0] + 22, "main #", 6));     /* heading: main, diamond */
-    CHECK(!strncmp(screen[2], ">main #", 7));          /* list */
+    CHECK(!strncmp(screen[0] + 20, "main #", 6));     /* heading: main, diamond */
+    CHECK(!strncmp(screen[2], ">main ", 6) && screen[2][17] == '#');  /* list */
     CHECK(!on_screen("unprompted news"));
     for (n = 0; n < 30; ++n) keys[n] = K_DOWN;
     run(keys, oa, 30);
     CHECK(on_screen("unprompted news"));
     /* At the newest: seen, so the diamonds and the arrow go. */
-    CHECK(screen[0][27] == ' ' && screen[2][6] == ' ' && screen[0][78] != '#');
+    CHECK(screen[0][25] == ' ' && screen[2][17] == ' ' && screen[BOTTOM][79] == ' ');
 
     /* Another agent's news comes with the poll of this one: a diamond
-     * and a count beside it in the list. Open-Apple-N goes there, and
-     * the marks go. */
+     * in the list's last column, and no count. Open-Apple-N goes there,
+     * and the mark goes. */
     gw_unread_coder = 2;
     keys[0] = IDLE;
     run(keys, oa, 1);
-    CHECK(!strncmp(screen[3], " coder #", 8) && screen[3][18] == '2');
-    CHECK(screen[0][27] == ' ');                        /* main has nothing new */
+    CHECK(!strncmp(screen[3], " coder ", 7) && screen[3][17] == '#' && screen[3][16] == ' ');
+    CHECK(screen[0][25] == ' ');                        /* main has nothing new */
     keys[0] = 'n'; oa[0] = 1;
     run(keys, oa, 1);
     oa[0] = 0;
-    CHECK(!strncmp(screen[3], ">coder  ", 8) && screen[3][18] == ' ');
-    CHECK(!strncmp(screen[0] + 22, "coder", 5));
+    CHECK(!strncmp(screen[3], ">coder ", 7) && screen[3][17] == ' ');
+    CHECK(!strncmp(screen[0] + 20, "coder", 5));
     keys[0] = IDLE;
     run(keys, oa, 1);
     CHECK(gw_unread_coder == 0 && !strncmp(screen[3], ">coder  ", 8));
     keys[0] = 'n'; oa[0] = 1;
     run(keys, oa, 1);                                   /* nothing new: stays */
-    CHECK(!strncmp(screen[0] + 22, "coder", 5));
+    CHECK(!strncmp(screen[0] + 20, "coder", 5));
     /* back to main for the rest */
     keys[0] = K_TAB; keys[1] = K_UP; keys[2] = K_RETURN;
     oa[0] = oa[1] = oa[2] = 0;
     run(keys, oa, 3);
-    CHECK(!strncmp(screen[0] + 22, "main", 4));
+    CHECK(!strncmp(screen[0] + 20, "main", 4));
     keys[0] = '>'; oa[0] = 1;
     run(keys, oa, 1);
     oa[0] = 0;
@@ -379,7 +413,7 @@ static void test_errors(void)
     CHECK(idle_for(1, 5) == 1);
     CHECK(on_screen("GATEWAY NOT ANSWERING") && link_fails == 1 && link_live);
     for (r = TOP; r <= BOTTOM; ++r) {
-        CHECK(!strcmp(screen[r] + 21, rows[r] + 21));
+        CHECK(!strcmp(screen[r] + 19, rows[r] + 19));
     }
     /* Every 5 s while all is well; after failures 5, 10, 20, 40, then
      * 60 s. 30 idles of 400 frames are 200 s: 40 polls when well, but
@@ -420,7 +454,7 @@ static void test_errors(void)
     gw_agents = "agent coder\nagent main\n";
     gw_drop_session = 1;
     idle_for(2, 5);
-    CHECK(!strncmp(screen[0] + 22, "main", 4) && !strncmp(screen[3], ">main", 5));
+    CHECK(!strncmp(screen[0] + 20, "main", 4) && !strncmp(screen[3], ">main", 5));
     CHECK(!strncmp(screen[2], " coder", 6));
 
     /* An agent the gateway no longer has: hello again for the new list. */
@@ -443,7 +477,7 @@ static void test_errors(void)
     keys[0] = 'r'; oa[0] = 1;
     run(keys, oa, 1);
     oa[0] = 0;
-    CHECK(link_live && on_screen("SIGNED, NOT ENCRYPTED") && !strncmp(screen[0] + 22, "main", 4));
+    CHECK(link_live && on_screen("SIGNED, NOT ENCRYPTED") && !strncmp(screen[0] + 20, "main", 4));
 
     /* Locked out: stopped, and told how long. */
     gw_refuse = 6; gw_refuse_left = -1;
@@ -474,7 +508,7 @@ static void test_errors(void)
     http_error = 0;
     CHECK(idle_for(1, 30) >= 1);
     CHECK(link_live && !link_waiting && on_screen("SIGNED, NOT ENCRYPTED"));
-    CHECK(!strncmp(screen[0] + 22, "main", 4) && on_screen("while down"));
+    CHECK(!strncmp(screen[0] + 20, "main", 4) && on_screen("while down"));
     gw_agents = "agent main\nagent coder\n";
 }
 
@@ -491,16 +525,19 @@ static void test_names(void)
     run(keys, oa, 1);
     CHECK(link_live && !strcmp(ses_labels[0], "Pinchy") && !ses_labels[1][0]);  /* 17: too long */
     CHECK(!strcmp(agent_label(0), "Pinchy") && !strcmp(agent_label(1), "coder"));
-    CHECK(!strncmp(screen[0] + 22, "Pinchy", 6) && !strncmp(screen[2], ">Pinchy", 7));
+    CHECK(!strncmp(screen[0] + 20, "Pinchy", 6) && !strncmp(screen[2], ">Pinchy", 7));
     CHECK(strstr(screen[SCR_ROWS - 1], " PINCHY ") != NULL);
     before_n = http_requests;
     keys[0] = IDLE;
     run(keys, NULL, 1);
     CHECK(http_requests > before_n && strstr(gw_last_target, "a=main&") != NULL);
-    gw_agents = "agent main\nagent coder\nname coder Thirteen chars\n";
+    gw_agents = "agent main\nagent coder\nname coder Exactly sixteen!\n";
     keys[0] = 'r'; oa[0] = 1;
     run(keys, oa, 1);
-    CHECK(!strncmp(screen[3], " Thirteen char ", 15) && !ses_labels[0][0]);   /* cut to 13 */
+    /* All 16 characters in the list, then the diamond's column, then the
+     * divider; and in full in the heading. */
+    CHECK(!strncmp(screen[3], " Exactly sixteen! ", 18) && !ses_labels[0][0]);
+    CHECK(screen[3][18] != ' ');
     gw_agents = "agent main\nagent coder\n";
 }
 
@@ -508,12 +545,12 @@ static void test_names(void)
 static void test_glyphs(void)
 {
     has_mousetext = 1;
-    CHECK(sc_char(GL_CHECK, 0) == MT_CHECK && sc_char(GL_DOWN, 1) == MT_DOWN);
+    CHECK(sc_char(GL_CHECK, 0) == MT_CHECK && sc_char(GL_DOWN, 1) == MT_DOWN && sc_char(GL_UP, 0) == MT_UP);
     CHECK(sc_char(GL_DIAMOND, 0) == MT_DIAMOND && sc_char(OA[0], 0) == MT_OAPPLE);
     has_mousetext = 0;
-    CHECK(sc_char(GL_CHECK, 0) == ('+' | 0x80) && sc_char(GL_DOWN, 0) == ('v' | 0x80));
+    CHECK(sc_char(GL_CHECK, 0) == ('+' | 0x80) && sc_char(GL_DOWN, 0) == ('v' | 0x80) && sc_char(GL_UP, 0) == ('^' | 0x80));
     CHECK(sc_char(GL_DIAMOND, 1) == '*' && sc_char(OA[0], 0) == MT_OAPPLE);
-    CHECK(sc_char(0x05, 0) == ('?' | 0x80));
+    CHECK(sc_char(0x06, 0) == ('?' | 0x80));
     has_mousetext = 1;
 }
 

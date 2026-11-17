@@ -339,8 +339,16 @@ export class A2Server {
 
   private hist(device: string, agent: string, url: URL): Buffer {
     const c = this.conv(device, agent);
-    const before = intParam(url, "before", c.next);
     const k = Math.min(Math.max(intParam(url, "k", 20), 1), HIST_MAX);
+    if (url.searchParams.has("after")) {
+      // From a point forward, oldest first: after=0 is the conversation's
+      // start. `more` says there are newer. Unlike poll, nothing is seen.
+      if (url.searchParams.has("before")) throw new Refusal(Code.BAD_REQUEST, "before or after, not both");
+      const after = intParam(url, "after", 0);
+      const newer = c.msgs.filter((m) => m.n > after);
+      return pack([], newer.slice(0, k), false, newer.length);
+    }
+    const before = intParam(url, "before", c.next);
     const older = c.msgs.filter((m) => m.n < before);
     return pack([], older.slice(-k), true, older.length);
   }

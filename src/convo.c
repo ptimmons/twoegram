@@ -29,13 +29,14 @@
 #include "tick.h"
 #include "cogs.h"
 
-#define LIST_W      20              /* columns 0..19 */
-#define DIV_COL     20
+#define LIST_W      18              /* columns 0..17: >, the name, the diamond */
+#define DIV_COL     18
 #define HEAD_ROW    0
 #define RULE_ROW    1
 #define FIRST_ROW   2
 #define LAST_ROW    (BODY_ROWS - 1) /* 22 */
-#define NAME_MAX    13              /* of an agent's name in the list */
+#define NAME_MAX    AGENT_NAME_MAX  /* 16: columns 1..16 of the list */
+#define DIAMOND_COL (NAME_MAX + 1)  /* 17 */
 
 #define COMPOSE_MAX 255
 #define COMPOSE_ROWS_MAX 3
@@ -60,7 +61,8 @@ static uint8_t pane_x(void)
     return list_on ? DIV_COL + 1 : 0;
 }
 
-/* The text area runs from one column inside the pane to column 78. */
+/* The text area runs from one column inside the pane to column 77
+ * (counting from 0); 78 is left blank, and 79 holds the scroll arrows. */
 static uint8_t text_x(void)
 {
     return (uint8_t)(pane_x() + 1);
@@ -68,7 +70,7 @@ static uint8_t text_x(void)
 
 static uint8_t text_w(void)
 {
-    return (uint8_t)(SCR_COLS - 2 - pane_x());
+    return (uint8_t)(SCR_COLS - 3 - pane_x());
 }
 
 static uint8_t compose_w(void)
@@ -175,7 +177,6 @@ static uint8_t cur_news(void)
 static void row_begin(uint8_t row)
 {
     uint8_t a = (uint8_t)(row - FIRST_ROW), bar, n;
-    char num[6];
 
     lb_clear(SC_SPACE);
     if (!list_on || row < FIRST_ROW) {
@@ -197,13 +198,12 @@ static void row_begin(uint8_t row)
         n = NAME_MAX;
     }
     lb_textn(1, agent_label(a), n, bar);
-    /* The diamond: something new, below the screen here, or elsewhere. */
+    /* The diamond, in its own column: something new, below the screen
+     * here, or from that agent. (The count went to make room for
+     * 16-character names; the heading still counts them when the list
+     * is hidden.) */
     if (a == cur ? cur_news() : agent_unread(a)) {
-        linebuf[2 + n] = sc_char(GL_DIAMOND, bar);
-    }
-    if ((n = agent_unread(a)) != 0 && a != cur) {
-        fmt_u32(num, n);
-        lb_text((uint8_t)(LIST_W - 1 - txt_len(num)), num, bar);
+        linebuf[DIAMOND_COL] = sc_char(GL_DIAMOND, bar);
     }
 }
 
@@ -239,7 +239,7 @@ static const char *head_note(void)
 static void draw_head(void)
 {
     const char *note = head_note();
-    uint8_t x, right = SCR_COLS - 2;        /* the text area's last column */
+    uint8_t x;
 
     lb_clear(SC_SPACE);
     if (list_on) {
@@ -249,12 +249,7 @@ static void draw_head(void)
     if (cur_news()) {
         linebuf[x + 1] = sc_char(GL_DIAMOND, 0);
     }
-    /* Scrolled back: a down arrow, there is more below. */
-    if (scroll || win_end >= 0) {
-        linebuf[right] = sc_char(GL_DOWN, 0);
-        right -= 2;
-    }
-    lb_text((uint8_t)(right + 1 - txt_len(note)), note, 0);
+    lb_text((uint8_t)(SCR_COLS - 2 - txt_len(note)), note, 0);
     scr_blit(HEAD_ROW);
 
     lb_clear(SC_SPACE);
@@ -303,7 +298,7 @@ static const char *pane_note(uint8_t r)
 
 static void draw_msgs(void)
 {
-    uint8_t n = msg_rows(), r;
+    uint8_t n = msg_rows(), r, up, down, live = (uint8_t)(msgs_now == MSGS_LIVE);
     uint16_t first, i;
 
     if (scroll > max_scroll()) {
@@ -312,6 +307,12 @@ static void draw_msgs(void)
     /* Newest at the foot once the conversation fills the pane; until
      * then, from the top. */
     first = lay_count > n ? (uint16_t)(lay_count - n - scroll) : 0;
+    /* The 80th column, a scroll bar of sorts: an up arrow at the pane's
+     * top when there is more above what is shown (on the screen's lines,
+     * held, or at the gateway), a down arrow at its foot when there is
+     * more below. */
+    up = (uint8_t)(lay_count && (first || lay_lines[0].msg || (live && st_older)));
+    down = (uint8_t)(lay_count && (scroll || win_end >= 0 || (live && !st_newest)));
     for (r = 0; r < n; ++r) {
         row_begin((uint8_t)(FIRST_ROW + r));
         i = (uint16_t)(first + r);
@@ -319,6 +320,12 @@ static void draw_msgs(void)
             draw_line(&lay_lines[i]);
         } else if (!lay_count) {
             lb_text(text_x(), pane_note(r), 0);
+        }
+        if (r == 0 && up) {
+            linebuf[SCR_COLS - 1] = sc_char(GL_UP, 0);
+        }
+        if (r == n - 1 && down) {
+            linebuf[SCR_COLS - 1] = sc_char(GL_DOWN, 0);
         }
         scr_blit((uint8_t)(FIRST_ROW + r));
     }
@@ -423,15 +430,16 @@ static uint8_t done(uint8_t rc, uint8_t loud)
     return rc;
 }
 
-/* Fetch the newest page of the current agent's conversation. */
-static void load_current(void)
+/* Fetch the newest page of the current agent's conversation, or with
+ * first its first page. */
+static void load_current(uint8_t first)
 {
     if (msgs_now != MSGS_LIVE || !agent_count()) {
         return;
     }
     status_msg("FETCHING MESSAGES");
     link_begin();
-    done(hist_load(agent_name(cur)), 1);
+    done(hist_load(agent_name(cur), first), 1);
 }
 
 static void open_agent(uint8_t a)
@@ -442,7 +450,7 @@ static void open_agent(uint8_t a)
         fmt_str(cur_agent, agent_name(a));
     }
     msg_select(a);
-    load_current();
+    load_current(0);
     win_end = -1;
     scroll = 0;
     relayout();
@@ -504,7 +512,7 @@ static void send(void)
     }
     /* A message joins the newest end: go there first if scrolled away. */
     if (!st_newest) {
-        load_current();
+        load_current(0);
     }
     status_msg("SENDING");
     link_begin();
@@ -580,8 +588,7 @@ static void go_older(uint8_t step)
     last = msg_on_row((uint8_t)(msg_rows() - 1));
     if (top == 0) {
         if (msgs_now != MSGS_LIVE || !st_older) {
-            status_msg("THE START OF THE CONVERSATION");
-            return;
+            return;                 /* the start: no up arrow says so */
         }
         status_msg("FETCHING OLDER MESSAGES");
         st_shift = 0;
@@ -590,7 +597,7 @@ static void go_older(uint8_t step)
             return;
         }
         if (!hist_added) {
-            status_msg("THE START OF THE CONVERSATION");
+            draw_all();             /* the start after all: the arrow goes */
             return;
         }
         top = (uint16_t)(top + st_shift);
@@ -815,7 +822,10 @@ static uint8_t oa_key(uint8_t k)
         }
         break;
     case '<': case ',':
-        /* the oldest held message (older ones: keep going up) */
+        /* the start: from the gateway if it has older than held */
+        if (msgs_now == MSGS_LIVE && st_older) {
+            load_current(1);
+        }
         relayout_from_start();
         scroll = max_scroll();
         draw_all();
@@ -823,7 +833,7 @@ static uint8_t oa_key(uint8_t k)
     case '>': case '.':
         /* the newest: from the gateway if it has newer than held */
         if (msgs_now == MSGS_LIVE && !st_newest) {
-            load_current();
+            load_current(0);
         }
         win_end = -1;
         relayout();

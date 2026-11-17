@@ -21,7 +21,9 @@ extern uint8_t  hist_unseen;        /* newer messages than the window holds */
  * ses_agents: from the gateway's unread lines, every poll. */
 extern uint8_t  hist_unread[SES_AGENTS_MAX];
 
-uint8_t hist_load(const char *agent);
+/* The newest page; or, with first, the conversation's first page, in
+ * one request, however long it is. */
+uint8_t hist_load(const char *agent, uint8_t first);
 uint8_t hist_older(const char *agent);
 uint8_t hist_newer(const char *agent);
 

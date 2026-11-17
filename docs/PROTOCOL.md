@@ -75,11 +75,18 @@ higher than the last it accepted.
 | `POST /a2/send?a=<agent>` | the message, 1 to 1,024 bytes of printable ASCII and `\n` | one `msg` record: the message as stored |
 | `GET /a2/poll?a=<agent>&after=<n>&w=<ms>` | | `busy`, `more`, `unread` lines, then `msg` records numbered above *n* |
 | `GET /a2/hist?a=<agent>&before=<n>&k=<count>` | | `more`, then up to *k* `msg` records numbered below *n*, oldest first |
+| `GET /a2/hist?a=<agent>&after=<n>&k=<count>` | | `more`, then up to *k* `msg` records numbered above *n*, oldest first; `after=0` is the conversation's start (plugin 1.1.0 and later) |
 
 `poll` waits up to *w* milliseconds (at most 4,000, under the card's 8 s
 keep-alive cutoff) for something to report, and answers at once if
 there is something already. `poll` also tells the plugin that the Apple
 has every message up to *after*, which is what clears unread counts.
+
+`hist` takes `before` or `after`, not both (BAD_REQUEST). With neither,
+it is the newest page. With `before`, `more 1` means there are older
+messages; with `after`, newer ones. Unlike `poll`, `hist` never counts
+anything as seen. A plugin older than 1.1.0 ignores `after` and sends the
+newest page.
 
 A request line longer than 512 bytes, or a body longer than 1,024, is
 refused.
