@@ -244,6 +244,50 @@ off. That way, a copy of your Twoegram disk is no use to anyone else.
 To remove the key from the card, for example before you give the card
 away, press **OPEN-APPLE-X** on the Set-up screen, then **Y**.
 
+### A Passphrase, If You Want One
+
+Anyone who starts your Apple can use the key on the card. If others can
+reach your Apple, give the key a **passphrase**: a phrase only you know,
+which Twoegram asks for every time it starts. With a passphrase, the
+card holds the key scrambled, and only the passphrase unscrambles it.
+The passphrase itself is never kept anywhere, on the card, on a disk, or
+on the gateway.
+
+1. Press OPEN-APPLE-K for the Set-up screen.
+2. Press TAB until you reach the **Passphrase** line, and type a phrase
+   of 8 to 32 characters. Twoegram shows a star for each character.
+3. Press RETURN. Twoegram asks for it again, to be sure of it: type it
+   once more and press RETURN.
+
+From then on, Twoegram starts by asking for the passphrase. If you type
+it wrong, the gateway won't recognize the key it makes, and Twoegram
+asks again.
+
+To change the passphrase, type a new one on the Set-up screen the same
+way. To stop using one, press **OPEN-APPLE-P** on the Set-up screen,
+then **Y**.
+
+> **Important:** Twoegram can't tell you a passphrase you've forgotten,
+> and nobody else can either. If you forget it, pair your Apple again
+> for a new key (see "Getting a Key from the Gateway"), and remove the old one
+> from the gateway's list.
+
+A longer passphrase is a stronger one. Several ordinary words strung
+together, such as `purple kettle on the stair`, are easier to remember
+and harder to guess than one odd word.
+
+### Locking Twoegram
+
+When you have a passphrase, press **OPEN-APPLE-L** to lock Twoegram
+when you step away. The screen clears and shows only a line for the
+passphrase. Twoegram also locks itself after 10 minutes without a key
+pressed.
+
+While it's locked, Twoegram has forgotten your key and your messages,
+and it stops checking for new ones. Type the passphrase and press
+RETURN: Twoegram checks it on the Apple, connects to the gateway again,
+and brings your conversation back.
+
 ### If the Gateway Doesn't Know Your Key
 
 If the gateway has forgotten your Apple (perhaps someone removed it
@@ -489,16 +533,22 @@ network as plain text. Anyone with the right equipment on your network
 could read it, although they couldn't change it or join in. That's why
 the status bar also says **NOT ENCRYPTED**.
 
-**Someone sitting at your Apple.** Twoegram doesn't ask for a password.
-Anyone who turns on your Apple with the Twoegram disk, or finds it
-running, can talk to your agents as you. Treat the Apple as you would
-a computer that's left signed in.
+**Someone sitting at your Apple, unless you give it a passphrase.**
+Without a passphrase, anyone who turns on your Apple with the Twoegram
+disk, or finds it running, can talk to your agents as you. With one
+(Chapter 2), Twoegram asks for it at every start, and OPEN-APPLE-L, or
+10 minutes without a key, locks it again.
+
+A passphrase protects against someone at the keyboard. It's weaker
+against someone who takes the CoGS card away *and* has recorded your
+network: with both, a computer could try one guess after another until
+one works. A long passphrase makes that take far too long to be worth
+it.
 
 > **Important:** Use Twoegram only on your own home network, and never
-> make your gateway reachable from the Internet. When you leave the
-> Apple where others can reach it, press OPEN-APPLE-Q to quit Twoegram.
-> A future version of Twoegram will encrypt the conversation and can ask
-> for a passphrase before it starts.
+> make your gateway reachable from the Internet. If others can reach
+> your Apple, give your key a passphrase, and lock Twoegram when you step
+> away. A future version of Twoegram will encrypt the conversation.
 
 ### What Your Agents Can Do from the Apple
 
@@ -511,7 +561,8 @@ that needs one, the agent will tell you it can't do it from here.
 
 Whoever looks after the gateway can change that by listing your Apple
 as an owner. Think before asking for it: anyone at your Apple would then
-have those powers too, and Twoegram doesn't yet ask for a passphrase.
+have those powers too. Give your key a passphrase first, and keep
+Twoegram locked when you're away from it.
 
 OpenClaw's own commands, such as `/status` and `/new`, work from the
 Apple unless the gateway turns them off.
@@ -573,6 +624,7 @@ Apple by mistake, simply pair again and revoke the old key.
 | OPEN-APPLE-N | go to the next agent with something new |
 | OPEN-APPLE-K | set the gateway and key |
 | OPEN-APPLE-R | connect to the gateway again |
+| OPEN-APPLE-L | lock Twoegram (with a passphrase) |
 | OPEN-APPLE-Q | quit Twoegram |
 
 ### In the Conversation
@@ -599,9 +651,10 @@ Apple by mistake, simply pair again and revoke the old key.
 
 | Press | To |
 |---|---|
-| TAB | move between the address and the key |
+| TAB | move between the address, the key and the passphrase |
 | RETURN | save, and connect |
 | OPEN-APPLE-X | remove the key from the CoGS card |
+| OPEN-APPLE-P | stop using a passphrase |
 | ESC | leave without changing anything |
 
 ### The Symbols
@@ -652,6 +705,23 @@ Check the card's configuration screen, then press OPEN-APPLE-R.
 You left the Set-up screen without typing a gateway and key. Press
 OPEN-APPLE-K when you're ready.
 
+**This Apple's key is locked with a passphrase.**
+Type your passphrase and press RETURN. Press ESC instead to type a new
+key on the Set-up screen.
+
+**The gateway does not know the key that passphrase makes: is it right?**
+The passphrase was probably mistyped. Type it again.
+
+**The key on the card is locked with a passphrase**
+You pressed ESC instead of typing the passphrase, and left the Set-up
+screen too. Press OPEN-APPLE-K, then RETURN, and Twoegram asks for the
+passphrase again.
+
+**THE SET-UP SCREEN, TWOEGRAM.SETUP, COULD NOT BE READ FROM THE DISK**
+The Set-up screen is a file of its own on the Twoegram disk, read when
+it's needed. Make sure the Twoegram disk is still in the drive, with
+`TWOEGRAM.SETUP` on it, and try again.
+
 ### When Setting Up
 
 **THE GATEWAY IS AN ADDRESS AND PORT, FOR EXAMPLE 192.168.1.20:8417**
@@ -672,6 +742,26 @@ You left the Key line empty, but the card doesn't have a key yet.
 **The key could not be kept on the card.**
 The CoGS card wouldn't save the key. Press any key to connect anyway;
 you'll have to type the key again next time.
+
+**A PASSPHRASE IS AT LEAST 8 CHARACTERS**
+Make it longer. Several words together are easiest.
+
+**TYPE THE PASSPHRASE AGAIN, THEN RETURN**
+Twoegram asks twice, to be sure you typed what you meant.
+
+**THE TWO DIFFER: TYPE THE PASSPHRASE AGAIN**
+The second typing didn't match the first. Start again with the first.
+
+**UNLOCK THE KEY FIRST, OR TYPE IT, TO GIVE IT A NEW PASSPHRASE**
+The key on the card is locked, and you didn't unlock it when Twoegram
+started. Start Twoegram again and type the old passphrase, or type the
+key itself on the Key line.
+
+**NO PASSPHRASE IS IN USE**
+You pressed OPEN-APPLE-P, but the key has no passphrase.
+
+**THE KEY NO LONGER NEEDS A PASSPHRASE**
+OPEN-APPLE-P worked: Twoegram won't ask for the passphrase again.
 
 ### When Connecting
 
@@ -801,7 +891,8 @@ quit Twoegram and choose it from the ProDOS menu. The file
 | Where | Contains |
 |---|---|
 | `TWOEGRAM.CFG`, on the Twoegram disk | the gateway's address |
-| the CoGS card's memory | your key |
+| `TWOEGRAM.SETUP`, on the Twoegram disk | the Set-up screen itself, read from the disk when it's needed |
+| the CoGS card's memory | your key, scrambled if you gave it a passphrase |
 | the gateway | your conversations |
 
 ---
@@ -822,6 +913,8 @@ quit Twoegram and choose it from the ProDOS menu. The file
 | Checking for news | every 5 seconds; every second while an agent is thinking | |
 | Being away | 30 minutes | The gateway forgets the session; Twoegram says hello again by itself. |
 | Wrong keys | 5 in a few minutes | The gateway locks your Apple out for 15 minutes. |
+| A passphrase | 8 to 32 characters | |
+| Time before Twoegram locks itself | 10 minutes without a key, with a passphrase | |
 
 ### What Twoegram Doesn't Do
 

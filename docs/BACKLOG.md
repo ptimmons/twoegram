@@ -7,10 +7,29 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 
 ## Waiting
 
-### 1. Build b023 with plugin 1.1.0 (built 2026-11-16)
+One disk covers all of this: `build/TWOEGRAM-b028.po` (or later), with
+plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
-Bring: `build/TWOEGRAM-b023.po`, `build/openclaw-twoegram-1.1.0.tgz`.
-Steps: PROBE.md, "Build b023".
+### 1. The passphrase and the lock (b028, built 2026-11-16)
+
+Steps: PROBE.md, "Build b028".
+
+- **The set-up screen loads from the disk** (`TWOEGRAM.SETUP`), opens
+  and closes cleanly, and opens again.
+- **Setting a passphrase**, typed twice. **Time the pause** after the
+  second Return: 64 hashes on the card, not yet measured. This has to
+  be settled before you rely on a passphrase, because changing the
+  count changes what a passphrase makes.
+- **Open-Apple-L**, a wrong passphrase refused at once, the right one
+  signs in again.
+- **The idle lock** after 10 minutes.
+- **A fresh start** asks for the passphrase; a wrong one is caught by the
+  gateway and asked again.
+- **Open-Apple-P** removes the passphrase.
+
+### 2. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
+
+Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
 - **Plugin 1.1.0 first.** Install it on the gateway as INSTALL.md step 2
   says; `openclaw plugins list` shows `a2` at 1.1.0. (b023 against an
@@ -25,7 +44,7 @@ Steps: PROBE.md, "Build b023".
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 2. Older items, not yet seen
+### 3. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the

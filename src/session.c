@@ -14,15 +14,6 @@ char     ses_sid[9];
 uint8_t  ses_open;
 uint8_t  ses_nagents;
 char     ses_agents[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
-/* In LOWBSS ($0800-$1FFF, never zeroed): cleared by every hello, and
- * read only while a hello's agents are listed. */
-#ifdef __CC65__
-#pragma bss-name (push, "LOWBSS")
-#endif
-char     ses_labels[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
-#ifdef __CC65__
-#pragma bss-name (pop)
-#endif
 char     ses_server[61];
 uint32_t ses_seq;
 a2_reply_t ses_reply;
@@ -30,7 +21,8 @@ uint8_t  ses_genuine;
 
 static uint8_t  sk[32];
 /* The reply buffer lives in LOWBSS, $0800-$1FFF on the Apple (see
- * cfg/twoegram.cfg): never zeroed, and always written before it is read. */
+ * cfg/twoegram.cfg): never zeroed, and always written before it is read.
+ * The set-up overlay loads over it (overlay.h). */
 #ifdef __CC65__
 #pragma bss-name (push, "LOWBSS")
 #endif
@@ -38,6 +30,9 @@ static uint8_t  rbuf[2048];
 #ifdef __CC65__
 #pragma bss-name (pop)
 #endif
+/* In main memory: the set-up overlay (overlay.h) loads over LOWBSS, and
+ * the names must outlast it. */
+char     ses_labels[SES_AGENTS_MAX][SES_AGENT_LEN + 1];
 static char     url[256];
 static char     hdrs[160];
 static char     meth[8];

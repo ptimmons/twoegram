@@ -51,7 +51,8 @@ uint8_t link_connect(void);
 /* The set-up screen, then hello (Open-Apple-K). */
 void link_setup(void);
 
-/* setup.c: 1 if the address and key were set, 0 if cancelled. */
-uint8_t setup_run(const char *why);
+/* The set-up screen (overlay.h): 1 if the address and key were set, 0 if
+ * cancelled. */
+#include "overlay.h"
 
 #endif

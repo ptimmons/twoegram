@@ -3,11 +3,13 @@
  */
 #include <string.h>
 #include "cogs.h"
+#include "screen.h"
 #include "tick.h"
 #include "kbd.h"
 #include "fmt.h"
 #include "session.h"
 #include "keystore.h"
+#include "lock.h"
 #include "config.h"
 #include "msgs.h"
 #include "ui.h"
@@ -142,12 +144,29 @@ uint8_t link_connect(void)
     return 0;
 }
 
+static void open_locked(void);
+
+/* Whether the card's key is locked with a passphrase and not yet
+ * unlocked: then the passphrase comes before connecting. */
+static uint8_t card_locked(void)
+{
+    static uint8_t scrambled[A2_KEY_LEN];
+    uint8_t rc = (uint8_t)(!lock_armed && ks_load(scrambled) == KS_LOCKED);
+
+    memset(scrambled, 0, sizeof scrambled);
+    return rc;
+}
+
 /* The gateway said no to this key: set-up again, until it is right or
  * cancelled. */
 static void connect_or_setup(void)
 {
     uint8_t rc;
 
+    if (card_locked()) {
+        open_locked();
+        return;
+    }
     for (;;) {
         rc = link_connect();
         if (rc != SES_E_REFUSED ||
@@ -160,9 +179,33 @@ static void connect_or_setup(void)
     }
 }
 
+/* The card's key is locked with a passphrase: ask for it, until the
+ * gateway knows the key it makes, or Esc goes to set-up. */
+static void open_locked(void)
+{
+    const char *why = 0;
+    uint8_t rc;
+
+    for (;;) {
+        if (!lock_open(why)) {
+            if (setup_run("To use a new key instead, type it here.")) {
+                connect_or_setup();
+            } else {
+                offline("LOCKED", "The key on the card is locked with a passphrase: " OA "-K to type it.");
+            }
+            return;
+        }
+        rc = link_connect();
+        if (rc != SES_E_REFUSED || ses_reply.code != A2_UNKNOWN_DEVICE) {
+            return;
+        }
+        why = "The gateway does not know the key that passphrase makes: is it right?";
+    }
+}
+
 void link_start(void)
 {
-    uint8_t have_gw, have_key;
+    uint8_t have_gw, rc;
 
     if (!cogs_slot) {
         offline("NO COGS CARD", "No CoGS card was found in any slot.");
@@ -170,8 +213,12 @@ void link_start(void)
     }
     /* The disk before any network use; then the card. */
     have_gw = cfg_load();
-    have_key = (uint8_t)!ks_load(ses_key);
-    if (!have_gw || !have_key) {
+    rc = ks_load(ses_key);
+    if (rc == KS_LOCKED) {
+        memset(ses_key, 0, A2_KEY_LEN);         /* lock_open reads it again */
+        rc = 0;
+    }
+    if (!have_gw || rc) {
         if (!setup_run(have_gw ? "The card holds no key for Twoegram yet." : 0)) {
             offline("NOT SET UP", "Not set up yet.");
             return;

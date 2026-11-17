@@ -28,7 +28,40 @@ def main():
     status = "ok" if heap >= NEED else "TOO SMALL"
     print(f"memcheck: {heap} bytes of heap (BSS ends ${bss_end:04X}, stack at "
           f"${STACK_TOP - stack:04X}); opening a file needs {NEED}: {status}")
-    return 0 if heap >= NEED else 1
+    return 0 if heap >= NEED and overlay_ok(mapfile) else 1
+
+
+# The set-up overlay (src/overlay.h) loads at $0800 over LOWBSS. Only these
+# buffers are idle while it is open and rebuilt afterwards; it must end
+# before anything else in LOWBSS starts.
+OVERLAY_MAY_COVER = ("layout.o", "msgs.o", "session.o")
+
+
+def overlay_ok(mapfile):
+    text = open(mapfile).read()
+    m = re.search(r"^OVERLAY1\s+([0-9A-F]+)\s+([0-9A-F]+)", text, re.M)
+    if not m:
+        return True                     # the probe: no overlay
+    end = int(m.group(2), 16)
+    mods = text.split("Segment list:")[0]
+    module, ok = None, True
+    for line in mods.splitlines():
+        if line and not line.startswith(" ") and line.endswith(":"):
+            module = line[:-1].rsplit("/", 1)[-1]
+            continue
+        g = re.match(r"\s+LOWBSS\s+Offs=([0-9A-F]+)\s+Size=([0-9A-F]+)", line)
+        if not g:
+            continue
+        start = 0x0800 + int(g.group(1), 16)
+        size = int(g.group(2), 16)
+        covered = start <= end
+        if covered and module not in OVERLAY_MAY_COVER:
+            print(f"memcheck: the set-up overlay ends at ${end:04X}, over "
+                  f"{module}'s LOWBSS at ${start:04X}: TOO BIG")
+            ok = False
+    if ok:
+        print(f"memcheck: the set-up overlay ends at ${end:04X}, over idle buffers only: ok")
+    return ok
 
 
 if __name__ == "__main__":

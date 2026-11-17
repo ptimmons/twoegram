@@ -61,8 +61,13 @@ done
 
 # cc65 writes an AppleSingle file; -as takes the type ($FF) and the load
 # address ($2000) from its header.
+# Anything else (the set-up overlay, TWOEGRAM.SETUP) is a plain binary
+# file, type BIN, loaded by the program itself at $0800.
 for BIN in "$@"; do
-    "$AC" -as "$OUT" "$(basename "$BIN")" < "$BIN"
+    case "$BIN" in
+    *.SYSTEM) "$AC" -as "$OUT" "$(basename "$BIN")" < "$BIN" ;;
+    *)        "$AC" -p "$OUT" "$(basename "$BIN")" BIN 0x0800 < "$BIN" ;;
+    esac
 done
 xattr -c "$OUT" 2>/dev/null || true
 
@@ -72,7 +77,10 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 for BIN in "$@"; do
     "$AC" -g "$OUT" "$(basename "$BIN")" > "$TMP/got"
-    tail -c +59 "$BIN" > "$TMP/want"
+    case "$BIN" in
+    *.SYSTEM) tail -c +59 "$BIN" > "$TMP/want" ;;
+    *)        cp "$BIN" "$TMP/want" ;;
+    esac
     if ! cmp -s "$TMP/got" "$TMP/want"; then
         echo "mkdisk: $OUT does not carry $BIN" >&2
         exit 1

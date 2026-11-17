@@ -28,6 +28,7 @@
 #include "history.h"
 #include "tick.h"
 #include "cogs.h"
+#include "lock.h"
 
 #define LIST_W      18              /* columns 0..17: >, the name, the diamond */
 #define DIV_COL     18
@@ -119,6 +120,8 @@ static const char *cur_name(void)
 
 static int16_t win_end = -1;
 static uint16_t since_poll;         /* frames since the last poll */
+static uint16_t idle_frames;        /* since the last key, up to a minute */
+static uint8_t  idle_min;           /* minutes since the last key */
 static uint8_t  news_below;         /* messages came in below the screen */
 
 static void lay_one(uint16_t i)
@@ -749,12 +752,35 @@ static void poll_now(void)
     }
 }
 
-/* Wait for a key, polling the gateway meanwhile. */
+/* Lock: the key, the session key and the messages leave memory until
+ * the passphrase is typed again; then sign in afresh. */
+static void lock_screen(void)
+{
+    if (!lock_armed) {
+        status_msg("NO PASSPHRASE IS SET: GIVE ONE ON THE SET-UP SCREEN, OPEN-APPLE-K");
+        return;
+    }
+    st_reset();
+    lock_now();
+    idle_frames = 0;
+    idle_min = 0;
+    link_connect();
+    restart();
+}
+
+/* Wait for a key, polling the gateway meanwhile; lock after
+ * LOCK_IDLE_MIN minutes without one. */
 static uint8_t wait_key(void)
 {
     while (!key_ready()) {
         if (tick_poll()) {
             ++since_poll;
+            if (++idle_frames >= TICKS_PER_SEC * 60) {
+                idle_frames = 0;
+                if (++idle_min >= LOCK_IDLE_MIN && lock_armed) {
+                    lock_screen();
+                }
+            }
         }
         if (since_poll < poll_gap()) {
             continue;
@@ -768,6 +794,8 @@ static uint8_t wait_key(void)
             restart();
         }
     }
+    idle_frames = 0;
+    idle_min = 0;
     return key_get();
 }
 
@@ -795,6 +823,9 @@ static uint8_t oa_key(uint8_t k)
     case 'k': case 'K':
         link_setup();
         restart();
+        break;
+    case 'l': case 'L':
+        lock_screen();
         break;
     case 'r': case 'R':
         if (!cogs_slot) {

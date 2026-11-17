@@ -17,6 +17,8 @@
 #include "layout.h"
 #include "link.h"
 #include "ui.h"
+#include "keystore.h"
+#include "lock.h"
 
 /* ---- the stubs: screen, keyboard, clock, disk ---- */
 
@@ -46,12 +48,24 @@ static const uint8_t *script;
 static const uint8_t *script_oa;
 static unsigned script_n, script_i;
 
+/* Called at every key: what the screen showed when it was asked for. */
+static void (*on_key)(void);
+static unsigned past_end;
+
 uint8_t key_get(void)
 {
+    if (on_key) on_key();
     if (script_i >= script_n) {
+        /* Open-Apple-Q ends the conversation screen; a screen that ignores
+         * it (the passphrase prompt) would wait for ever. */
+        if (++past_end > 50) {
+            printf("FAIL: the script ran out on a screen that does not quit\n");
+            exit(1);
+        }
         key_oa = 1;
         return 'q';
     }
+    past_end = 0;
     key_oa = script_oa ? script_oa[script_i] : 0;
     return script[script_i++];
 }
@@ -541,6 +555,164 @@ static void test_names(void)
     gw_agents = "agent main\nagent coder\n";
 }
 
+/* ---- the passphrase and the lock ---- */
+
+static const char *watch[6];
+static uint8_t seen[6];
+static uint8_t leaked;          /* messages or the key while locked */
+
+static int key_is_zero(void)
+{
+    unsigned i;
+    for (i = 0; i < 16; ++i) if (ses_key[i]) return 0;
+    return 1;
+}
+
+static void watcher(void)
+{
+    unsigned i;
+
+    for (i = 0; i < 6 && watch[i]; ++i) {
+        if (on_screen(watch[i])) seen[i] = 1;
+    }
+    if (on_screen("Twoegram is locked.") && (on_screen("while down") || !key_is_zero())) {
+        leaked = 1;
+    }
+}
+
+static void watch_for(const char *a, const char *b, const char *c, const char *d)
+{
+    watch[0] = a; watch[1] = b; watch[2] = c; watch[3] = d; watch[4] = 0;
+    memset(seen, 0, sizeof seen);
+    leaked = 0;
+    on_key = watcher;
+}
+
+static void test_passphrase(void)
+{
+    static uint8_t keys[300], oa[300];
+    static const uint8_t card[15] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+    uint8_t plain[16], got[16];
+    unsigned n, i, hellos;
+
+    memset(oa, 0, sizeof oa);
+    memcpy(plain, gw_key, 16);
+    memcpy(prefs, card, 15);
+    prefs[15] = KS_MARK;
+    memcpy(prefs + 16, plain, 16);
+    prefs_len = 32;
+    lock_armed = 0;
+
+    /* Without a passphrase, Open-Apple-L says how to give one. */
+    keys[0] = 'l'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(on_screen("NO PASSPHRASE IS SET"));
+
+    /* Set-up: too short; typed twice differently; then twice the same. */
+    watch_for("AT LEAST 8", "TYPE THE PASSPHRASE AGAIN", "THE TWO DIFFER", "****");
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n++] = K_TAB;                          /* from the key to the passphrase */
+    n += type(keys + n, "short");
+    keys[n++] = K_RETURN;
+    for (i = 0; i < 5; ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "correct horsf");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    hellos = (unsigned)gw_hellos;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
+    CHECK(!on_screen("correct"));               /* never shown */
+    /* The card: its own settings as they were, our mark, the key
+     * scrambled; the passphrase unscrambles it. */
+    CHECK(prefs_len == 32 && !memcmp(prefs, card, 15) && prefs[15] == KS_MARK_PASS);
+    CHECK(memcmp(prefs + 16, plain, 16) != 0);
+    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horse", 13) == 0);
+    CHECK(!memcmp(got, plain, 16));
+    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horsf", 13) == 0);
+    CHECK(memcmp(got, plain, 16) != 0);
+    CHECK(lock_armed && link_live && (unsigned)gw_hellos > hellos);
+    CHECK(!memcmp(ses_key, plain, 16));
+
+    /* Open-Apple-L: the screen, the key and the messages go; a wrong
+     * passphrase is refused on the Apple (no request); the right one
+     * signs in again. */
+    keys[0] = '>'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(on_screen("echo: while down"));
+    watch_for("Twoegram is locked.", "That is not the passphrase.", 0, 0);
+    n = 0;
+    keys[n] = 'l'; oa[n++] = 1;
+    n += type(keys + n, "not my passphrase");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    hellos = (unsigned)gw_hellos;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(seen[0] && seen[1] && !leaked);
+    CHECK((unsigned)gw_hellos == hellos + 1);   /* only the unlocked one */
+    CHECK(link_live && on_screen("echo: while down") && !memcmp(ses_key, plain, 16));
+
+    /* Ten minutes without a key lock it too. */
+    watch_for("Twoegram is locked.", 0, 0, 0);
+    n = 0;
+    for (i = 0; i < 89; ++i) keys[n++] = IDLE;
+    run(keys, oa, n);
+    CHECK(!seen[0] && on_screen("echo: while down"));      /* nine minutes and more: not yet */
+    n = 0;
+    for (i = 0; i < 91; ++i) keys[n++] = IDLE;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    CHECK(seen[0] && !leaked && link_live && on_screen("echo: while down"));
+    /* ... and the count starts again: another five minutes, no lock. */
+    watch_for("Twoegram is locked.", 0, 0, 0);
+    n = 0;
+    for (i = 0; i < 45; ++i) keys[n++] = IDLE;
+    run(keys, oa, n);
+    CHECK(!seen[0] && on_screen("echo: while down"));
+
+    /* A fresh start with the key locked: the passphrase first. A wrong
+     * one makes a key the gateway does not know; it says so and asks
+     * again. */
+    ses_forget();
+    lock_armed = 0;
+    link_live = 0;
+    watch_for("This Apple's key is locked with a passphrase.",
+              "The gateway does not know the key that passphrase makes", 0, 0);
+    n = 0;
+    n += type(keys + n, "wrong guess!");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "correct horse");
+    keys[n++] = K_RETURN;
+    script = keys; script_oa = oa; script_n = n; script_i = 0;
+    link_start();
+    CHECK(seen[0] && seen[1] && script_i == n);
+    CHECK(link_live && lock_armed && !memcmp(ses_key, plain, 16));
+
+    /* Open-Apple-P on set-up takes the passphrase off: the key as it is
+     * on the card again. */
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n] = 'p'; oa[n++] = 1;
+    keys[n++] = 'y';
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(prefs[15] == KS_MARK && !memcmp(prefs + 16, plain, 16) && !lock_armed);
+    CHECK(!memcmp(prefs, card, 15) && link_live);
+    on_key = 0;
+}
+
 /* The glyph bytes: MouseText, or plain stand-ins without it. */
 static void test_glyphs(void)
 {
@@ -562,6 +734,7 @@ int main(void)
     test_send_poll();
     test_errors();
     test_names();
+    test_passphrase();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

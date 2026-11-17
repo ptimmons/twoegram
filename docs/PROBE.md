@@ -1,5 +1,29 @@
 # Testing on the card
 
+## Build b028: the passphrase and the lock
+
+Plugin 1.1.0 as for b023 (no plugin change). Boot `build/TWOEGRAM-b028.po`.
+It also carries everything in the b023 list below, so one disk covers
+both. The disk now has `TWOEGRAM.SETUP`, the set-up screen, read from the
+disk when it opens.
+
+1. **Set-up still works** (it is now loaded from the disk): Open-Apple-K
+   opens it at once; Esc returns to the conversation, drawn whole; a
+   second Open-Apple-K opens it again.
+2. **Give the key a passphrase.** Open-Apple-K, Tab to Passphrase, type
+   one (8 or more characters; stars appear), Return; type it again,
+   Return. **Time the pause after the second Return** (the card hashes
+   64 times): please say how long.
+3. **Open-Apple-L.** The screen clears to the prompt. A wrong passphrase:
+   "That is not the passphrase.", at once. The right one: it signs in
+   again and the conversation comes back.
+4. **The idle lock.** Leave it 10 minutes untouched: it locks by itself.
+5. **A fresh start.** Quit and start Twoegram: it asks for the
+   passphrase first. Type it wrong once: the gateway does not know the
+   key it makes, and it asks again. Then right.
+6. **Open-Apple-P** on the set-up screen, Y: the next start asks for no
+   passphrase. (Give it one again afterwards if you want to keep it.)
+
 ## Build b023: straight to the start, the scroll arrows, a narrower list
 
 Needs plugin 1.1.0 on the gateway (`build/openclaw-twoegram-1.1.0.tgz`):

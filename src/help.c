@@ -51,10 +51,11 @@ static const struct help_row rows[] = {
     { "Delete",     "erase",           "Tab Esc",    "back to the chat" },
     { "Up Down",    "scroll",          "",           "" },
     { OA "-Up Dn",  "page",            "ANYWHERE",   0 },
-    { OA "-< >",    "oldest, newest",  OA "-B",      "hide, show agents" },
+    { OA "-< >",    "start, newest",   OA "-B",      "hide, show agents" },
     { "Tab",        "to the agents",   OA "-N",      "next with news" },
     { "",           "",                OA "-K",      "gateway and key" },
     { "",           "",                OA "-R",      "connect again" },
+    { "",           "",                OA "-L",      "lock" },
     { "",           "",                OA "-?",      "this help" },
     { "",           "",                OA "-Q",      "quit" },
 };
@@ -106,7 +107,7 @@ void help_show(void)
     sides();
     scr_blit(row++);
     sides();
-    lb_text(COL1_KEY, "\x04 something new there      \x03 scrolled back: more below", 0);
+    lb_text(COL1_KEY, "\x04 something new there      \x05 \x03 more above, more below", 0);
     scr_blit(row++);
     sides();
     lb_text(COL1_KEY, "press any key to return", 0);

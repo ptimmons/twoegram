@@ -919,18 +919,18 @@ static void test_keystore(void)
     /* Nothing stored at all: the card's own settings would be invented. */
     prefs_len = 0;
     CHECK(ks_load(got) == KS_NONE);
-    CHECK(ks_save(key) == KS_NOROOM && prefs_len == 0);
+    CHECK(ks_save(key, KS_MARK) == KS_NOROOM && prefs_len == 0);
 
     /* The user's card: 15 bytes of its own. */
     memcpy(prefs, orig, 15);
     prefs_len = 15;
     CHECK(ks_load(got) == KS_NONE);
-    CHECK(ks_save(key) == 0);
+    CHECK(ks_save(key, KS_MARK) == 0);
     CHECK(prefs_len == 32 && !memcmp(prefs, orig, 15) && prefs[15] == KS_MARK);
     CHECK(ks_load(got) == 0 && !memcmp(got, key, 16));
     /* Saving again replaces our own key. */
     key[0] = 0x99;
-    CHECK(ks_save(key) == 0 && ks_load(got) == 0 && got[0] == 0x99);
+    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0 && got[0] == 0x99);
     /* Clearing goes back to the card's own fifteen bytes. */
     CHECK(ks_clear() == 0 && prefs_len == 15 && !memcmp(prefs, orig, 15));
     CHECK(ks_load(got) == KS_NONE);
@@ -940,11 +940,19 @@ static void test_keystore(void)
     memcpy(prefs, orig, 15);
     memset(prefs + 15, 0x11, 17);
     prefs_len = 32;
-    CHECK(ks_save(key) == KS_INUSE && prefs[15] == 0x11);
+    CHECK(ks_save(key, KS_MARK) == KS_INUSE && prefs[15] == 0x11);
     CHECK(ks_load(got) == KS_NONE);
     /* All zero there counts as free. */
     memset(prefs + 15, 0, 17);
-    CHECK(ks_save(key) == 0 && prefs[15] == KS_MARK && !memcmp(prefs, orig, 15));
+    CHECK(ks_save(key, KS_MARK) == 0 && prefs[15] == KS_MARK && !memcmp(prefs, orig, 15));
+    /* A key under a passphrase: loaded as locked, scrambled bytes and all;
+     * saved over and cleared like the plain one. */
+    CHECK(ks_save(key, KS_MARK_PASS) == 0 && prefs[15] == KS_MARK_PASS);
+    CHECK(ks_load(got) == KS_LOCKED && !memcmp(got, key, 16));
+    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0);
+    CHECK(ks_save(key, KS_MARK_PASS) == 0 && ks_clear() == 0 && prefs_len == 15);
+    CHECK(ks_load(got) == KS_NONE && !memcmp(prefs, orig, 15));
+    CHECK(ks_save(key, KS_MARK) == 0);
 }
 
 static void test_config(void)

@@ -319,7 +319,8 @@ otherwise interrupt:
    unlocked //e can reach a shell on the gateway host.
 6. **Lock and passphrase** (planned for milestone 7; moved here
    2026-11-16, since eavesdroppers and interlopers at home are not a
-   worry for now). The design, ready to build: the card's flash holds the
+   worry for now; built 2026-11-16 in b028, not yet on the card: see
+   "The passphrase and the lock" below). The design, ready to build: the card's flash holds the
    device key XORed with a hash of the passphrase (a second mark byte says
    so); Twoegram asks for it at start-up and unscrambles the key in
    memory, never storing it. The gateway keeps the same key: no protocol
@@ -1038,4 +1039,66 @@ heading's note ("thinking...", "2 new elsewhere") ends at column 77 too.
 Dropping the count saved more than the change cost: 1,766 bytes of heap
 left. The manual: the count and the 13-character cut are gone, and the
 screenshots are retaken.
+
+### The passphrase and the lock (b028)
+
+Started 2026-11-16 as the first half of home automation from the Apple
+(section 9, items 5 and 6): an owner Apple must be lockable first.
+
+- **On the card:** byte 15 is `$A3` instead of `$A2` when bytes 16-31
+  hold the key XORed with a pad: `H("twoegram-pass" || passphrase)`,
+  then `H(previous || passphrase)`, 64 hashes in all, by the card
+  (`ks_scramble`). The gateway keeps the same key: no protocol change, no
+  pairing again. The passphrase is never stored.
+- **At the start:** a locked key asks for the passphrase (`lock_open`)
+  before anything else uses the network. A wrong one makes a key whose
+  device id the gateway does not know: UNKNOWN_DEVICE, said as "The
+  gateway does not know the key that passphrase makes: is it right?",
+  and asked again. Those refusals count toward the gateway's per-address
+  limit (20 a minute, then 5 minutes), which bounds guessing at the
+  gateway. Esc goes to set-up, to type a new key.
+- **Open-Apple-L, or 10 minutes without a key** (`LOCK_IDLE_MIN`), with a
+  passphrase only: the key and session key are wiped, the held messages
+  dropped (`st_reset`; their text stays in aux memory until overwritten),
+  polling stops, and the screen shows only the prompt. The passphrase is
+  checked on the Apple against the device id the key made, so a wrong
+  one sends nothing; the right one says hello again and reloads. The
+  draft being typed is kept.
+- **Set-up:** a Passphrase line (8 to 32 characters, shown as stars,
+  typed twice). Empty: no change to a kept key; a new key typed without
+  one is saved plain. Open-Apple-P saves the unlocked key plain again.
+  A key locked and not unlocked can be kept, but not given a new
+  passphrase without typing it.
+- **Weakness, as designed:** with the card and a recording of the LAN
+  (the device id goes in clear in every hello), passphrases can be tried
+  offline; 64 hashes a guess are nothing to a PC. Length is the defence,
+  and the manual says so. The gateway cannot tell whether an Apple has a
+  passphrase.
+- **Memory: the set-up screen became an overlay.** The passphrase work
+  first overflowed main memory by 388 bytes (2K more, against 1,766 of
+  heap). setup.c (code and text, 3,856 bytes) is now its own file,
+  `TWOEGRAM.SETUP` (type BIN), loaded at $0800 each time set-up opens,
+  over the layout table, the text buffer and the reply buffer, which are
+  idle then and rebuilt after (`overlay.h`). `ses_labels` moved to main
+  memory, since it must survive; `memcheck.py` now fails the build if
+  the overlay reaches anything else in LOWBSS. The lock screen lives in
+  the language card. Heap now: 2,991 bytes. Tried in Virtual ][: the
+  overlay loads from the disk, set-up works, Esc redraws the
+  conversation screen, and set-up loads again on the next Open-Apple-K.
+  The disk and the release carry `TWOEGRAM.SETUP`; mkdisk.sh adds plain
+  files as BIN at $0800. Upgrading by copying files now means both
+  `TWOEGRAM.SYSTEM` and `TWOEGRAM.SETUP`.
+- **Tests:** the key store's second mark; on the screen, Open-Apple-L
+  without a passphrase; set-up with one too short, two that differ, then
+  two the same (the card's own 15 bytes untouched, the stored key
+  unscrambled only by the right passphrase, never shown); the lock (the
+  messages and the key gone while locked, a wrong passphrase refused with
+  no request, the right one signing in again); the idle lock at ten
+  minutes and not at nine, and its count starting again after; a fresh
+  start with a wrong then a right passphrase; Open-Apple-P. The help
+  screen gains Open-Apple-L.
+- **Not known until the card:** how long 64 hashes take. If it is much
+  over a second or two, fewer rounds; the count is `PASS_ROUNDS`, and
+  changing it changes what a passphrase makes, so it must be settled
+  before anyone uses one.
 
