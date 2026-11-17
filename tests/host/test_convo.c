@@ -19,6 +19,8 @@
 #include "ui.h"
 #include "keystore.h"
 #include "lock.h"
+#include "save.h"
+#include <unistd.h>
 
 /* ---- the stubs: screen, keyboard, clock, disk ---- */
 
@@ -713,6 +715,207 @@ static void test_passphrase(void)
     on_key = 0;
 }
 
+/* ---- saving the conversation ---- */
+
+static char saved_text[400000];
+static size_t saved_len;
+
+/* The file, read whole; 0 if it is not there. */
+static int read_saved(const char *name)
+{
+    FILE *f = fopen(name, "rb");
+
+    saved_len = 0;
+    if (!f) return 0;
+    saved_len = fread(saved_text, 1, sizeof saved_text - 1, f);
+    saved_text[saved_len] = 0;
+    fclose(f);
+    return 1;
+}
+
+/* Messages in the file: a line "10:mm You" or "10:mm <label>" each. */
+static unsigned saved_msgs(const char *label)
+{
+    unsigned n = 0;
+    size_t i, w = strlen(label);
+
+    for (i = 0; i + 6 < saved_len; ++i) {
+        if ((i == 0 || saved_text[i - 1] == '\r') && saved_text[i + 2] == ':' &&
+            saved_text[i + 5] == ' ' &&
+            (!strncmp(saved_text + i + 6, "You\r", 4) ||
+             (!strncmp(saved_text + i + 6, label, w) && saved_text[i + 6 + w] == '\r'))) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+/* A down arrow in the 80th column: more below what is shown. */
+static int down_arrow(void)
+{
+    int r;
+    for (r = TOP; r <= BOTTOM; ++r) if (screen[r][SCR_COLS - 1] == 'v') return 1;
+    return 0;
+}
+
+static unsigned save_fail_at;       /* the key at which the gateway goes */
+
+static void fail_gateway(void)
+{
+    if (save_fail_at && script_i == save_fail_at) http_error = 3;
+}
+
+static void test_save(void)
+{
+    static uint8_t keys[100], oa[100];
+    char here[1024], dir[] = "/tmp/twoegram-save-XXXXXX", want[80], label[20], name[20];
+    unsigned n, i, total;
+
+    memset(oa, 0, sizeof oa);
+    CHECK(getcwd(here, sizeof here) && mkdtemp(dir) && chdir(dir) == 0);
+    strcpy(label, agent_label(0));
+    save_default(label, name);
+    total = conv_total;
+
+    /* The name it offers, from the agent's: letters and digits, a letter
+     * first, at most 11, ".TXT". */
+    save_default("Pinchy", want);
+    CHECK(!strcmp(want, "PINCHY.TXT"));
+    save_default("2nd agent-of-mine!", want);
+    CHECK(!strcmp(want, "NDAGENTOFMI.TXT"));
+    save_default("", want);
+    CHECK(!strcmp(want, "TWOEGRAM.TXT"));
+
+    /* Esc at the name: nothing written. */
+    keys[0] = 's'; oa[0] = 1;
+    keys[1] = K_ESC;
+    run(keys, oa, 2);
+    CHECK(on_screen("NOT SAVED") && !read_saved(name));
+
+    /* Open-Apple-S, Return: the whole conversation, from its first
+     * message, in pages, to the name offered. */
+    keys[0] = 's'; oa[0] = 1;
+    keys[1] = K_RETURN;
+    run(keys, oa, 2);
+    oa[0] = 0;
+    sprintf(want, "SAVED %u MESSAGES AS %s", total, name);
+    CHECK(on_screen(want));
+    CHECK(read_saved(name));
+    CHECK(!strncmp(saved_text, "Twoegram: the conversation with ", 32));
+    CHECK(saved_msgs(label) == total);
+    CHECK(strstr(saved_text, "\r\r10:01 You\rm1 ") != NULL);
+    CHECK(strstr(saved_text, "m100 ") != NULL && strstr(saved_text, "m7 ") != NULL);
+    CHECK(!memchr(saved_text, '\n', saved_len));        /* CR line ends only */
+    /* Message 7, at 1,500 bytes, is there whole: its text with the line
+     * breaks (every 61st) made CRs. */
+    {
+        char m7[1600];
+        conv_text(7, m7);
+        for (i = 0; i < 1500; ++i) if (m7[i] == '\n') m7[i] = '\r';
+        CHECK(memmem(saved_text, saved_len, m7, 1500) != NULL);
+    }
+    /* After it, the newest on the screen, ready to type. */
+    CHECK(st_newest && st[st_count - 1].n == total && !down_arrow() && link_live);
+
+    /* Again: it asks before replacing. N keeps the file; Y replaces it. */
+    {
+        FILE *f = fopen(name, "wb");
+        fputs("keep me", f);
+        fclose(f);
+    }
+    keys[0] = 's'; oa[0] = 1;
+    keys[1] = K_RETURN;
+    keys[2] = 'n';
+    run(keys, oa, 3);
+    CHECK(on_screen("NOT SAVED") && read_saved(name) && !strcmp(saved_text, "keep me"));
+    keys[2] = 'y';
+    run(keys, oa, 3);
+    CHECK(on_screen(want) && read_saved(name) && saved_msgs(label) == total);
+
+    /* A name typed over the one offered; lowercase becomes uppercase. */
+    n = 0;
+    keys[n] = 's'; oa[n++] = 1;
+    for (i = 0; i < strlen(name); ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "chat.txt");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    oa[0] = 0;
+    CHECK(read_saved("CHAT.TXT") && saved_msgs(label) == total);
+    CHECK(on_screen("AS CHAT.TXT"));
+
+    /* Esc while it works: the file keeps what had come. */
+    n = 0;
+    keys[n] = 's'; oa[n++] = 1;
+    for (i = 0; i < strlen(name); ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "PART.TXT");
+    keys[n++] = K_RETURN;
+    keys[n++] = K_ESC;
+    run(keys, oa, n);
+    oa[0] = 0;
+    CHECK(on_screen("SAVING STOPPED: THE FILE HAS THE FIRST "));
+    CHECK(read_saved("PART.TXT") && saved_msgs(label) > 0 && saved_msgs(label) < total);
+    CHECK(st_newest && st[st_count - 1].n == total);  /* the newest again */
+
+    /* The gateway goes partway: said, with what the file has. */
+    n = 0;
+    keys[n] = 's'; oa[n++] = 1;
+    for (i = 0; i < strlen(name); ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "GONE.TXT");
+    keys[n++] = K_RETURN;
+    save_fail_at = n + 1;               /* as it reads the next key */
+    keys[n++] = 'x';
+    on_key = fail_gateway;
+    run(keys, oa, n);
+    on_key = 0;
+    save_fail_at = 0;
+    oa[0] = 0;
+    CHECK(on_screen("THE GATEWAY STOPPED ANSWERING: THE FILE HAS THE FIRST "));
+    CHECK(read_saved("GONE.TXT") && saved_msgs(label) > 0 && saved_msgs(label) < total);
+    http_error = 0;
+    keys[0] = IDLE;
+    for (i = 0; i < 20 && !link_ok(); ++i) run(keys, oa, 1);
+
+    /* The gateway gone before the first page: no file, said; once it is
+     * back, the conversation is there again. */
+    n = 0;
+    keys[n] = 's'; oa[n++] = 1;
+    for (i = 0; i < strlen(name); ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "FIRST.TXT");
+    save_fail_at = n;                   /* as it reads the Return */
+    keys[n++] = K_RETURN;
+    on_key = fail_gateway;
+    run(keys, oa, n);
+    on_key = 0;
+    save_fail_at = 0;
+    oa[0] = 0;
+    CHECK(on_screen("NOT SAVED: THE GATEWAY DID NOT GIVE THE CONVERSATION"));
+    CHECK(!read_saved("FIRST.TXT"));
+    http_error = 0;
+    keys[0] = IDLE;
+    for (i = 0; i < 20 && !link_ok(); ++i) run(keys, oa, 1);
+    keys[0] = '>'; oa[0] = 1;
+    run(keys, oa, 1);
+    oa[0] = 0;
+    CHECK(link_live && st_newest && st_count && st[st_count - 1].n == total);
+
+    /* A disk that will not take it: said. */
+    n = 0;
+    keys[n] = 's'; oa[n++] = 1;
+    for (i = 0; i < strlen(name); ++i) keys[n++] = K_DELETE;
+    n += type(keys + n, "nowhere/x.txt");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    oa[0] = 0;
+    CHECK(on_screen("COULD NOT SAVE, PRODOS ERROR $FF"));
+
+    unlink(name);
+    unlink("CHAT.TXT");
+    unlink("PART.TXT");
+    unlink("GONE.TXT");
+    CHECK(chdir(here) == 0);
+    CHECK(rmdir(dir) == 0);             /* nothing else was written */
+}
+
 /* The glyph bytes: MouseText, or plain stand-ins without it. */
 static void test_glyphs(void)
 {
@@ -735,6 +938,7 @@ int main(void)
     test_errors();
     test_names();
     test_passphrase();
+    test_save();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

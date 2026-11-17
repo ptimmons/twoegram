@@ -29,6 +29,7 @@
 #include "tick.h"
 #include "cogs.h"
 #include "lock.h"
+#include "save.h"
 
 #define LIST_W      18              /* columns 0..17: >, the name, the diamond */
 #define DIV_COL     18
@@ -768,6 +769,35 @@ static void lock_screen(void)
     restart();
 }
 
+/* Open-Apple-S: the whole conversation to a file (save.h). The overlay
+ * loads over the layout, and the store ends up holding the newest end it
+ * reached: lay it out again from there. */
+static void save_screen(void)
+{
+    uint8_t rc;
+
+    if (msgs_now != MSGS_LIVE || !agent_count()) {
+        status_msg("NOT CONNECTED: NOTHING TO SAVE");
+        return;
+    }
+    rc = save_run(agent_name(cur), agent_label(cur));
+    if (rc && done(rc, 1)) {
+        if (!link_live) {
+            return;                 /* restarted: its message stands */
+        }
+    }
+    if (!st_newest) {
+        load_current(0);            /* stopped partway: back to the newest */
+    }
+    win_end = -1;
+    scroll = 0;
+    relayout();
+    draw_all();
+    if (save_note[0]) {
+        status_msg(save_note);
+    }
+}
+
 /* Wait for a key, polling the gateway meanwhile; lock after
  * LOCK_IDLE_MIN minutes without one. */
 static uint8_t wait_key(void)
@@ -826,6 +856,9 @@ static uint8_t oa_key(uint8_t k)
         break;
     case 'l': case 'L':
         lock_screen();
+        break;
+    case 's': case 'S':
+        save_screen();
         break;
     case 'r': case 'R':
         if (!cogs_slot) {

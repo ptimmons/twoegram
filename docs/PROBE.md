@@ -1,5 +1,27 @@
 # Testing on the card
 
+## Build b033: saving the conversation
+
+Plugin 1.1.0, as before. Boot `build/TWOEGRAM-b033.po`; it carries
+everything below too. The disk now also has `TWOEGRAM.SAVE`, read from
+the disk when saving.
+
+1. **Open-Apple-S** in a conversation: the status bar asks `SAVE AS:`
+   with the agent's name and `.TXT`. Return. It counts messages as it
+   saves, then says `SAVED <n> MESSAGES AS <name>`, and the screen is at
+   the newest message, drawn whole. **How long did it take**, for how
+   many messages?
+2. **The file:** quit Twoegram and look at it (in an editor, or `CAT`
+   and `TYPE`, or copy the disk image to the Mac): the agent's name at
+   the top, each message with its time and who, all of it.
+3. **Again, the same name:** it asks `REPLACE ...?`. N leaves the file;
+   Y replaces it.
+4. **Esc while it saves** (a long conversation): it stops and says how
+   many messages the file has.
+5. **If you boot from the CoGS network disk:** does saving there work,
+   or is that disk read-only (`THE DISK IS WRITE-PROTECTED`)? Either way,
+   try a name on another disk, `/VOLUME/NAME.TXT`.
+
 ## Build b028: the passphrase and the lock
 
 Plugin 1.1.0 as for b023 (no plugin change). Boot `build/TWOEGRAM-b028.po`.

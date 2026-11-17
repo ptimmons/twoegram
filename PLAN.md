@@ -284,7 +284,9 @@ otherwise interrupt:
    Newsiie's Open-Apple-S saves an article: the conversation as text with
    who said what and when, never during a request (the network-disk
    rule), retried on $27. Main memory is the obstacle (milestone 4
-   notes), so it likely belongs in an overlay loaded from disk.
+   notes), so it likely belongs in an overlay loaded from disk. Built
+   2026-11-17 in b033, not yet on the card: see "Saving the
+   conversation" below.
 3. **Marks instead of words** (2026-11-15, after milestone 6), done in
    build b010: a MouseText down arrow at the heading's right replaces
    "scrolled back"; a diamond beside the agent's name, in the heading and
@@ -1118,4 +1120,55 @@ reach a shell on the gateway all the same, so the lock still matters.)
   `PASS_ROUNDS` stays at 64 for good, since changing it would change
   what a passphrase makes. Open-Apple-P passed too. Not yet reported:
   the idle lock, a fresh start.
+
+### Saving the conversation (b033)
+
+Started 2026-11-17: section 9, item 2.
+
+- **Open-Apple-S** asks `SAVE AS:` on the status bar, offering the
+  agent's name (letters and digits, a letter first, 11 at most, then
+  `.TXT`; `TWOEGRAM.TXT` if none). Up to 40 characters, so a path such
+  as `/LETTERS/PINCHY.TXT` fits; typed lowercase becomes uppercase. An
+  existing file is replaced only on Y.
+- **The whole conversation**, not only what is held: the first page
+  (`hist ... after=0`), then `hist_newer` (a `poll` from the newest
+  held) until the newest, each page written before the next request,
+  so the disk and the card take turns. What is written is tracked by
+  the gateway's numbers, since the store drops its oldest as it fills
+  (a page is at most 20 messages and 1,900 bytes, far inside the
+  store). An empty conversation makes no file. Esc between pages stops
+  it; a failure partway keeps the file with what came, and says how
+  many. Afterwards the screen is the newest end, fetched again if it
+  stopped partway. The polls mark the conversation fetched, as reading
+  it would.
+- **The file:** ProDOS TXT, CR line ends; "Twoegram: the conversation
+  with <label>", then for each message "hh:mm You" or "hh:mm <label>",
+  its text (its `\n` as CR, the check mark `$02` as `+`), and a blank
+  line. No dates: the protocol carries none.
+- **Not retried on $27**, unlike TWOEGRAM.CFG: that would mean fetching
+  it all again. The message says to try again.
+- **Memory: a second overlay**, `TWOEGRAM.SAVE` (segment OVERLAY2,
+  2,684 bytes), loaded at $0800 like set-up but over the layout table
+  and the text buffer only ($0800-$141B), since it needs the reply
+  buffer for fetching. Its working variables load with it (a bss in
+  the overlay); only `save_note`, the result, is in main memory, for
+  the status bar after the screen is drawn again. `memcheck.py` checks
+  each overlay against what it may cover (saving ends at $127B). Heap
+  now 2,573 bytes (from 2,991).
+- **A fix on the way, in `hist_load`:** it empties the store before
+  asking, and when the request failed it left the empty store marked
+  the newest, so neither Open-Apple-> nor a send fetched it again (a
+  poll found nothing newer than it knew). It now marks it not the
+  newest. Opening an agent while the gateway is down benefits too.
+- **Tests:** the default names; Esc at the name; a save of the whole
+  conversation (every message, the 1,500-byte one whole, CR line ends
+  only, the screen at the newest after); replace declined and accepted;
+  a typed name; Esc partway; the gateway failing partway; the gateway
+  gone before the first page (no file, and Open-Apple-> brings the
+  conversation back once it answers); a name ProDOS cannot take. In Virtual ][ (no card): the help row, "NOT CONNECTED:
+  NOTHING TO SAVE", and, with a throwaway build that skipped that
+  check (b030), the overlay loading from the disk, the prompt, the
+  replace question and the screen drawn again after. Not seen until the
+  card: a file actually written, a long conversation's time, a network
+  disk.
 

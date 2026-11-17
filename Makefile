@@ -40,6 +40,7 @@ APP = \
 	src/setup.c \
 	src/lock.c \
 	src/overlay.c \
+	src/save.c \
 	src/config.c \
 	src/keystore.c \
 	src/session.c \
@@ -66,6 +67,7 @@ HDRS = $(wildcard src/*.h)
 
 BIN   = build/TWOEGRAM.SYSTEM
 SETUP = build/TWOEGRAM.SETUP
+SAVE  = build/TWOEGRAM.SAVE
 PRBIN = build/A2PROBE.SYSTEM
 
 # Build numbers. BUILDNUM holds the number the next disk gets; it goes up
@@ -112,6 +114,8 @@ $(BIN): $(call obj,$(APP) $(COMMON)) $(CFG) tools/memcheck.py
 	@python3 -I tools/memcheck.py build/twoegram.map $(CFG) || { rm -f $@; exit 1; }
 	@cp $@.1 $(SETUP)
 	@echo "TWOEGRAM.SETUP: $$(wc -c < $(SETUP)) bytes, the set-up overlay"
+	@cp $@.2 $(SAVE)
+	@echo "TWOEGRAM.SAVE: $$(wc -c < $(SAVE)) bytes, the saving overlay"
 
 $(PRBIN): $(call obj,$(PROBE) $(COMMON)) $(CFG) tools/memcheck.py
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/a2probe.map -Ln build/a2probe.lbl -o $@ $(call obj,$(PROBE) $(COMMON))
@@ -131,7 +135,7 @@ disk: $(DISK)
 # gateway: make disk GATEWAY=http://192.168.1.20:8417, kept like URL=),
 # else the probe's URL (the dev server).
 $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
-	VOL=$(VOLUME) tools/mkdisk.sh $(DISK) $(BIN) $(SETUP) $(PRBIN)
+	VOL=$(VOLUME) tools/mkdisk.sh $(DISK) $(BIN) $(SETUP) $(SAVE) $(PRBIN)
 	@if [ -n "$(GATEWAY)" ] && [ -f probe.cfg ]; then \
 	    grep -v '^GATEWAY=' probe.cfg > probe.cfg.new; \
 	    printf 'GATEWAY=%s\n' "$(GATEWAY)" >> probe.cfg.new; \
@@ -166,7 +170,7 @@ REL      = build/release
 release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	rm -rf $(REL)
 	mkdir -p $(REL)
-	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(SETUP) $(PRBIN)
+	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(SETUP) $(SAVE) $(PRBIN)
 	@if tools/ac -ll $(REL)/TWOEGRAM-$(VERSION).po | grep -q '\.CFG'; then \
 	    echo "release: a .CFG file is on the release disk" >&2; exit 1; \
 	fi
@@ -204,7 +208,7 @@ build/host/test_store: tests/host/test_store.c src/store.c tests/host/auxmodel.c
 
 # The conversation screen itself, on test_a2.c's model card and gateway,
 # with a text screen and scripted keys in place of the Apple's.
-HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup.c src/lock.c src/overlay.c \
+HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup.c src/lock.c src/overlay.c src/save.c \
              src/help.c src/status.c src/screen.c
 
 build/host/test_convo: tests/host/test_convo.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host

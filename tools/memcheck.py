@@ -31,18 +31,27 @@ def main():
     return 0 if heap >= NEED and overlay_ok(mapfile) else 1
 
 
-# The set-up overlay (src/overlay.h) loads at $0800 over LOWBSS. Only these
-# buffers are idle while it is open and rebuilt afterwards; it must end
-# before anything else in LOWBSS starts.
-OVERLAY_MAY_COVER = ("layout.o", "msgs.o", "session.o")
+# The overlays (src/overlay.h) load at $0800 over LOWBSS. Each may cover
+# only the buffers that are idle while it runs and rebuilt afterwards; it
+# must end before anything else in LOWBSS starts. Saving fetches as it
+# goes, so the reply buffer (session.o) must stay out of its way.
+OVERLAYS = (
+    ("OVERLAY1", "the set-up overlay", ("layout.o", "msgs.o", "session.o")),
+    ("OVERLAY2", "the saving overlay", ("layout.o", "msgs.o")),
+)
 
 
 def overlay_ok(mapfile):
     text = open(mapfile).read()
-    m = re.search(r"^OVERLAY1\s+([0-9A-F]+)\s+([0-9A-F]+)", text, re.M)
-    if not m:
-        return True                     # the probe: no overlay
-    end = int(m.group(2), 16)
+    ok = True
+    for seg, what, may_cover in OVERLAYS:
+        m = re.search(r"^" + seg + r"\s+([0-9A-F]+)\s+([0-9A-F]+)", text, re.M)
+        if m:
+            ok = one_overlay_ok(text, int(m.group(2), 16), what, may_cover) and ok
+    return ok
+
+
+def one_overlay_ok(text, end, what, may_cover):
     mods = text.split("Segment list:")[0]
     module, ok = None, True
     for line in mods.splitlines():
@@ -53,14 +62,12 @@ def overlay_ok(mapfile):
         if not g:
             continue
         start = 0x0800 + int(g.group(1), 16)
-        size = int(g.group(2), 16)
-        covered = start <= end
-        if covered and module not in OVERLAY_MAY_COVER:
-            print(f"memcheck: the set-up overlay ends at ${end:04X}, over "
+        if start <= end and module not in may_cover:
+            print(f"memcheck: {what} ends at ${end:04X}, over "
                   f"{module}'s LOWBSS at ${start:04X}: TOO BIG")
             ok = False
     if ok:
-        print(f"memcheck: the set-up overlay ends at ${end:04X}, over idle buffers only: ok")
+        print(f"memcheck: {what} ends at ${end:04X}, over idle buffers only: ok")
     return ok
 
 

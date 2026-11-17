@@ -7,10 +7,20 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 
 ## Waiting
 
-One disk covers all of this: `build/TWOEGRAM-b028.po` (or later), with
+One disk covers all of this: `build/TWOEGRAM-b033.po` (or later), with
 plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
-### 1. The rest of the lock (b028, built 2026-11-16)
+### 1. Saving the conversation (b033, built 2026-11-17)
+
+Steps: PROBE.md, "Build b033".
+
+- **Open-Apple-S** saves the whole conversation; how long it takes.
+- **The file** reads right on the Apple (or on the Mac).
+- **Replacing** a file asks first.
+- **Esc** partway stops it and says how much was saved.
+- **A network disk:** writable, or not.
+
+### 2. The rest of the lock (b028, built 2026-11-16)
 
 Steps: PROBE.md, "Build b028", steps 4 and 5. Setting a passphrase,
 the lock and Open-Apple-P passed on 2026-11-17; these were not
@@ -20,7 +30,7 @@ mentioned:
 - **A fresh start** asks for the passphrase; a wrong one is caught by the
   gateway and asked again.
 
-### 2. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
+### 3. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
 
 Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
@@ -37,7 +47,7 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 3. Older items, not yet seen
+### 4. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the

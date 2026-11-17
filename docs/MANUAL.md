@@ -428,6 +428,47 @@ arrived below.
 Scroll down to the bottom, or press OPEN-APPLE->, to read it. The
 diamond disappears once you've reached it.
 
+### Saving a Conversation to Disk
+
+To keep a conversation, press **OPEN-APPLE-S**. Twoegram saves the whole
+conversation with the agent you're talking to, from its first message to
+its newest, as a text file you can read in any Apple II word processor
+or editor, or copy to another computer.
+
+1. Press OPEN-APPLE-S. The status bar asks `SAVE AS:` and offers a name
+   made from the agent's, such as `PINCHY.TXT`.
+2. Press RETURN to use that name, or press DELETE and type another. A
+   name alone saves on the Twoegram disk; to save on another disk,
+   type its name first, as in `/LETTERS/PINCHY.TXT`.
+3. If a file by that name is already there, Twoegram asks whether to
+   replace it. Press **Y** to replace it, or **N** to leave it alone.
+
+Twoegram fetches the conversation from the gateway a page at a time and
+writes each page as it arrives, so the status bar counts the messages as
+they're saved. A long conversation takes a little while. Press **ESC** to
+stop early; the file keeps the messages saved so far. When it's done,
+the status bar says how many messages were saved, and the conversation
+returns to the newest message.
+
+The file begins with the agent's name. Then each message has the time it
+was sent and who sent it, `You` or the agent, on a line of its own, with
+the message below:
+
+    Twoegram: the conversation with Pinchy
+
+    08:40 You
+    Is the light in the office on?
+
+    08:41 Pinchy
+    Candle 12 is off.
+
+The file holds the conversation as the gateway keeps it: the latest 500
+messages. It doesn't have dates, only times. A check mark in a message
+becomes `+` in the file.
+
+> **Note:** A saved conversation is plain text. Anyone with the disk can
+> read it, passphrase or not. Keep it on a disk you keep to yourself.
+
 ---
 
 ## Chapter 5: More Than One Agent
@@ -554,15 +595,21 @@ it.
 
 Your gateway decides what an agent may do, not Twoegram. To the
 gateway, your Apple is a trusted acquaintance rather than the gateway's
-owner, so an agent you talk to from the Apple doesn't get the gateway's
-most powerful tools: running commands on the gateway computer, using
-its screen, or changing the gateway itself. If you ask for something
+owner, so an agent you talk to from the Apple doesn't get a few of the
+gateway's most powerful tools: using its screen, managing its sessions
+and plugins, or changing the gateway itself. If you ask for something
 that needs one, the agent will tell you it can't do it from here.
 
-Whoever looks after the gateway can change that by listing your Apple
-as an owner. Think before asking for it: anyone at your Apple would then
-have those powers too. Give your key a passphrase first, and keep
-Twoegram locked when you're away from it.
+Most of an agent's tools stay available, though, and that includes
+running commands on the gateway computer. That's how an agent can turn
+off your lights when you ask from the Apple: it runs the command that
+tells your home-automation system to. It also means that whoever can use
+your Apple can ask an agent to do almost anything it could do for you
+elsewhere. Give your key a passphrase, and keep Twoegram locked when
+you're away from it.
+
+Whoever looks after the gateway can narrow what an agent may do for the
+Apple, or give the Apple an agent of its own with fewer tools.
 
 OpenClaw's own commands, such as `/status` and `/new`, work from the
 Apple unless the gateway turns them off.
@@ -573,8 +620,9 @@ The gateway keeps the newest 500 messages of each conversation, so
 Twoegram can show them to you again, in files that only the gateway's
 own account can read. OpenClaw keeps its own record of each
 conversation too, as it does for every other way of talking to your
-agents. Your Apple keeps nothing on its disks: the conversation lives in
-the Apple's memory only while Twoegram runs.
+agents. Your Apple keeps nothing on its disks unless you save a
+conversation (Chapter 4): otherwise the conversation lives in the
+Apple's memory only while Twoegram runs.
 
 ### Keeping Your Key Safe
 
@@ -637,6 +685,7 @@ Apple by mistake, simply pair again and revoke the old key.
 | UP ARROW, DOWN ARROW | scroll a line |
 | OPEN-APPLE-UP ARROW, OPEN-APPLE-DOWN ARROW | scroll a screen |
 | OPEN-APPLE-<, OPEN-APPLE-> | go to the start of the conversation, or the newest message |
+| OPEN-APPLE-S | save the conversation to disk |
 | TAB, ESC | choose another agent |
 
 ### In the List of Agents
@@ -840,6 +889,63 @@ The gateway received your message but couldn't get an answer from the
 agent. The rest of the message says why. Show it to whoever looks after
 the gateway.
 
+### When Saving
+
+**SAVED** *number* **MESSAGES AS** *name*
+The whole conversation is in the file.
+
+**NOT SAVED**
+You pressed ESC at the name, or N when asked whether to replace a file.
+
+**NOTHING TO SAVE: NO MESSAGES WITH** *agent*
+The conversation is empty, so Twoegram made no file.
+
+**NOT SAVED: THE GATEWAY DID NOT GIVE THE CONVERSATION**
+The gateway didn't answer when Twoegram asked for the start of the
+conversation, so there's no file. Save again once the status bar says
+`SIGNED, NOT ENCRYPTED`.
+
+**NOT CONNECTED: NOTHING TO SAVE**
+Twoegram saves from the gateway, so it must be connected. Press
+OPEN-APPLE-R to connect.
+
+**SAVING STOPPED: THE FILE HAS THE FIRST** *number* **MESSAGES**
+You pressed ESC while Twoegram was saving. The file has the start of the
+conversation, up to that point.
+
+**THE GATEWAY STOPPED ANSWERING: THE FILE HAS THE FIRST** *number* **MESSAGES**
+The gateway stopped answering partway through. Save again once the
+status bar says `SIGNED, NOT ENCRYPTED`.
+
+**THE DISK IS WRITE-PROTECTED**
+Slide the disk's write-protect tab, or save on another disk. A CoGS
+network disk may be read-only; type the name of another disk first, as
+in `/LETTERS/PINCHY.TXT`.
+
+**THE DISK IS FULL**
+Save on another disk, or delete something from this one.
+
+**THE DISK FAILED (I/O ERROR $27): TRY AGAIN**
+The disk didn't take a block. Save again; it usually works the second
+time.
+
+**NOT A PRODOS NAME: LETTERS, DIGITS AND PERIODS, A LETTER FIRST**
+A ProDOS file name is up to 15 letters, digits and periods, and starts
+with a letter.
+
+**NO SUCH DISK OR FOLDER: TYPE /DISK/NAME, OR JUST A NAME**
+The disk or folder you named isn't there. Check its name, or type just
+a file name to save on the Twoegram disk.
+
+**COULD NOT SAVE, PRODOS ERROR $**_nn_
+ProDOS refused, for a reason Twoegram has no words for. The number is
+ProDOS's own error code.
+
+**SAVING, TWOEGRAM.SAVE, COULD NOT BE READ FROM THE DISK**
+Saving is a file of its own on the Twoegram disk, read when it's needed.
+Make sure the Twoegram disk is still in the drive, with
+`TWOEGRAM.SAVE` on it, and try again.
+
 ---
 
 ## Appendix C: For the Technically Curious
@@ -892,6 +998,8 @@ quit Twoegram and choose it from the ProDOS menu. The file
 |---|---|
 | `TWOEGRAM.CFG`, on the Twoegram disk | the gateway's address |
 | `TWOEGRAM.SETUP`, on the Twoegram disk | the Set-up screen itself, read from the disk when it's needed |
+| `TWOEGRAM.SAVE`, on the Twoegram disk | the part of Twoegram that saves conversations, read from the disk when it's needed |
+| a text file of your choosing | a conversation you saved with OPEN-APPLE-S |
 | the CoGS card's memory | your key, scrambled if you gave it a passphrase |
 | the gateway | your conversations |
 
@@ -915,6 +1023,7 @@ quit Twoegram and choose it from the ProDOS menu. The file
 | Wrong keys | 5 in a few minutes | The gateway locks your Apple out for 15 minutes. |
 | A passphrase | 8 to 32 characters | |
 | Time before Twoegram locks itself | 10 minutes without a key, with a passphrase | |
+| A file name when saving | 40 characters, with the disk and folders | Twoegram doesn't take more. |
 
 ### What Twoegram Doesn't Do
 
@@ -929,7 +1038,6 @@ quit Twoegram and choose it from the ProDOS menu. The file
   become *, and characters with no near equivalent appear as ?.
 - **Several gateways.** Twoegram talks to one gateway at a time. To
   change gateways, press OPEN-APPLE-K.
-- **Saving a conversation to disk.** Not yet; it's planned.
 
 ---
 

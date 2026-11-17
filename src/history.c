@@ -107,6 +107,9 @@ uint8_t hist_load(const char *agent, uint8_t first)
     fmt_u32(fmt_str(p, "&k="), HIST_PAGE);
     rc = ses_call("GET", target, NULL, 0);
     if (rc) {
+        /* Emptied, and not the newest: Open-Apple->, a send, or a poll
+         * that finds the newest unheld fetches it again. */
+        st_newest = 0;
         return rc;
     }
     more = take(0);
