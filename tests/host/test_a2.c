@@ -952,6 +952,21 @@ static void test_keystore(void)
     CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0);
     CHECK(ks_save(key, KS_MARK_PASS) == 0 && ks_clear() == 0 && prefs_len == 15);
     CHECK(ks_load(got) == KS_NONE && !memcmp(prefs, orig, 15));
+    /* A master, plain and locked: loaded the same way, and said so. */
+    CHECK(ks_save(key, KS_MASTER) == 0 && prefs[15] == KS_MASTER);
+    CHECK(ks_load(got) == 0 && ks_master && !memcmp(got, key, 16));
+    CHECK(ks_save(key, KS_MASTER_PASS) == 0 && ks_load(got) == KS_LOCKED && ks_master);
+    ks_master = 1;
+    CHECK(KS_MARK_FOR(0) == KS_MASTER && KS_MARK_FOR(1) == KS_MASTER_PASS);
+    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0 && !ks_master);
+    CHECK(KS_MARK_FOR(0) == KS_MARK && KS_MARK_FOR(1) == KS_MARK_PASS);
+    CHECK(ks_clear() == 0 && ks_load(got) == KS_NONE && !ks_master);
+    /* $A6 and above are not ours. */
+    memset(prefs + 15, 0, 17);
+    prefs[15] = 0xA6;
+    prefs_len = 32;
+    CHECK(ks_load(got) == KS_NONE && ks_save(key, KS_MARK) == KS_INUSE);
+    memset(prefs + 15, 0, 17);
     CHECK(ks_save(key, KS_MARK) == 0);
 }
 
@@ -998,6 +1013,23 @@ static void test_config(void)
     strcpy(ses_base, "unchanged");
     strcpy(text, "# nothing here\rOTHER=1\r");
     CHECK(!cfg_parse(text) && !strcmp(ses_base, "unchanged"));
+
+    /* Key names (docs/RELAY.md, part 1): before the address; the old form
+     * has none; a name that cannot be one is not taken as a name. */
+    strcpy(cfg_name, "old");
+    strcpy(text, "# Twoegram: the gateway\rGATEWAY=claw1 http://192.168.1.20:8417\r");
+    CHECK(cfg_parse(text) && !strcmp(ses_base, "http://192.168.1.20:8417") && !strcmp(cfg_name, "claw1"));
+    strcpy(text, "GATEWAY=10.1.2.3:8417\r");
+    CHECK(cfg_parse(text) && !strcmp(cfg_name, ""));
+    strcpy(text, "GATEWAY=my-gw_2 10.1.2.3\rGATEWAY=other 10.4.4.4\r");
+    CHECK(cfg_parse(text) && !strcmp(cfg_name, "my-gw_2") && !strcmp(ses_base, "http://10.1.2.3:8417"));
+    strcpy(text, "GATEWAY=Claw1 10.1.2.3\r");             /* uppercase: not a name, not an address */
+    CHECK(!cfg_parse(text) && !strcmp(cfg_name, ""));
+    strcpy(text, "GATEWAY=0123456789abcdefg 10.1.2.3\r"); /* 17 characters */
+    CHECK(!cfg_parse(text));
+    CHECK(cfg_name_ok("a", 1) && cfg_name_ok("0123456789abcdef", 16) && cfg_name_ok("a-b_c", 5));
+    CHECK(!cfg_name_ok("", 0) && !cfg_name_ok("A", 1) && !cfg_name_ok("a b", 3) && !cfg_name_ok("a.b", 3));
+    cfg_name[0] = 0;
 }
 
 static void test_no_card(void)

@@ -10,6 +10,7 @@
 #include "link.h"
 #include "session.h"
 #include "store.h"
+#include "keystore.h"
 
 /* Before the 80-column screen is known to exist: a message on the
  * 40-column screen, written straight to page 1. */
@@ -51,6 +52,7 @@ int main(void)
     convo_run();
 
     ses_forget();               /* no key left in memory after quitting */
+    ks_forget();
     scr_done();
     return 0;
 }

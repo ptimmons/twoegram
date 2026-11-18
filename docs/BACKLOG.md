@@ -7,10 +7,27 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 
 ## Waiting
 
-One disk covers all of this: `build/TWOEGRAM-b036.po` (or later), with
-plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
+One disk covers all of this: `build/TWOEGRAM-b037.po` (or later), with
+plugin 1.2.0 (`build/openclaw-twoegram-1.2.0.tgz`) on claw1 and the
+Hermes plugin 1.1.0 on the Mac mini. b037 keeps working with the key now
+on the card, so the older items can be tried before item 1.
 
-### 1. Twoegram on Hermes Agent (plugin 1.0.0, built 2026-11-17)
+### 1. Keys made on the Apple (K2, b037, built 2026-11-18)
+
+Steps: PROBE.md, "Build b037". It needs the new plugins on both
+gateways first (listed there).
+
+- **Open-Apple-M** makes the key; how long it takes.
+- **Open-Apple-V** shows claw1's key and device id; **`openclaw a2 add`**
+  takes it, and the ids match.
+- **The mini** gets its own key the same way, with `hermes a2 add`.
+- **Switching** between claw1 and the mini by key name and address only.
+- **The passphrase** and the lock, with the new key.
+- **Revoked at one gateway**, the other still works; the new hint line
+  (this replaces b034's check, which needed a typed key).
+- **The old key** on the card works with b037 until replaced.
+
+### 2. Twoegram on Hermes Agent (plugin 1.0.0 installed, built 2026-11-17)
 
 Installed on the Mac mini on 2026-11-17 (Hermes v0.23.2): the plugin
 is enabled, `platforms.a2.enabled: true` is set, and the gateway listens
@@ -19,16 +36,10 @@ on port 8417. The config from before is in
 signed in from the Mac Studio, saw `hermes (Hermes)`, and was revoked,
 so the mini has no devices.
 
-First, on the Mac mini:
-
-```bash
-hermes a2 pair "Apple IIe"
-```
-
-In Twoegram's set-up, type the gateway `192.168.1.30:8417` and that
-key. If Twoegram has a key for claw1 now, this replaces it: Twoegram
-holds one gateway at a time. To go back to Pinchy, type claw1's address
-and a key from `openclaw a2 pair`.
+The Apple reaches the mini as item 1, step 4 says: key name `mini`,
+address `192.168.1.30:8417`, and `hermes a2 add`, which needs the
+Hermes plugin 1.1.0 on the mini first. (With the b036 disk, `hermes a2
+pair` and typing its key does the same, replacing claw1's key.)
 
 **Optional:** make the gateway a background service, so it comes back
 after a reboot. I was not allowed to do this over SSH:
@@ -39,22 +50,14 @@ hermes gateway install --start-now --start-on-login
 
 Then check:
 
-- **The Apple connects** to `http://192.168.1.30:8417`, with a key
-  from `hermes a2 pair`. Hermes is listed as the one agent.
+- **The Apple connects** to `http://192.168.1.30:8417`. Hermes is
+  listed as the one agent.
 - **A real answer** from Hermes's model, folded to fit the screen.
 - **An approval:** ask for something that needs one, and type
   `/approve` (and, another time, `/deny`).
 - **`/sethome`**, then a scheduled message arriving on the Apple.
 - **Busy:** the Apple shows Hermes working until the answer comes.
-- **The new words** (b036): the splash, set-up's help, and the bad-key
-  line.
-
-### 2. Saying when the key is refused (b034, built 2026-11-17, optional)
-
-Steps: PROBE.md, "Build b034" (needs a spare pairing to revoke).
-
-- **The pane's second line**, "Pair this Apple again (openclaw a2 pair),
-  then Open-Apple-K", after a revocation mid-conversation.
+- **The new words** (b036): the splash and set-up's help.
 
 ### 3. Saving the conversation (b033, built 2026-11-17)
 

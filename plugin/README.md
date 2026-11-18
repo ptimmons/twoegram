@@ -14,7 +14,7 @@ Needs OpenClaw 2026.11.3 or later (before 2026.12) and Node 24.16+ or
 With the gateway stopped:
 
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.1.0.tgz --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.2.0.tgz --force --accept-capabilities
 ```
 
 ```bash
@@ -25,17 +25,18 @@ openclaw config set channels.a2 '{"host":"0.0.0.0","port":8417}' --strict-json
 openclaw gateway start
 ```
 
-Then pair the Apple, and type the key it prints into Twoegram's set-up
-screen (Open-Apple-K):
+Then add the Apple. On its set-up screen (Open-Apple-K), Open-Apple-M
+makes its key and Open-Apple-V shows the key for this gateway's key
+name. On the gateway:
 
 ```bash
-openclaw a2 pair "Apple //e"
+openclaw a2 add "Apple //e"
 ```
 
-`openclaw a2 list` and `openclaw a2 revoke <id>` manage paired Apples.
-`openclaw a2 add "Apple //e"` adds a key the Apple made itself
-(docs/RELAY.md): it asks for the key without showing it, and prints the
-device id to compare with the Apple's.
+It asks for the key without showing it, and prints the device id, which
+should match the Apple's. `openclaw a2 list` and `openclaw a2 revoke
+<id>` manage the Apples it knows. `openclaw a2 pair` still makes a key
+on the gateway, for an Apple with Twoegram 1.0 or for a relay.
 
 ## Settings (`channels.a2`)
 

@@ -13,7 +13,7 @@ checksums:
 
 - `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
   It carries no address and no key; the set-up screen asks for both.
-- `openclaw-twoegram-1.1.0.tgz`: the plugin, compiled, with only the
+- `openclaw-twoegram-1.2.0.tgz`: the plugin, compiled, with only the
   files OpenClaw loads.
 
 ## 1. Copy the plugin to the gateway host
@@ -21,7 +21,7 @@ checksums:
 From the Mac:
 
 ```bash
-scp build/release/openclaw-twoegram-1.1.0.tgz build/release/SHA256SUMS GATEWAY-HOST:
+scp build/release/openclaw-twoegram-1.2.0.tgz build/release/SHA256SUMS GATEWAY-HOST:
 ```
 
 On the gateway host, check it arrived whole:
@@ -56,7 +56,7 @@ openclaw plugins registry --refresh
 Then install:
 
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.1.0.tgz --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.2.0.tgz --force --accept-capabilities
 ```
 
 It should end with `Saved for the next Gateway start.` Leave the gateway
@@ -109,15 +109,22 @@ show `a2` with no warning:
 [a2] listening on http://0.0.0.0:8417/a2/ for 0 device(s); agents main
 ```
 
-## 4. Pair the Apple
+## 4. Add the Apple
+
+The Apple makes its own key (docs/RELAY.md, part 1). On the Apple: start
+Twoegram, and on the set-up screen press Open-Apple-M to make the key,
+type a key name for this gateway (such as `claw1`) and its address (for
+example `192.168.1.20:8417`), then press Open-Apple-V. The Apple shows
+the key for this gateway and a device id. On the gateway host:
 
 ```bash
-openclaw a2 pair "Apple //e"
+openclaw a2 add "Apple //e"
 ```
 
-It prints the device's key once, in groups of five characters, and the
-gateway address to type in. No restart is needed: the running gateway
-sees new devices, and revoked ones, on its next request.
+It asks for the key without showing it, and prints the device id, which
+should be the one on the Apple's screen. Then press a key on the Apple,
+and Return. No restart is needed: the running gateway sees new devices,
+and revoked ones, on its next request.
 
 ```bash
 openclaw a2 list
@@ -129,10 +136,15 @@ openclaw a2 revoke <device-id>
 
 `revoke` also deletes that device's saved conversations.
 
-On the Apple: start Twoegram from `TWOEGRAM-1.0.po`. The set-up screen
-asks for the gateway's address (for example `192.168.1.20:8417`) and the
-key. If the card already holds a key that this gateway knows, leave the
-key empty to keep it.
+**An Apple with Twoegram 1.0** (build b036 or earlier) cannot make keys:
+its set-up screen takes one made by the gateway instead.
+
+```bash
+openclaw a2 pair "Apple //e"
+```
+
+This prints the key once, and the gateway's address. Plugin 1.2.0 keeps
+`pair` for those Apples, and for a relay.
 
 ## 5. Check the gateway's security
 

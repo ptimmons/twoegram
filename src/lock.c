@@ -11,6 +11,7 @@
 #include "proto.h"
 #include "session.h"
 #include "keystore.h"
+#include "config.h"
 #include "lock.h"
 
 #ifdef __CC65__
@@ -86,22 +87,42 @@ static uint8_t ask(const char *head, const char *why, uint8_t esc)
     }
 }
 
-/* ses_key = the card's scrambled key, unscrambled with pass. */
+uint8_t lock_use(void)
+{
+    if (!ks_master) {
+        memcpy(ses_key, ks_secret, A2_KEY_LEN);
+        return 0;
+    }
+    if (!cfg_name[0]) {
+        return KS_NONAME;
+    }
+    return ks_derive(ks_secret, cfg_name, ses_key);
+}
+
+/* ks_secret = the card's scrambled secret, unscrambled with pass, and
+ * ses_key from it. */
 static uint8_t unscramble(void)
 {
-    uint8_t rc = ks_load(ses_key);
+    uint8_t rc = ks_load(ks_secret);
 
     if (rc == KS_LOCKED) {
-        rc = ks_scramble(ses_key, pass, pn);
+        rc = ks_scramble(ks_secret, pass, pn);
     }
     memset(pass, 0, sizeof pass);
     pn = 0;
+    if (!rc) {
+        ks_have = 1;
+        rc = lock_use();
+    }
     return rc;
 }
 
 uint8_t lock_open(const char *why)
 {
+    /* link.c sees to a key name before asking (KS_NONAME is a failure
+     * here). */
     if (!ask("This Apple's key is locked with a passphrase.", why, 1) || unscramble()) {
+        ks_forget();
         memset(ses_key, 0, A2_KEY_LEN);
         return 0;
     }
@@ -115,6 +136,7 @@ void lock_now(void)
 
     memcpy(was_id, ses_id, sizeof was_id);
     ses_forget();
+    ks_forget();
     for (;;) {
         ask("Twoegram is locked.", why, 0);
         /* The right passphrase makes the key that made this device id. */
@@ -122,6 +144,7 @@ void lock_now(void)
             return;
         }
         memset(ses_key, 0, A2_KEY_LEN);
+        ks_forget();
         memcpy(ses_id, was_id, sizeof was_id);
         why = "That is not the passphrase.";
     }

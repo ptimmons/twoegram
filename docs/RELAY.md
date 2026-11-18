@@ -1,6 +1,7 @@
 # Several agents: keys made on the Apple, and the relay
 
-**Status:** planned 2026-11-17. K1 built 2026-11-18 (see Milestones).
+**Status:** planned 2026-11-17. K1 and K2 built 2026-11-18; K3 is the
+card test (see Milestones).
 PLAN.md, "Several agents", tracks it.
 
 Twoegram holds one gateway and one key at a time. To talk to agents on
@@ -81,47 +82,48 @@ checked against the device id of the current gateway's derived key.
 
 ### TWOEGRAM.CFG
 
-It remembers several gateways and which one is in use:
+It holds the gateway in use, with its key name before the address:
 
-    # Twoegram: the gateways
+    # Twoegram: the gateway
     GATEWAY=claw1 http://192.168.1.20:8417
-    GATEWAY=mini http://192.168.1.30:8417
-    USE=claw1
 
-Today's one-line form, `GATEWAY=http://...` with no name, still loads
-as the only gateway. It has no key name, so it works only with a card
-that still holds a gateway's key (`$A2` or `$A3`). Set-up asks for a
-name for it when you make a master. The file's limit is 4 gateways. The
-reason is room in the set-up overlay, not any principle, so the limit
-can grow.
+The form before key names, `GATEWAY=http://...`, still loads, as a
+gateway with no name. That works with a card that still holds a
+gateway's key (`$A2` or `$A3`); with a master, set-up asks for a name.
+
+**Planned as a list of 4 gateways, and dropped in K2 for room.** The
+list, and the screen to pick from it, made the set-up overlay 9K, and it
+has 6K ($0800 up to the program at $2000). Without the list, moving to
+another gateway is typing its key name and address. No key is typed
+again, which was the point.
 
 ### Set-up (the TWOEGRAM.SETUP overlay)
 
-- **The gateways**: a short list showing name, address, and the one in
-  use. You can add one, pick one, or remove one. Picking one says hello
-  to it at once.
-- **Make a master key**: asks first if the card already holds a key,
-  because the gateways that know the old key will stop working. Then it
-  makes M, saves it, and offers the passphrase as now.
-- **Show this gateway's key**: shows K(g) for the gateway in use, its
-  device id, and the command to type on the gateway:
+As built in K2:
+
+- **Three lines:** Key name, Address, Passphrase. Key names are
+  lowercased as they are typed, and only `a-z 0-9 - _` are taken.
+- **Open-Apple-M** makes a master. It asks first if the card already
+  holds a key, because the gateways that know the old key will stop
+  working. It saves M at once (`$A4`); a passphrase typed afterwards and
+  Return lock it (`$A5`).
+- **Open-Apple-V** shows K(g) for the key name in the field, with its
+  device id and the commands to type on the gateway:
 
       openclaw a2 add "Apple IIe"
       hermes a2 add "Apple IIe"
-      twoegram-relay add "Apple IIe"
 
-  This screen has to be asked for, and it needs the key unlocked if
-  there is a passphrase. The key is wiped from the screen when you
-  leave it.
-- **Typing a key is gone.** The base-32 parsing and check moves from
-  reading a key to writing one out, so the overlay gains the new screens
-  without carrying both.
+  It needs the secret unlocked if there is a passphrase. The key is
+  wiped from the screen and memory at the next key pressed.
+- **Typing a key is gone.** The overlay writes keys out in base 32
+  instead of reading them.
+- **Open-Apple-X** and **Open-Apple-P** work as before, on the master.
 
-The Apple already has HMAC, so deriving a key at start-up or when you
-switch gateways costs a few dozen bytes of main memory. Writing a key
-out in base 32 with its check character is new code, and it goes in the
-overlay. Main memory has 2,462 bytes of heap. The overlay's growth is
-checked against its space by `memcheck.py` (PLAN.md, b028).
+**Memory.** The overlay is 5,615 bytes: code and text in `OVERLAY1`,
+and its variables in their own segment, `OVL1DATA`, loaded with it.
+Moving set-up's variables out of main memory, and the file writer
+(`cfg_save`) into the overlay, gave main memory 223 bytes more: heap
+2,685, from 2,462. `ks_derive` and `lock_use` live in the language card.
 
 ### `a2 add`, on every server
 
@@ -345,7 +347,7 @@ All settled on 2026-11-18:
 | | What | Done when |
 |---|---|---|
 | K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` (**done 2026-11-18**) |
-| K2 | the card's new marks, TWOEGRAM.CFG's gateway list, set-up's screens | host tests pass; tried in Virtual ][ |
+| K2 | the card's new marks, the key name in TWOEGRAM.CFG, set-up's screens | host tests pass; tried in Virtual ][ (**done 2026-11-18**, b037; the gateway list dropped for room) |
 | K3 | on the card | a master, two gateways, switching, the lock, one revoked |
 | R1 | `server.py` split; the Hermes plugin unchanged | its 130 tests pass |
 | R2 | the relay: upstream client, pass-through, CLI | the two-dev-server run passes |

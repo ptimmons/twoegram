@@ -101,7 +101,15 @@ uint8_t tick_wait(uint16_t n) { (void)n; return 0; }
 char status_net[24] = "COGS 10.0.0.9";
 void net_check(void) {}
 uint8_t cfg_load(void) { return 1; }
-uint8_t cfg_save(void) { return 0; }
+static char saved_cfg[200];
+uint8_t cfg_save(void)
+{
+    char *p = saved_cfg;
+    p += sprintf(p, "# Twoegram: the gateway\rGATEWAY=");
+    if (cfg_name[0]) p += sprintf(p, "%s ", cfg_name);
+    sprintf(p, "%s\r", ses_base);
+    return 0;
+}
 
 /* ---- driving it ---- */
 
@@ -487,7 +495,7 @@ static void test_errors(void)
     idle_for(2, 5);
     CHECK(!link_live && !link_waiting);
     CHECK(on_screen("THE GATEWAY DOES NOT KNOW THIS KEY"));
-    CHECK(link_badkey && on_screen("Pair this Apple again on the gateway, then "));
+    CHECK(link_badkey && on_screen("Add this Apple's key on the gateway again"));
     CHECK(idle_for(1, 10) == 0);
     /* Paired again (here: the gateway knows it again); Open-Apple-R. */
     strcpy(gw_id, "922fadb6");
@@ -500,7 +508,7 @@ static void test_errors(void)
     gw_refuse = 6; gw_refuse_left = -1;
     idle_for(1, 5);
     CHECK(!link_live && on_screen("WAIT 15 MINUTES"));
-    CHECK(!link_badkey && !on_screen("Pair this Apple again"));
+    CHECK(!link_badkey && !on_screen("Add this Apple's key on the gateway"));
     CHECK(idle_for(1, 10) == 0);
     gw_refuse = 0;
     keys[0] = 'r'; oa[0] = 1;
@@ -617,7 +625,8 @@ static void test_passphrase(void)
     watch_for("AT LEAST 8", "TYPE THE PASSPHRASE AGAIN", "THE TWO DIFFER", "****");
     n = 0;
     keys[n] = 'k'; oa[n++] = 1;
-    keys[n++] = K_TAB;                          /* from the key to the passphrase */
+    keys[n++] = K_TAB;                          /* from the key name ... */
+    keys[n++] = K_TAB;                          /* ... past the address, to the passphrase */
     n += type(keys + n, "short");
     keys[n++] = K_RETURN;
     for (i = 0; i < 5; ++i) keys[n++] = K_DELETE;
@@ -715,6 +724,160 @@ static void test_passphrase(void)
     CHECK(prefs[15] == KS_MARK && !memcmp(prefs + 16, plain, 16) && !lock_armed);
     CHECK(!memcmp(prefs, card, 15) && link_live);
     on_key = 0;
+}
+
+/* ---- keys made on the Apple (docs/RELAY.md, part 1) ---- */
+
+/* What the gateway does with `a2 add`: the key from the screen, as the
+ * user would type it. */
+static char shown_key[40];
+static void gateway_adds(void)
+{
+    uint8_t buf[27], dig[32];
+
+    CHECK(a2_key_parse(shown_key, gw_key) == 0);
+    memcpy(buf, "twoegram-id", 11);
+    memcpy(buf + 11, gw_key, 16);
+    sha256(buf, 27, dig);
+    a2_hex(gw_id, dig, 4);
+}
+
+/* Called on every key while watching: a key on the screen is added at
+ * the gateway at once, as the user would. */
+static void read_shown_key(void)
+{
+    int r;
+    char *p;
+
+    watcher();
+    for (r = 0; r < SCR_ROWS; ++r) {
+        p = strstr(screen[r], "device id ");
+        if (p && p - screen[r] > 36 && strncmp(shown_key, p - 36, 32)) {
+            memcpy(shown_key, p - 36, 32);
+            shown_key[32] = 0;
+            gateway_adds();
+        }
+    }
+}
+
+static void test_master(void)
+{
+    static uint8_t keys[300], oa[300];
+    static const uint8_t own[15] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5 };
+    uint8_t want[16], got[16];
+    unsigned n, hellos;
+
+    memset(oa, 0, sizeof oa);
+    ses_forget();
+    ks_forget();
+    lock_armed = 0;
+    link_live = 0;
+    memcpy(prefs, own, 15);
+    prefs_len = 15;                             /* nothing of ours on the card */
+    cfg_name[0] = 0;
+
+    /* A fresh card: set-up first. Return is refused until there is a key;
+     * Open-Apple-M makes one, Open-Apple-V shows the gateway's, and with
+     * a key name Return saves and connects. */
+    watch_for("Make this Apple's key", "MAKE THIS APPLE'S KEY FIRST", "This Apple's key for the gateway:",
+              "GIVE THE GATEWAY A KEY NAME");
+    on_key = read_shown_key;
+    shown_key[0] = 0;
+    n = 0;
+    keys[n++] = K_RETURN;                       /* no key yet */
+    keys[n] = 'm'; oa[n++] = 1;
+    keys[n++] = K_RETURN;                       /* a key, but no key name */
+    n += type(keys + n, "Claw1");               /* lowercased as typed */
+    keys[n] = 'v'; oa[n++] = 1;                 /* shown, and added at the gateway */
+    keys[n++] = ' ';                            /* the key is put away */
+    keys[n++] = K_RETURN;
+    hellos = (unsigned)gw_hellos;
+    script = keys; script_oa = oa; script_n = n; script_i = 0;
+    link_start();
+    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
+    on_key = watcher;
+    CHECK(prefs_len == 32 && !memcmp(prefs, own, 15) && prefs[15] == KS_MASTER);
+    CHECK(ks_master && ks_have && !memcmp(prefs + 16, ks_secret, 16));
+    CHECK(strlen(shown_key) == 32 && !on_screen(shown_key));    /* gone once a key was pressed */
+    CHECK(ks_derive(ks_secret, "claw1", want) == 0);
+    CHECK(a2_key_parse(shown_key, got) == 0 && !memcmp(got, want, 16));
+    memset(oa, 0, sizeof oa);
+    CHECK(script_i == n && link_live && (unsigned)gw_hellos > hellos && !memcmp(ses_key, want, 16));
+    CHECK(!strcmp(cfg_name, "claw1"));
+    CHECK(!strcmp(saved_cfg, "# Twoegram: the gateway\rGATEWAY=claw1 http://10.0.0.2:8417\r"));
+
+    /* Another gateway: its name and address, no key typed. This gateway
+     * does not know the new key, so set-up says how to add it. */
+    watch_for("The gateway does not know this Apple's key", 0, 0, 0);
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE;
+    keys[n++] = K_DELETE; keys[n++] = K_DELETE;
+    n += type(keys + n, "mini");
+    keys[n++] = K_RETURN;
+    keys[n++] = K_ESC;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(seen[0] && !strcmp(cfg_name, "mini"));
+    CHECK(ks_derive(ks_secret, "mini", want) == 0 && !memcmp(ses_key, want, 16));
+    /* Back to claw1: its key again, with nothing more on the gateway. */
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE;
+    n += type(keys + n, "claw1");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(link_live && ks_derive(ks_secret, "claw1", want) == 0 && !memcmp(ses_key, want, 16));
+
+    /* A passphrase locks the master ($A5); the lock and a fresh start
+     * unlock it, and the key made is claw1's again. */
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n++] = K_TAB; keys[n++] = K_TAB;
+    n += type(keys + n, "a long passphrase");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "a long passphrase");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(prefs[15] == KS_MASTER_PASS && memcmp(prefs + 16, ks_secret, 16) != 0 && lock_armed);
+    CHECK(link_live && !memcmp(ses_key, want, 16));
+    watch_for("Twoegram is locked.", "That is not the passphrase.", 0, 0);
+    n = 0;
+    keys[n] = 'l'; oa[n++] = 1;
+    n += type(keys + n, "a wrong passphrase");
+    keys[n++] = K_RETURN;
+    n += type(keys + n, "a long passphrase");
+    keys[n++] = K_RETURN;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(seen[0] && seen[1] && !leaked && link_live && !memcmp(ses_key, want, 16));
+    ses_forget();
+    ks_forget();
+    lock_armed = 0;
+    link_live = 0;
+    n = 0;
+    n += type(keys + n, "a long passphrase");
+    keys[n++] = K_RETURN;
+    script = keys; script_oa = oa; script_n = n; script_i = 0;
+    link_start();
+    CHECK(link_live && lock_armed && ks_master && !memcmp(ses_key, want, 16));
+
+    /* Esc on set-up changes nothing; and a second Open-Apple-M asks first. */
+    watch_for("EVERY GATEWAY MUST HAVE THIS APPLE ADDED AGAIN", 0, 0, 0);
+    memcpy(got, prefs + 16, 16);
+    n = 0;
+    keys[n] = 'k'; oa[n++] = 1;
+    keys[n] = 'm'; oa[n++] = 1;
+    keys[n++] = 'n';
+    keys[n++] = K_ESC;
+    run(keys, oa, n);
+    memset(oa, 0, sizeof oa);
+    CHECK(seen[0] && !memcmp(prefs + 16, got, 16) && prefs[15] == KS_MASTER_PASS && link_live);
+    on_key = 0;
+    cfg_name[0] = 0;
+    gateway_reset();
 }
 
 /* ---- saving the conversation ---- */
@@ -940,6 +1103,7 @@ int main(void)
     test_errors();
     test_names();
     test_passphrase();
+    test_master();
     test_save();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;

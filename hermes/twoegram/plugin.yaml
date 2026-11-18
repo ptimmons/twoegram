@@ -1,7 +1,7 @@
 name: twoegram
 label: Apple //e (Twoegram)
 kind: platform
-version: 1.0.0
+version: 1.1.0
 description: >
   The a2 platform: chat with Hermes from an Apple //e running Twoegram, over
   the LAN. Every request and reply is signed with a key paired by

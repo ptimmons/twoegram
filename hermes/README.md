@@ -57,23 +57,21 @@ On the machine running Hermes:
 
    `hermes gateway uninstall` removes the service.
 
-4. **Pair the Apple**:
+4. **Add the Apple.** On Twoegram's set-up screen (Open-Apple-K),
+   Open-Apple-M makes the Apple's key (once, for every gateway), and
+   Open-Apple-V shows its key for this gateway's key name, such as
+   `mini`. Then:
 
    ```bash
-   hermes a2 pair "Apple IIe"
+   hermes a2 add "Apple IIe"
    ```
 
-   This prints the key, once, and the address to type into Twoegram's
-   set-up (Open-Apple-K). There is no need to restart the gateway: a
-   device paired or revoked takes effect at its next request.
+   It asks for the key without showing it, and prints the device id,
+   which should match the Apple's. There is no need to restart the
+   gateway: a device added or revoked takes effect at its next request.
 
-Or, once the Apple makes its own keys (docs/RELAY.md, part 1), add
-the key its set-up shows. It is asked for, not shown as you type, and
-the device id printed should match the Apple's:
-
-```bash
-hermes a2 add "Apple IIe"
-```
+   For an Apple with Twoegram 1.0, which cannot make keys, `hermes a2
+   pair "Apple IIe"` makes one on the gateway instead, shown once.
 
 To check and manage devices:
 

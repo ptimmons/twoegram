@@ -177,36 +177,12 @@ appear again the next time you start Twoegram.
 ## Chapter 2: Setting Up Twoegram
 
 Before your Apple can talk with your agents, the gateway has to know
-it. You introduce them once, with a **key**: a secret password, made by
-the gateway for your Apple alone. After that, Twoegram remembers the
-gateway and the key, and connects by itself each time you start it.
+it. You introduce them once, with a **key**: a secret password that
+only your Apple and that gateway hold. Your Apple makes its own key,
+and you type it on the gateway. After that, Twoegram remembers the
+gateway, and connects by itself each time you start it.
 
-### Getting a Key from the Gateway
-
-The key is made on the gateway. Whoever looks after the gateway types
-this command there:
-
-```
-openclaw a2 pair "Apple IIe"
-```
-
-or, on a gateway running Hermes Agent:
-
-```
-hermes a2 pair "Apple IIe"
-```
-
-The gateway answers with two things for you to copy down:
-
-- the **key**: 27 letters and numbers, in groups of five, such as
-  `00000-00000-00000-00000-00000-00`. (That one is only an example.)
-- the **gateway's address**, such as `http://192.168.1.20:8417`.
-
-> **Important:** The key is shown only once. Copy it carefully, keep it
-> to yourself, and throw the paper away once Twoegram has it. Anyone with
-> your key can talk to your agents as you.
-
-### Typing the Address and the Key
+### Making Your Apple's Key
 
 The Set-up screen appears by itself the first time you start Twoegram.
 At any other time, press **OPEN-APPLE-K** to bring it back.
@@ -215,41 +191,88 @@ At any other time, press **OPEN-APPLE-K** to bring it back.
 
 **Figure 2-1.** The Set-up screen
 
-1. Type the gateway's address. You can leave off the `http://` at the
-   beginning; Twoegram adds it for you.
+1. Press **OPEN-APPLE-M**. The CoGS card draws a secret from its own
+   random numbers, and keeps it. This secret never leaves the card:
+   Twoegram never shows it, sends it, or writes it on a disk. The status
+   bar says `THIS APPLE HAS A NEW KEY`.
+2. On the **Key name** line, type a short name for the gateway, such as
+   `claw1`: up to 16 small letters, digits, dashes and underlines. Your
+   Apple's key for that gateway is made from the secret and this name,
+   so each gateway you name gets a key of its own.
+3. Press TAB to move to the **Address** line, and type the gateway's
+   address, such as `192.168.1.20:8417`. You can leave off the
+   `http://` at the beginning; Twoegram adds it for you.
 
-   ![Figure 2-2. The gateway's address, typed in](images/setup-gateway.png)
+   ![Figure 2-2. The key name and the address, typed in](images/setup-gateway.png)
 
-   **Figure 2-2.** The gateway's address, typed in
+   **Figure 2-2.** The key name and the address, typed in
 
-2. Press TAB to move to the **Key** line.
-3. Type the key exactly as the gateway showed it. You can leave out the
+### Giving the Key to the Gateway
+
+1. Press **OPEN-APPLE-V**. Twoegram shows your Apple's key for this
+   gateway: 27 letters and numbers, in groups of five, and beside it a
+   **device id** of eight letters and digits.
+2. At the gateway, whoever looks after it types this command:
+
+   ```
+   openclaw a2 add "Apple IIe"
+   ```
+
+   or, on a gateway running Hermes Agent:
+
+   ```
+   hermes a2 add "Apple IIe"
+   ```
+
+   The gateway asks for the key, and doesn't show it as it's typed.
+   Type the key exactly as your Apple shows it. You can leave out the
    dashes, and capital or small letters are both fine.
-4. Press RETURN.
+3. The gateway answers with a device id. It should be the same as the
+   one on your Apple's screen. If it's different, the key was mistyped:
+   remove that one (see "For Whoever Looks After the Gateway" in Chapter
+   6) and type it again.
+4. Back at the Apple, press any key: the key disappears from the screen.
+   Then press RETURN.
 
-Twoegram checks the key before it uses it. The last character of every
-key is a check on the others, so if you mistype one, Twoegram notices
-straight away and says `THE KEY DOES NOT CHECK: A TYPING SLIP? COMPARE
-IT AGAIN`. Compare what you typed with your paper, correct it, and press
-RETURN again.
-
-When the key is right, Twoegram saves the address on the disk and the
-key on the CoGS card, then connects. The status bar says `SAYING HELLO
-TO` and the gateway's address, and in a moment your conversation
-appears.
+Twoegram saves the key name and address on the disk, then connects. The
+status bar says `SAYING HELLO TO` and the gateway's address, and in a
+moment your conversation appears.
 
 > **By the way:** Press ESC to leave the Set-up screen without changing
-> anything. To change only the gateway's address, leave the Key line
-> empty: Twoegram keeps the key it already has.
+> anything. OPEN-APPLE-V shows the key again whenever you need it, for
+> as long as the key name stays the same.
+
+### Talking to Another Gateway
+
+Your Apple talks to one gateway at a time, but it can have a key for
+any number of them. To move to another gateway, press OPEN-APPLE-K,
+type that gateway's key name and address, and press RETURN. The first
+time, give that gateway its key with OPEN-APPLE-V, as above. After that,
+moving back and forth is only a matter of typing the name and address:
+the keys never need typing again.
+
+> **Important:** The key name is part of the key. If you change a
+> gateway's key name, your Apple makes a different key for it, and that
+> gateway has to be given the new one.
 
 ### Where Your Key Is Kept
 
-Your key is never written on a disk. It's kept in a small corner of the
-CoGS card's own memory, which remembers it even when the computer is
-off. That way, a copy of your Twoegram disk is no use to anyone else.
+Your Apple's secret is never written on a disk. It's kept in a small
+corner of the CoGS card's own memory, which remembers it even when the
+computer is off. That way, a copy of your Twoegram disk is no use to
+anyone else. Each gateway's key is worked out from the secret whenever
+it's needed, and never kept anywhere on the Apple.
 
-To remove the key from the card, for example before you give the card
-away, press **OPEN-APPLE-X** on the Set-up screen, then **Y**.
+To remove the secret from the card, for example before you give the
+card away, press **OPEN-APPLE-X** on the Set-up screen, then **Y**.
+
+If you press OPEN-APPLE-M when the card already has a secret, Twoegram
+asks first: a new secret means new keys for every gateway, and each one
+has to be given its new key.
+
+> **By the way:** Earlier versions of Twoegram had you type a key made by
+> the gateway (with `a2 pair`). If your card has one of those, it keeps
+> working, with whatever gateway you set. OPEN-APPLE-M replaces it.
 
 ### A Passphrase, If You Want One
 
@@ -275,9 +298,9 @@ way. To stop using one, press **OPEN-APPLE-P** on the Set-up screen,
 then **Y**.
 
 > **Important:** Twoegram can't tell you a passphrase you've forgotten,
-> and nobody else can either. If you forget it, pair your Apple again
-> for a new key (see "Getting a Key from the Gateway"), and remove the old one
-> from the gateway's list.
+> and nobody else can either. If you forget it, make a new key with
+> OPEN-APPLE-M, give it to each gateway, and remove the old ones from
+> the gateways' lists.
 
 A longer passphrase is a stronger one. Several ordinary words strung
 together, such as `purple kettle on the stair`, are easier to remember
@@ -297,9 +320,11 @@ and brings your conversation back.
 
 ### If the Gateway Doesn't Know Your Key
 
-If the gateway has forgotten your Apple (perhaps someone removed it
-from the gateway's list, or made it a new key), Twoegram says so and
-shows the Set-up screen again. Ask for a new key, and type it in.
+If the gateway doesn't know your Apple's key (perhaps someone removed it
+from the gateway's list, or it was never given this key), Twoegram says
+so and shows the Set-up screen again. Press OPEN-APPLE-V, give the
+gateway the key as described in "Giving the Key to the Gateway", and
+press RETURN.
 
 ---
 
@@ -656,21 +681,24 @@ Apple's memory only while Twoegram runs.
 
 ### Keeping Your Key Safe
 
-The key appears only once, when your Apple is paired, and is kept in
-the CoGS card, not on any disk. Once it's typed in, you don't need the
-paper again. Tear it up, or at least don't keep it beside the Apple.
+Your Apple's secret stays in the CoGS card, and is never shown. Each
+gateway's key appears on the screen only when you press OPEN-APPLE-V,
+and disappears at the next key you press. There's no need to write it
+down: type it straight from the screen at the gateway. If you do copy it
+onto paper, tear the paper up once the gateway has the key.
 
 If the Apple or the card leaves your hands:
 
-1. Ask whoever looks after the gateway to remove the Apple from the
-   gateway's list (`openclaw a2 revoke`). From then on, the key is
-   worthless. The gateway forgets the conversations it kept for that
-   Apple at the same time.
+1. Ask whoever looks after each gateway to remove the Apple from that
+   gateway's list (`openclaw a2 revoke`, or `hermes a2 revoke`). From
+   then on, its key is worthless. The gateway forgets the conversations
+   it kept for that Apple at the same time.
 2. Press OPEN-APPLE-K, then OPEN-APPLE-X on the Set-up screen, to wipe
-   the key from the card.
+   the secret from the card.
 
-If you lose the paper before typing the key, or type it into another
-Apple by mistake, simply pair again and revoke the old key.
+If someone sees a gateway's key, remove it from that gateway's list,
+give the gateway a new key name on the Set-up screen, and give it the
+new key. The other gateways' keys aren't affected.
 
 ### For Whoever Looks After the Gateway
 
@@ -682,8 +710,9 @@ Apple by mistake, simply pair again and revoke the old key.
 - Give the Apple only the agents it needs, with the channel's `agents`
   setting. An agent with fewer tools is the safest one to talk to from
   the Apple.
-- `openclaw a2 list` shows every paired Apple. Revoke any you don't
-  recognize or no longer use.
+- `openclaw a2 add` takes an Apple's key, which the Apple shows; it
+  asks for it without showing it. `openclaw a2 list` shows every Apple
+  the gateway knows. Revoke any you don't recognize or no longer use.
 - `openclaw security audit` checks the gateway's settings. It has
   nothing to say about the a2 channel once an Apple is paired.
 - The gateway's log notes every hello, with the Apple's name and
@@ -730,8 +759,10 @@ Apple by mistake, simply pair again and revoke the old key.
 
 | Press | To |
 |---|---|
-| TAB | move between the address, the key and the passphrase |
+| TAB | move between the key name, the address and the passphrase |
 | RETURN | save, and connect |
+| OPEN-APPLE-M | make this Apple's key |
+| OPEN-APPLE-V | show the key for the gateway named, to type on it |
 | OPEN-APPLE-X | remove the key from the CoGS card |
 | OPEN-APPLE-P | stop using a passphrase |
 | ESC | leave without changing anything |
@@ -780,13 +811,16 @@ seconds.
 Twoegram waited 20 seconds and the CoGS card still wasn't connected.
 Check the card's configuration screen, then press OPEN-APPLE-R.
 
+**Make this Apple's key (OPEN-APPLE-M), and give the gateway a key name.**
+Twoegram needs both before it can connect: see Chapter 2.
+
 **Not set up yet.**
-You left the Set-up screen without typing a gateway and key. Press
-OPEN-APPLE-K when you're ready.
+You left the Set-up screen before Twoegram had a gateway and a key.
+Press OPEN-APPLE-K when you're ready.
 
 **This Apple's key is locked with a passphrase.**
-Type your passphrase and press RETURN. Press ESC instead to type a new
-key on the Set-up screen.
+Type your passphrase and press RETURN. Press ESC instead to go to the
+Set-up screen, where OPEN-APPLE-M makes a new key.
 
 **The gateway does not know the key that passphrase makes: is it right?**
 The passphrase was probably mistyped. Type it again.
@@ -803,24 +837,42 @@ it's needed. Make sure the Twoegram disk is still in the drive, with
 
 ### When Setting Up
 
-**THE GATEWAY IS AN ADDRESS AND PORT, FOR EXAMPLE 192.168.1.20:8417**
-What you typed on the Gateway line isn't an address Twoegram can use.
+**THE ADDRESS IS AN ADDRESS AND PORT, FOR EXAMPLE 192.168.1.20:8417**
+What you typed on the Address line isn't an address Twoegram can use.
 
-**A KEY IS 27 CHARACTERS: 26, THEN ONE TO CHECK THEM**
-The key is too short or too long. Count the characters on your paper,
-leaving out the dashes.
+**MAKE THIS APPLE'S KEY FIRST: OPEN-APPLE-M**
+**THERE IS NO KEY YET: OPEN-APPLE-M MAKES ONE**
+The card doesn't hold a key for Twoegram yet. Press OPEN-APPLE-M.
 
-**THE KEY DOES NOT CHECK: A TYPING SLIP? COMPARE IT AGAIN**
-**THAT IS NOT A KEY: CHECK THE LAST CHARACTER**
-One of the characters you typed isn't the one on your paper. Look
-especially at 0 and O, and at 1 and I.
+**GIVE THE GATEWAY A KEY NAME: 1 TO 16 OF A-Z 0-9 - _**
+**GIVE THE GATEWAY A KEY NAME FIRST**
+Your Apple's key for a gateway is made from its key name: type one on
+the Key name line.
 
-**TYPE THE KEY: THE CARD DOES NOT HOLD ONE**
-You left the Key line empty, but the card doesn't have a key yet.
+**THIS APPLE HAS A NEW KEY: OPEN-APPLE-V SHOWS THE GATEWAY'S**
+OPEN-APPLE-M worked. Give each gateway its key (Chapter 2).
+
+**A NEW KEY: EVERY GATEWAY MUST HAVE THIS APPLE ADDED AGAIN. Y OR N**
+**THIS REPLACES THE KEY FROM THE GATEWAY: ADD THE NEW ONE THERE. Y OR N**
+You pressed OPEN-APPLE-M, and the card already holds a key. Press Y to
+make a new one anyway, or any other key to keep the old one.
+
+**THIS KEY CAME FROM A GATEWAY: OPEN-APPLE-M MAKES ONE HERE**
+The card holds a key made by a gateway with an earlier version of
+Twoegram, so there's no key to show. It keeps working; to have keys
+for several gateways, press OPEN-APPLE-M.
+
+**THE KEY IS LOCKED: START AGAIN AND TYPE THE PASSPHRASE**
+The key on the card is locked, and you didn't unlock it when Twoegram
+started. Start Twoegram again and type the passphrase.
+
+**PRESS A KEY WHEN IT IS ADDED**
+Twoegram is showing a gateway's key. Press any key once the gateway has
+it, and the key disappears.
 
 **The key could not be kept on the card.**
-The CoGS card wouldn't save the key. Press any key to connect anyway;
-you'll have to type the key again next time.
+The CoGS card wouldn't save the key. Press any key to go on; you'll
+have to make the key again next time.
 
 **A PASSPHRASE IS AT LEAST 8 CHARACTERS**
 Make it longer. Several words together are easiest.
@@ -830,11 +882,6 @@ Twoegram asks twice, to be sure you typed what you meant.
 
 **THE TWO DIFFER: TYPE THE PASSPHRASE AGAIN**
 The second typing didn't match the first. Start again with the first.
-
-**UNLOCK THE KEY FIRST, OR TYPE IT, TO GIVE IT A NEW PASSPHRASE**
-The key on the card is locked, and you didn't unlock it when Twoegram
-started. Start Twoegram again and type the old passphrase, or type the
-key itself on the Key line.
 
 **NO PASSPHRASE IS IN USE**
 You pressed OPEN-APPLE-P, but the key has no passphrase.
@@ -854,14 +901,15 @@ the address, especially the number after the colon.
 **THE GATEWAY DOES NOT KNOW THIS KEY**
 **BAD SIGNATURE: IS THE KEY RIGHT?**
 The gateway doesn't recognize your key. When connecting, Twoegram shows
-the Set-up screen; type the key again, or ask for a new one. If this
-happens in the middle of a conversation, the key has been taken back
-(revoked) on the gateway, or the copy on the card has changed (a card
-firmware upgrade or reset can do that). Either way the message pane
-says **Pair this Apple again on the gateway, then OPEN-APPLE-K.**
-Do just that: pair your Apple again, then press OPEN-APPLE-K and type
-the new key. Then revoke the old device on the gateway (`openclaw a2
-list` shows it, `openclaw a2 revoke` takes it away).
+the Set-up screen, saying **The gateway does not know this Apple's
+key**: press OPEN-APPLE-V and give the gateway the key (Chapter 2). If
+this happens in the middle of a conversation, the key has been taken
+back (revoked) on the gateway, or the copy on the card has changed (a
+card firmware upgrade or reset can do that). Either way the message
+pane says **Add this Apple's key on the gateway again: OPEN-APPLE-K,
+OPEN-APPLE-V.** Do just that. If the card's key changed, revoke the
+old device on the gateway too (`openclaw a2 list` shows it, `openclaw
+a2 revoke` takes it away).
 
 **LOCKED OUT AFTER BAD TRIES: WAIT 15 MINUTES**
 The gateway saw too many wrong keys from your Apple. Wait 15 minutes,

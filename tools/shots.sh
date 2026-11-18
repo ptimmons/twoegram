@@ -36,8 +36,17 @@ snap help
 "$V" oa k >/dev/null
 "$V" await "Twoegram set-up" 10
 snap setup
-# The gateway typed in (an example address; no key is typed).
-"$V" text "192.168.1.20:8417" >/dev/null
-sleep 3                               # typed at keyboard speed
+# A key name and the gateway's address typed in (an example address).
+# One key at a time: the //e's keyboard holds only one.
+slow() {
+    local i
+    for ((i = 0; i < ${#1}; i++)); do
+        "$V" text "${1:i:1}" >/dev/null
+        sleep 0.3
+    done
+}
+slow "claw1"
+"$V" tab >/dev/null
+slow "192.168.1.20:8417"
 snap setup-gateway
 "$V" key esc >/dev/null

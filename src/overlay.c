@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-extern char _OVERLAY1_LOAD__[], _OVERLAY1_SIZE__[];
+extern char _OVERLAY1_LOAD__[], _OVERLAY1_SIZE__[], _OVL1DATA_SIZE__[];
 extern char _OVERLAY2_LOAD__[], _OVERLAY2_SIZE__[];
 
 static uint8_t load(const char *file, char *at, unsigned size)
@@ -26,7 +26,7 @@ static uint8_t load(const char *file, char *at, unsigned size)
     close(fd);
     return (uint8_t)(n == (int)size);
 }
-#define LOAD_SETUP() load(SETUP_FILE, _OVERLAY1_LOAD__, (unsigned)_OVERLAY1_SIZE__)
+#define LOAD_SETUP() load(SETUP_FILE, _OVERLAY1_LOAD__, (unsigned)_OVERLAY1_SIZE__ + (unsigned)_OVL1DATA_SIZE__)
 #define LOAD_SAVE()  load(SAVE_FILE, _OVERLAY2_LOAD__, (unsigned)_OVERLAY2_SIZE__)
 #else
 /* On the Mac the overlays' code is linked in. */

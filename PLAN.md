@@ -1288,8 +1288,9 @@ direct mode and leave the protocol unchanged.
   - Each gateway's key is HMAC(M, "twoegram-gw" || name), cut to 16
     bytes. Set-up shows it, and `a2 add` on the gateway takes it at a
     prompt that does not echo.
-  - TWOEGRAM.CFG remembers up to 4 gateways, so switching is a choice in
-    set-up, not a new key.
+  - TWOEGRAM.CFG holds the gateway's key name with its address, so
+    switching is typing a name and address, not a key. (A list of 4 was
+    planned, and dropped in K2 for room.)
   - True public-key auth stays out: a minute or more of 6502 time for
     each operation. X25519 pairing is noted under "Later".
 - **The relay** (R1 to R4):
@@ -1344,3 +1345,58 @@ Apple's set-up does not use it yet (K2).
   key then signed in at its own server, and only there: the `mini` key
   at the TypeScript server got UNKNOWN_DEVICE. A message went through
   and came back.
+
+### K2: the Apple makes its key (2026-11-18, b037, plugins 1.2.0 and 1.1.0)
+
+The Apple's half of RELAY.md part 1. Not yet on the card (K3: PROBE.md,
+"Build b037").
+
+- **The card.** Marks `$A4` (a master) and `$A5` (a master under a
+  passphrase) join `$A2`/`$A3`. `ks_load` sets `ks_master`. The secret
+  in memory is `ks_secret`, with `ks_have`, kept apart from `ses_key`,
+  the key in use. `lock_use()`, in the language card, makes `ses_key`
+  from it: the secret itself for a gateway's key, else
+  `ks_derive(M, cfg_name)`. The lock unscrambles into `ks_secret`, and
+  quitting and locking wipe it.
+- **TWOEGRAM.CFG:** `GATEWAY=<key name> http://...`. The old form still
+  reads, with no name. `cfg_save` moved into the overlay, its only
+  user.
+- **Set-up:** Key name, Address and Passphrase lines; Open-Apple-M
+  makes the master (two RANDOM draws and the tick count, hashed by the
+  card), Open-Apple-V shows the gateway's key and device id until a key
+  is pressed, and typing a key is gone (RELAY.md, decision 4). With a
+  master and no key name, start-up goes to set-up first.
+- **Wording:** the bad-key line is now "Add this Apple's key on the
+  gateway again: Open-Apple-K, Open-Apple-V." The set-up prompts in
+  link.c name Open-Apple-V and -M.
+- **The gateway list was dropped.** With a list of 4 and a screen to
+  pick from it, the overlay was 9K against its 6K. Without it, 5,615
+  bytes.
+- **A crash, found in Virtual ][.** Set-up's variables moved into the
+  overlay with `#pragma bss-name ("OVERLAY1")`, the same name as its
+  code. cc65 then emits a function's static locals (`-Cl`) at the
+  function's own label, so `JSR _setup_main` ran into a zero byte, a
+  BRK. The variables now have their own segment, `OVL1DATA`, in the
+  same file (cfg/twoegram.cfg). The loader reads both, and memcheck.py
+  checks both.
+- **Memory:** heap 2,685 bytes, up from 2,462. Set-up's 252 bytes of
+  variables and `cfg_save` left main memory.
+- **The plugins:** OpenClaw 1.2.0 and Hermes 1.1.0, with K1's `a2 add`.
+  `src/secret.ts` was missing from the package's `files`, and OpenClaw
+  loads the TypeScript, so 1.2.0 would not have loaded. It's added, and
+  every local import in the packed tarball was checked.
+- **Tests:**
+  - Host: 1,146 checks in a2 (the new marks, key names in the config
+    file) and 1,477 in convo. The new convo test covers:
+    - a fresh card: Return refused, Open-Apple-M, no key name refused,
+      Open-Apple-V, with the model gateway taking the key off the screen
+      as `a2 add` would, then Return and connected;
+    - moving to `mini` (refused, since that gateway has not been given
+      that key) and back to `claw1` with nothing typed but the name;
+    - a passphrase on the master, the lock, and a fresh start;
+    - a second Open-Apple-M declined.
+  - Virtual ][ (no card): set-up opens and draws, key names are
+    lowercased, and Open-Apple-M and -V say there is no card or no key.
+    Keys pasted quickly are dropped, since the //e holds one key at a
+    time; shots.sh now types one at a time. Screenshots retaken.
+

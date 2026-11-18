@@ -37,6 +37,7 @@ def main():
 # goes, so the reply buffer (session.o) must stay out of its way.
 OVERLAYS = (
     ("OVERLAY1", "the set-up overlay", ("layout.o", "msgs.o", "session.o")),
+    ("OVL1DATA", "the set-up overlay's data", ("layout.o", "msgs.o", "session.o")),
     ("OVERLAY2", "the saving overlay", ("layout.o", "msgs.o")),
 )
 

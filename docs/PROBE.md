@@ -1,5 +1,48 @@
 # Testing on the card
 
+## Build b037: keys made on the Apple (RELAY.md, K3)
+
+Boot `build/TWOEGRAM-b037.po` (or later). It carries everything below
+b034 too. The gateways need the new plugins first, since `a2 add` is new:
+
+- **claw1:** OpenClaw plugin 1.2.0, `build/openclaw-twoegram-1.2.0.tgz`,
+  installed as INSTALL.md steps 1 and 2 say. `openclaw plugins list`
+  shows `a2` at 1.2.0, and `openclaw a2 add --help` exists.
+- **The Mac mini:** Hermes plugin 1.1.0: `hermes/twoegram` copied over
+  `~/.hermes/plugins/twoegram`, and the gateway restarted.
+  `hermes a2 --help` lists `add`.
+
+1. **The old key still works.** Start b037 with the card as it is:
+   it connects to Pinchy as before, with no question asked.
+2. **The new set-up screen.** Open-Apple-K: a Key name line (empty), the
+   Address (claw1's), the Passphrase. Open-Apple-M asks `THIS REPLACES
+   THE KEY FROM THE GATEWAY ...`; Y. `THIS APPLE HAS A NEW KEY`. **How
+   long did it take?** (Two draws of random numbers and a hash.) The
+   pairing claw1 knew from `openclaw a2 pair` is now unused: revoke it
+   afterwards (`openclaw a2 list`, `revoke`).
+3. **claw1's key.** Type `claw1` as the key name. Open-Apple-V shows the
+   key, 27 characters, and a device id. On claw1, `openclaw a2 add
+   "Apple IIe"`, type the key (not shown as you type): the device id it
+   prints is the Apple's. A key on the Apple puts the key away. Return:
+   connected to Pinchy. The conversation starts empty, as a new device's
+   does.
+4. **The mini's key.** Open-Apple-K. Key name `mini`, address
+   `192.168.1.30:8417`, Open-Apple-V, `hermes a2 add "Apple IIe"` on
+   the mini, same device id, Return: Hermes.
+5. **Back to claw1, no key typed.** Open-Apple-K, key name `claw1`,
+   claw1's address, Return: Pinchy, and the conversation from step 3.
+6. **A passphrase on the new key.** Open-Apple-K, Tab to Passphrase,
+   type it twice. Open-Apple-L locks and the passphrase unlocks. Quit
+   and start again: the passphrase first, then Pinchy.
+7. **One gateway revoked, the other not.** On the mini, `hermes a2 list`
+   and `revoke` the Apple, while it is on the mini: the pane says
+   `THE GATEWAY DOES NOT KNOW THIS KEY` and, below it, `Add this Apple's
+   key on the gateway again:` Open-Apple-`K,` Open-Apple-`V.` (This
+   replaces b034's check.) Move to claw1: it still works. Add the key on
+   the mini again whenever you like.
+8. **The screen.** Does set-up read well, and does the key show clearly?
+   Typing fast on the real keyboard: any keys lost?
+
 ## Build b034: when the gateway refuses the key
 
 Plugin 1.1.0, as before. Boot `build/TWOEGRAM-b034.po` (or later; b036 is current); it carries

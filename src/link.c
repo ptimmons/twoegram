@@ -181,7 +181,7 @@ static void connect_or_setup(void)
             (ses_reply.code != A2_UNKNOWN_DEVICE && ses_reply.code != A2_BAD_SIGNATURE)) {
             return;
         }
-        if (!setup_run("The gateway does not know this key. Pair this Apple on the gateway, then type its key.")) {
+        if (!setup_run("The gateway does not know this Apple's key: " OA "-V shows it, to add there.")) {
             return;
         }
     }
@@ -196,10 +196,10 @@ static void open_locked(void)
 
     for (;;) {
         if (!lock_open(why)) {
-            if (setup_run("To use a new key instead, type it here.")) {
+            if (setup_run("To make a new key instead: " OA "-M.")) {
                 connect_or_setup();
             } else {
-                offline("LOCKED", "The key on the card is locked with a passphrase: " OA "-K to type it.");
+                offline("LOCKED", "The key on the card is locked with a passphrase: " OA "-K for set-up.");
             }
             return;
         }
@@ -221,13 +221,16 @@ void link_start(void)
     }
     /* The disk before any network use; then the card. */
     have_gw = cfg_load();
-    rc = ks_load(ses_key);
+    rc = ks_load(ks_secret);
     if (rc == KS_LOCKED) {
-        memset(ses_key, 0, A2_KEY_LEN);         /* lock_open reads it again */
-        rc = 0;
+        ks_forget();                            /* lock_open reads it again */
+        rc = ks_master && !cfg_name[0] ? KS_NONAME : 0;
+    } else if (!rc) {
+        ks_have = 1;
+        rc = lock_use();
     }
     if (!have_gw || rc) {
-        if (!setup_run(have_gw ? "The card holds no key for Twoegram yet." : 0)) {
+        if (!setup_run(have_gw ? "Make this Apple's key (" OA "-M), and give the gateway a key name." : 0)) {
             offline("NOT SET UP", "Not set up yet.");
             return;
         }

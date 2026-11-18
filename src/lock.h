@@ -35,4 +35,9 @@ uint8_t lock_open(const char *why);
  * back in ses_key and no session open. */
 void lock_now(void);
 
+/* ses_key from ks_secret: the secret itself if it is a gateway's key,
+ * else the key derived for cfg_name. 0, KS_NONAME, or a card code. In
+ * the language card with the rest of this file. */
+uint8_t lock_use(void);
+
 #endif
