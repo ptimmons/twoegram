@@ -1,4 +1,4 @@
-// `openclaw a2 pair | list | revoke`, run on the gateway host. They edit
+// `openclaw a2 pair | add | list | revoke`, run on the gateway host. They edit
 // the device file; the running gateway notices the change on its next
 // request, so no restart is needed.
 
@@ -6,6 +6,8 @@ import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { FileConvStore } from "./convstore.ts";
 import { DeviceStore } from "./devices.ts";
+import { parseKey } from "./protocol.ts";
+import { readSecret } from "./secret.ts";
 
 export const DEFAULT_PORT = 8417;
 
@@ -38,7 +40,11 @@ export type CliOptions = {
   /** channels.a2.host and port, for the hint. */
   listen: () => { host: string; port: number };
   print?: (line: string) => void;
+  /** Ask for a key without showing it (secret.ts); the tests answer. */
+  readKey?: (prompt: string) => Promise<string>;
 };
+
+export const ADD_PROMPT = "Key (from Twoegram's set-up; not shown as you type): ";
 
 export function registerA2Commands(program: Command, o: CliOptions): void {
   const print = o.print ?? ((l: string) => console.log(l));
@@ -58,6 +64,27 @@ export function registerA2Commands(program: Command, o: CliOptions): void {
       print(`    ${written}`);
       print("");
       if (hosts.length) print(`Gateway: ${hosts.map((h) => `http://${h}:${port}`).join("  or  ")}`);
+    });
+
+  a2.command("add [name]")
+    .description("Add an Apple //e by the key its set-up shows")
+    .action(async (name?: string) => {
+      const typed = await (o.readKey ?? readSecret)(ADD_PROMPT);
+      const key = parseKey(typed);
+      if (!key) {
+        print("That is not a key: a character is wrong or missing. Nothing was added.");
+        process.exitCode = 1;
+        return;
+      }
+      const device = store().add(key, name ?? "");
+      key.fill(0);
+      if (!device) {
+        print("That key is paired already. Nothing was added.");
+        process.exitCode = 1;
+        return;
+      }
+      print(`Added device ${device.id} (${device.name}).`);
+      print("Check that Twoegram's set-up shows the same device id.");
     });
 
   a2.command("list")

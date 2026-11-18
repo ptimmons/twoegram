@@ -116,6 +116,113 @@
    "id": "4fe761ca"
   }
  ],
+ "derived": [
+  {
+   "master": "00000000000000000000000000000000",
+   "name": "claw1",
+   "key": "ec5ccb24f4d7d986e188145c1209bdc9",
+   "written": "XHECP-97MTZ-CRDRC-82HE1-42DXS-48",
+   "id": "f5f135b3"
+  },
+  {
+   "master": "00000000000000000000000000000000",
+   "name": "mini",
+   "key": "bc17fcd00870e63cda45b6b02e7f96cb",
+   "written": "QGBZS-M08E3-K3SPJ-5PTR2-WZWPS-CU",
+   "id": "59116b11"
+  },
+  {
+   "master": "00000000000000000000000000000000",
+   "name": "relay",
+   "key": "10f64ff8c9e4a642464664e6b451bec9",
+   "written": "23V4Z-Y69WJ-K44HJ-6CKKB-8MDYS-4H",
+   "id": "e8b4162b"
+  },
+  {
+   "master": "ffffffffffffffffffffffffffffffff",
+   "name": "mini",
+   "key": "7538a1f396077775c79aab0b10d1454a",
+   "written": "EMWA3-WWP0X-VQBHW-TNC5H-1MA59-8~",
+   "id": "d485bc6a"
+  },
+  {
+   "master": "ffffffffffffffffffffffffffffffff",
+   "name": "relay",
+   "key": "c90ffaa76603888d148f85686d88daba",
+   "written": "S47ZN-9V60E-48T54-FGNM6-V26TQ-8N",
+   "id": "3dd23a57"
+  },
+  {
+   "master": "ffffffffffffffffffffffffffffffff",
+   "name": "a",
+   "key": "a9144fa1e5f634c8363877fa2e1f603a",
+   "written": "N4A4Z-8F5YR-TCGDH-REZX2-W7V07-8C",
+   "id": "90d8daab"
+  },
+  {
+   "master": "00112233445566778899aabbccddeeff",
+   "name": "claw1",
+   "key": "5e82d5727d99d0b9f5e3663b7aae71a6",
+   "written": "BT1DA-WKXK7-8BKXF-3CRXQ-NBKHM-RQ",
+   "id": "4c6603b0"
+  },
+  {
+   "master": "00112233445566778899aabbccddeeff",
+   "name": "mini",
+   "key": "e1ae90e8f440b335aad00731144748da",
+   "written": "W6Q91-T7M82-SKBAP-G0WRH-8HT8V-8J",
+   "id": "2628aca9"
+  },
+  {
+   "master": "00112233445566778899aabbccddeeff",
+   "name": "relay",
+   "key": "0c07cc3f86393c53f16b91269c4bb340",
+   "written": "1G3WR-FW674-Y57WB-BJ4K9-RJXK8-0=",
+   "id": "b95b91ad"
+  },
+  {
+   "master": "9e9b1eaf80bc3d80de63ec9921367a88",
+   "name": "mini",
+   "key": "6b639bfbb9b236326129c90a910b43eb",
+   "written": "DDHSQ-YXSP8-V34R9-9S459-22T3X-C*",
+   "id": "71a96c82"
+  },
+  {
+   "master": "9e9b1eaf80bc3d80de63ec9921367a88",
+   "name": "relay",
+   "key": "186405e0fd6437494f62cce811a2274f",
+   "written": "31J0B-R7XCG-VMJKV-2SKM1-38H79-WK",
+   "id": "0a918073"
+  },
+  {
+   "master": "9e9b1eaf80bc3d80de63ec9921367a88",
+   "name": "a",
+   "key": "a4634a8b7a36cf77fd1092d12c5d4d0d",
+   "written": "MHHMN-2VT6V-7QFZ8-GJB8J-RQAD1-MJ",
+   "id": "26efa75c"
+  },
+  {
+   "master": "02712ac6f01d37ac0b4bba10e3691a65",
+   "name": "claw1",
+   "key": "14ea58b0f40282fb0eb443d2fdbbb844",
+   "written": "2KN5H-C7M0A-1FP3N-M8F9F-VEXR8-GT",
+   "id": "072281f5"
+  },
+  {
+   "master": "02712ac6f01d37ac0b4bba10e3691a65",
+   "name": "mini",
+   "key": "12bc1e0d16f7be0dc6905b6ff9e9ff89",
+   "written": "2AY1W-38PYY-Z0VHM-GBDQZ-KTFZH-46",
+   "id": "07622257"
+  },
+  {
+   "master": "02712ac6f01d37ac0b4bba10e3691a65",
+   "name": "relay",
+   "key": "ef5abd85988b6fd93a9108ecf1761be0",
+   "written": "XXDBV-1CRHD-QXJEM-H13PF-2XGVW-0$",
+   "id": "2250d3d9"
+  }
+ ],
  "signing": [
   {
    "key": "00000000000000000000000000000000",

@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  deriveKey,
   deviceId,
   formatKey,
   hmac,
@@ -120,5 +121,27 @@ describe("replies", () => {
 
   it("refuses a record whose length is wrong", () => {
     expect(() => parseReply(Buffer.from("A2 1 0 -\nmsg 1 0 10:00 5\nabc\n"))).toThrow();
+  });
+});
+
+describe("keys derived from the Apple's master secret", () => {
+  const master = Buffer.from("00112233445566778899aabbccddeeff", "hex");
+
+  it("are HMAC(M, \"twoegram-gw\" || name), cut to 16 bytes", () => {
+    const want = createHmac("sha256", master).update("twoegram-gwclaw1").digest().subarray(0, 16);
+    expect(deriveKey(master, "claw1").equals(want)).toBe(true);
+  });
+
+  it("differ for every name, and so do their device ids", () => {
+    const names = ["claw1", "mini", "relay", "a", "claw-1", "claw_1"];
+    const ids = new Set(names.map((n) => deviceId(deriveKey(master, n))));
+    expect(ids.size).toBe(names.length);
+  });
+
+  it("refuse a name the Apple could not type, and a master of the wrong size", () => {
+    for (const bad of ["", "Claw1", "claw 1", "x".repeat(17), "café"]) {
+      expect(() => deriveKey(master, bad)).toThrow();
+    }
+    expect(() => deriveKey(Buffer.alloc(15), "claw1")).toThrow();
   });
 });

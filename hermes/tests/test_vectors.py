@@ -21,6 +21,21 @@ def test_keys(k):
     assert p.device_id(key) == k["id"]
 
 
+@pytest.mark.parametrize("d", V["derived"], ids=lambda d: d["name"] + "/" + d["id"])
+def test_derived_keys(d):
+    key = p.derive_key(bytes.fromhex(d["master"]), d["name"])
+    assert key.hex() == d["key"]
+    assert p.format_key(key) == d["written"] and p.device_id(key) == d["id"]
+
+
+def test_derive_refuses_what_the_apple_could_not_type():
+    for bad in ["", "Claw1", "claw 1", "x" * 17, "caf\u00e9"]:
+        with pytest.raises(ValueError):
+            p.derive_key(bytes(16), bad)
+    with pytest.raises(ValueError):
+        p.derive_key(bytes(15), "claw1")
+
+
 @pytest.mark.parametrize("s", V["signing"], ids=lambda s: str(s["seq"]))
 def test_signing(s):
     key, cn, sn = (bytes.fromhex(s[x]) for x in ("key", "cn", "sn"))

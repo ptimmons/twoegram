@@ -86,6 +86,21 @@ def parse_key(text: str) -> Optional[bytes]:
     return (n >> 2).to_bytes(16, "big")
 
 
+KEY_NAME = re.compile(r"[a-z0-9_-]{1,16}\Z")
+
+
+def derive_key(master: bytes, name: str) -> bytes:
+    """The key the Apple derives for gateway `name` from the card's master
+    secret: the first 16 bytes of HMAC(M, "twoegram-gw" || name)
+    (docs/RELAY.md, part 1). Only the Apple holds M; a gateway sees an
+    ordinary device key. Here for the tests, the vectors and the client."""
+    if len(master) != 16:
+        raise ValueError("a master secret is 16 bytes")
+    if not KEY_NAME.match(name):
+        raise ValueError("a key name is 1 to 16 of a-z 0-9 - _")
+    return hmac(master, "twoegram-gw", name)[:16]
+
+
 def device_id(key: bytes) -> str:
     return hashlib.sha256(b"twoegram-id" + key).digest()[:4].hex()
 

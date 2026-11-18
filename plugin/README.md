@@ -33,6 +33,9 @@ openclaw a2 pair "Apple //e"
 ```
 
 `openclaw a2 list` and `openclaw a2 revoke <id>` manage paired Apples.
+`openclaw a2 add "Apple //e"` adds a key the Apple made itself
+(docs/RELAY.md): it asks for the key without showing it, and prints the
+device id to compare with the Apple's.
 
 ## Settings (`channels.a2`)
 

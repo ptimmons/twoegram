@@ -1,7 +1,7 @@
 # Several agents: keys made on the Apple, and the relay
 
-**Status:** planned 2026-11-17, nothing built yet. PLAN.md, "Several
-agents", tracks it.
+**Status:** planned 2026-11-17. K1 built 2026-11-18 (see Milestones).
+PLAN.md, "Several agents", tracks it.
 
 Twoegram holds one gateway and one key at a time. To talk to agents on
 several gateways (Pinchy on claw1, Hermes on the Mac mini, and others
@@ -125,12 +125,14 @@ checked against its space by `memcheck.py` (PLAN.md, b028).
 
 ### `a2 add`, on every server
 
-New in the OpenClaw plugin (1.2.0), the Hermes plugin (1.1.0), the
-stand-alone dev server and the relay:
+Built in K1, in both plugins and both dev servers, and in the relay
+when it comes. The plugins release it with K2, as OpenClaw plugin 1.2.0
+and Hermes plugin 1.1.0:
 
     openclaw a2 add "Apple IIe"
-    Key (from the Apple's set-up, not shown as you type):
-    Added "Apple IIe": device id 5c01e9a2. Check that the Apple shows the same id.
+    Key (from Twoegram's set-up; not shown as you type):
+    Added device 5c01e9a2 (Apple IIe).
+    Check that Twoegram's set-up shows the same device id.
 
 - The key is read from a prompt that does not echo, never from an
   argument, and its check character catches a mistyped key.
@@ -342,7 +344,7 @@ All settled on 2026-11-18:
 
 | | What | Done when |
 |---|---|---|
-| K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` |
+| K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` (**done 2026-11-18**) |
 | K2 | the card's new marks, TWOEGRAM.CFG's gateway list, set-up's screens | host tests pass; tried in Virtual ][ |
 | K3 | on the card | a master, two gateways, switching, the lock, one revoked |
 | R1 | `server.py` split; the Hermes plugin unchanged | its 130 tests pass |

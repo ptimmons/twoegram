@@ -98,6 +98,20 @@ export function parseKey(text: string): Buffer | null {
   return out;
 }
 
+/** A gateway's key name, typed in the Apple's set-up: what its key is
+ * derived from (docs/RELAY.md, part 1). */
+export const KEY_NAME = /^[a-z0-9_-]{1,16}$/;
+
+/** The key the Apple derives for gateway `name` from the card's master
+ * secret: the first 16 bytes of HMAC(M, "twoegram-gw" || name). Only
+ * the Apple holds M; a gateway sees an ordinary device key. Here for the
+ * tests, the vectors and the client. */
+export function deriveKey(master: Buffer, name: string): Buffer {
+  if (master.length !== 16) throw new Error("a master secret is 16 bytes");
+  if (!KEY_NAME.test(name)) throw new Error("a key name is 1 to 16 of a-z 0-9 - _");
+  return hmac(master, "twoegram-gw", name).subarray(0, 16);
+}
+
 export function deviceId(key: Buffer): string {
   return createHash("sha256").update("twoegram-id").update(key).digest().subarray(0, 4).toString("hex");
 }

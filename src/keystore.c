@@ -67,6 +67,30 @@ uint8_t ks_save(const uint8_t key[A2_KEY_LEN], uint8_t mark)
     return rc;
 }
 
+/* In the language card, with the lock (lock.c): it runs only at the
+ * start, on a gateway chosen in set-up, and after unlocking. Its parts
+ * are written as it runs, so they stay in main memory's DATA. */
+#ifdef __CC65__
+#pragma code-name (push, "LC")
+#pragma rodata-name (push, "LC")
+#endif
+uint8_t ks_derive(const uint8_t master[A2_KEY_LEN], const char *name, uint8_t key[A2_KEY_LEN])
+{
+    static cogs_part_t p[2] = { { (const uint8_t *)"twoegram-gw", 11 } };
+    uint8_t rc;
+
+    COGS_PART(p[1], name, strlen(name));
+    /* blob is idle here (only ks_load and ks_save use it, and wipe it). */
+    rc = hmac_parts(master, A2_KEY_LEN, p, 2, blob);
+    memcpy(key, blob, A2_KEY_LEN);
+    memset(blob, 0, 32);
+    return rc;
+}
+#ifdef __CC65__
+#pragma rodata-name (pop)
+#pragma code-name (pop)
+#endif
+
 uint8_t ks_clear(void)
 {
     uint8_t n, rc = cogs_prefs_get(blob, &n);

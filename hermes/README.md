@@ -67,6 +67,14 @@ On the machine running Hermes:
    set-up (Open-Apple-K). There is no need to restart the gateway: a
    device paired or revoked takes effect at its next request.
 
+Or, once the Apple makes its own keys (docs/RELAY.md, part 1), add
+the key its set-up shows. It is asked for, not shown as you type, and
+the device id printed should match the Apple's:
+
+```bash
+hermes a2 add "Apple IIe"
+```
+
 To check and manage devices:
 
 ```bash
@@ -116,7 +124,7 @@ Files:
 | `twoegram/store.py` | the device and conversation files |
 | `twoegram/server.py` | the `/a2/` endpoints, and a small HTTP/1.1 listener |
 | `twoegram/adapter.py` | the Hermes platform adapter and its registration |
-| `twoegram/cli.py` | `hermes a2 pair`, `list` and `revoke` |
+| `twoegram/cli.py` | `hermes a2 pair`, `add`, `list` and `revoke` |
 | `twoegram/echo.py` | the echo agent, for the tests and the dev server |
 
 ## Development

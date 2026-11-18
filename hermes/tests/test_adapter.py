@@ -19,7 +19,8 @@ from gateway.session import SessionSource  # noqa: E402
 
 from twoegram import adapter as ad  # noqa: E402
 from twoegram import cli  # noqa: E402
-from twoegram.protocol import Code, parse_key  # noqa: E402
+from twoegram.protocol import Code, derive_key, device_id, format_key, parse_key  # noqa: E402
+from twoegram.store import DeviceStore  # noqa: E402
 
 from test_server import Client  # noqa: E402
 
@@ -96,6 +97,34 @@ def test_cli_pairs_lists_and_revokes(home):
     assert cli.dispatch(argparse.Namespace(a2_command="revoke", id=dev), out=out.append) == 0
     assert out == [f"revoked {dev}"]
     assert cli.dispatch(argparse.Namespace(a2_command="revoke", id=dev), out=out.append) == 1
+
+
+def test_cli_adds_a_key_made_by_the_apple(home):
+    master = bytes(range(16))
+    key = derive_key(master, "mini")
+    asked, out = [], []
+
+    def typed(text):
+        return lambda prompt: (asked.append(prompt), text)[1]
+
+    args = argparse.Namespace(a2_command="add", name="Apple IIe")
+    assert cli.dispatch(args, out=out.append, read_key=typed(format_key(key).lower())) == 0
+    assert asked == [cli.ADD_PROMPT]
+    assert device_id(key) in out[0] and format_key(key) not in "\n".join(out)
+    store = DeviceStore(home / "platforms" / "a2" / "devices.json")
+    assert store.get(device_id(key)).key == key
+    assert (home / "platforms" / "a2" / "devices.json").stat().st_mode & 0o777 == 0o600
+    out = []
+    assert cli.dispatch(args, out=out.append, read_key=typed(format_key(key))) == 1
+    assert "paired already" in out[0]
+    w = format_key(derive_key(master, "relay"))
+    slip = w[:2] + ("Z" if w[2] != "Z" else "Y") + w[3:]
+    out = []
+    assert cli.dispatch(args, out=out.append, read_key=typed(slip)) == 1
+    assert "not a key" in out[0] and len(store.list()) == 1
+    parser = argparse.ArgumentParser()
+    cli.setup(parser)
+    assert parser.parse_args(["add", "Den"]).name == "Den"
 
 
 async def test_hello_lists_hermes(running):

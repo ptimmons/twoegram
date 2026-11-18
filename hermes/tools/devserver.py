@@ -3,6 +3,7 @@ against it without Hermes (as plugin/src/dev-server.ts is for the TypeScript).
 
     python3 hermes/tools/devserver.py [--port 8417] [--store .dev-py] [--seed N]
     python3 hermes/tools/devserver.py --store .dev-py pair
+    python3 hermes/tools/devserver.py --store .dev-py add    (a key made by the Apple, asked for)
 
 Standard library only.
 """
@@ -38,12 +39,19 @@ def main():
     ap.add_argument("--port", type=int, default=8417)
     ap.add_argument("--store", default=".dev-py")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("cmd", nargs="?", choices=["pair"])
+    ap.add_argument("cmd", nargs="?", choices=["pair", "add"])
     a = ap.parse_args()
     if a.cmd == "pair":
         dev, written = DeviceStore(Path(a.store) / "devices.json").pair("dev")
         print(written)
         return
+    if a.cmd == "add":
+        import getpass
+        from twoegram.protocol import parse_key
+        key = parse_key(getpass.getpass("Key (not shown as you type): "))
+        dev = key and DeviceStore(Path(a.store) / "devices.json").add(key, "dev")
+        print(f"added {dev.id}" if dev else "not a key, or paired already")
+        raise SystemExit(0 if dev else 1)
     asyncio.run(serve(a))
 
 

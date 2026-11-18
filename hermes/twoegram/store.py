@@ -86,6 +86,20 @@ class DeviceStore:
         self._save()
         return dev, format_key(key)
 
+    def add(self, key: bytes, name: str = "") -> Optional[Device]:
+        """A device whose key was made elsewhere (by the Apple, from its master
+        secret) and typed here; None if that key is paired already."""
+        self._fresh()
+        if len(key) != 16:
+            raise ValueError("a device key is 16 bytes")
+        if device_id(key) in self._devices:
+            return None
+        created = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        dev = Device(device_id(key), bytes(key), name or "Apple //e", created)
+        self._devices[dev.id] = dev
+        self._save()
+        return dev
+
     def revoke(self, ident: str) -> bool:
         self._fresh()
         had = self._devices.pop(ident, None) is not None

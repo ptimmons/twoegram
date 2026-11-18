@@ -955,6 +955,27 @@ static void test_keystore(void)
     CHECK(ks_save(key, KS_MARK) == 0);
 }
 
+/* Keys derived from a master secret, against hermes/tests/vectors.json
+ * (made by plugin/src/protocol.ts). */
+static void test_derive(void)
+{
+    uint8_t m[16], key[16], want[16];
+
+    memset(m, 0, 16);
+    CHECK(ks_derive(m, "claw1", key) == 0);
+    unhex(want, "ec5ccb24f4d7d986e188145c1209bdc9");
+    CHECK(!memcmp(key, want, 16));
+    CHECK(ks_derive(m, "mini", key) == 0);
+    unhex(want, "bc17fcd00870e63cda45b6b02e7f96cb");
+    CHECK(!memcmp(key, want, 16));
+    unhex(m, "02712ac6f01d37ac0b4bba10e3691a65");
+    CHECK(ks_derive(m, "relay", key) == 0);
+    unhex(want, "ef5abd85988b6fd93a9108ecf1761be0");
+    CHECK(!memcmp(key, want, 16));
+    /* In place, over the master itself. */
+    CHECK(ks_derive(m, "relay", m) == 0 && !memcmp(m, want, 16));
+}
+
 static void test_config(void)
 {
     char text[200];
@@ -1071,6 +1092,7 @@ int main(void)
     test_prefs();
     test_session();
     test_keystore();
+    test_derive();
     test_config();
     test_history();
     printf("a2: %d checks, %d failed (%u hashes on the model card)\n", checks, fails, hashes);

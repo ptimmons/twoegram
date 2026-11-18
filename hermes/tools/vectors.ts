@@ -7,6 +7,7 @@
 
 import { createHash } from "node:crypto";
 import {
+  deriveKey,
   deviceId,
   formatKey,
   helloMac,
@@ -53,6 +54,15 @@ const signing = keys.slice(0, 6).map((key, i) => {
     hello: helloMac(sk, payload).toString("hex"),
   };
 });
+
+// Keys the Apple derives from its master secret (docs/RELAY.md, part 1).
+const keyNames = ["claw1", "mini", "relay", "a", "0123456789abcdef", "my-gw_2"];
+const derived = keys.slice(0, 5).flatMap((m, i) =>
+  keyNames.slice(i % 2, i % 2 + 3).map((name) => {
+    const k = deriveKey(m, name);
+    return { master: m.toString("hex"), name, key: k.toString("hex"), written: formatKey(k), id: deviceId(k) };
+  }),
+);
 
 const records = [
   { n: 1, mine: true, time: "09:05", text: "hi" },
@@ -127,6 +137,7 @@ process.stdout.write(
   JSON.stringify(
     {
       keys: keys.map((k) => ({ key: k.toString("hex"), written: formatKey(k), id: deviceId(k) })),
+      derived,
       signing,
       records,
       replies,

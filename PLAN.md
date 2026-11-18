@@ -1306,3 +1306,41 @@ direct mode and leave the protocol unchanged.
 - **Decided 2026-11-18:** key names typed in set-up; Ubuntu LTS on
   the LXC; a suffix for clashing agent ids; and set-up no longer takes a typed
   key, to save room (RELAY.md, "Decisions").
+
+### K1: keys derived from a master (2026-11-18)
+
+The servers' half of RELAY.md part 1, and the Apple's derivation. The
+Apple's set-up does not use it yet (K2).
+
+- **`deriveKey` / `derive_key` / `ks_derive`** in TypeScript, Python and
+  C: the first 16 bytes of HMAC(M, "twoegram-gw" || name), names
+  1 to 16 of `a-z 0-9 - _`. `hermes/tests/vectors.json` gains 15 derived
+  keys made by the TypeScript, which the Python, `tools/a2client.py`
+  (written separately) and the Apple's host tests all match.
+- **`a2 add [name]`** in the OpenClaw plugin, the Hermes plugin, and both
+  dev servers. The key is read at a prompt that does not echo (from
+  stdin when piped), never from an argument. A key that does not check,
+  or is paired already, adds nothing. The device id is printed so it can
+  be compared with the Apple's screen. What it adds is exactly what
+  `pair` makes, so `list` and `revoke` are unchanged.
+- **`tools/a2client.py --master <hex> --name <g>`** acts as an Apple
+  with a master. Its `key` command prints the derived key, for piping
+  into `a2 add`.
+- **On the Apple:** `ks_derive` is in the language card beside the lock.
+  It uses the prefs buffer, which is idle then, for the HMAC, and wipes
+  it afterwards. In main memory it would have cost 178 bytes of heap.
+  There it costs 21: heap 2,441 bytes, from 2,462. Nothing calls it yet.
+- **Versions unchanged.** The OpenClaw plugin stays 1.1.0 and the Hermes
+  plugin 1.0.0 until K2, since nothing can use `add` before the Apple
+  makes keys. They go out together as 1.2.0 and 1.1.0.
+- **Tests:** 75 TypeScript (a new `commands.test.ts`: add, a mistyped key,
+  a key paired twice, list and revoke after add; the derivation against
+  an independent HMAC), 147 Python (the vectors, names refused, `hermes
+  a2 add` in Hermes's own CLI registration), and host tests all passing
+  (a2: 1,131 checks).
+- **A round trip with no Apple.** A random test master made a `claw1` key
+  and a `mini` key. Each was piped into `add` at one dev server: the
+  TypeScript one and the Python one, started with no provider keys. Each
+  key then signed in at its own server, and only there: the `mini` key
+  at the TypeScript server got UNKNOWN_DEVICE. A message went through
+  and came back.

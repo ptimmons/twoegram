@@ -37,6 +37,13 @@ uint8_t ks_save(const uint8_t key[A2_KEY_LEN], uint8_t mark);
 #define PASS_ROUNDS 64
 uint8_t ks_scramble(uint8_t key[A2_KEY_LEN], const char *pass, uint8_t n);
 
+/* The key for the gateway named name (1 to KS_NAME_MAX of a-z 0-9 - _,
+ * checked by the caller) from the master secret: the first 16 bytes of
+ * HMAC(master, "twoegram-gw" || name), docs/RELAY.md part 1. 0 or a card
+ * code. key may be master itself. */
+#define KS_NAME_MAX 16
+uint8_t ks_derive(const uint8_t master[A2_KEY_LEN], const char *name, uint8_t key[A2_KEY_LEN]);
+
 /* Remove the key, leaving the card's own settings as they were. */
 uint8_t ks_clear(void);
 

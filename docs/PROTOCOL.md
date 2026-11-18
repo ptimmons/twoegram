@@ -34,6 +34,18 @@ of five with hyphens:
 On entry, hyphens and spaces are ignored, lowercase is uppercase, `O` is
 `0`, and `I` and `L` are `1` (`U` appears only as a check character).
 
+**A key made by the Apple** (docs/RELAY.md, part 1). The card may
+instead hold a master secret M, 16 random bytes that never leave it.
+The Apple then derives a key for each gateway from the gateway's **key
+name** *g*, 1 to 16 of `a-z 0-9 - _`, typed in set-up:
+
+    K(g) = the first 16 bytes of HMAC-SHA256(M, "twoegram-gw" || g)
+
+The Apple shows K(g) in the written form above, and `openclaw a2 add`
+(or `hermes a2 add`) takes it at a prompt that does not echo. To a
+gateway it is an ordinary device key: nothing below changes, and a
+gateway cannot tell how a key was made.
+
 **Device id:** the first 4 bytes of SHA-256(`"twoegram-id"` || key), as
 8 lowercase hex digits. Both sides derive it; nobody types it.
 

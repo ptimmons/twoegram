@@ -11,6 +11,14 @@ the two check each other.
     a2client.py ... chat main                              (type lines; Ctrl-D ends)
 
 The key can also come from the A2_KEY environment variable.
+
+Or, as the Apple does with a master secret (docs/RELAY.md, part 1):
+
+    a2client.py --master <32 hex> --name claw1 key     (the key to give `a2 add`)
+    a2client.py --master <32 hex> --name claw1 hello
+
+A2_MASTER and A2_NAME work too. Use a test master only: `key` prints the
+derived key, as the Apple's set-up would show it.
 """
 import argparse
 import hashlib
@@ -38,6 +46,21 @@ def parse_key(text):
         raise SystemExit("the key does not check: a typing slip?")
     bits = "".join(f"{v:05b}" for v in vals)[:128]
     return int(bits, 2).to_bytes(16, "big")
+
+
+def format_key(key):
+    n = int.from_bytes(key, "big") << 2       # 128 bits and 2 zero bits
+    vals = [(n >> (5 * (25 - i))) & 31 for i in range(26)]
+    s = "".join(ALPHABET[v] for v in vals) + CHECK[sum((i + 1) * v for i, v in enumerate(vals)) % 37]
+    return "-".join(s[i:i + 5] for i in range(0, 27, 5))
+
+
+def derive_key(master, name):
+    if len(master) != 16:
+        raise SystemExit("a master secret is 32 hex digits")
+    if not (1 <= len(name) <= 16 and all(c in "abcdefghijklmnopqrstuvwxyz0123456789-_" for c in name)):
+        raise SystemExit("a key name is 1 to 16 of a-z 0-9 - _")
+    return mac(master, "twoegram-gw", name)[:16]
 
 
 def mac(key, *parts):
@@ -159,12 +182,26 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--url", default=os.environ.get("A2_URL", "http://127.0.0.1:8417"))
     ap.add_argument("--key", default=os.environ.get("A2_KEY"))
-    ap.add_argument("cmd", choices=["hello", "send", "poll", "hist", "chat"])
+    ap.add_argument("--master", default=os.environ.get("A2_MASTER"))
+    ap.add_argument("--name", default=os.environ.get("A2_NAME"))
+    ap.add_argument("cmd", choices=["key", "hello", "send", "poll", "hist", "chat"])
     ap.add_argument("args", nargs="*")
     a = ap.parse_args()
-    if not a.key:
-        raise SystemExit("give --key or set A2_KEY")
-    c = Client(a.url, parse_key(a.key))
+    if a.master:
+        if not a.name:
+            raise SystemExit("a master needs --name, the gateway's key name")
+        try:
+            key = derive_key(bytes.fromhex(a.master), a.name)
+        except ValueError:
+            raise SystemExit("a master secret is 32 hex digits")
+    elif a.key:
+        key = parse_key(a.key)
+    else:
+        raise SystemExit("give --key or --master (or set A2_KEY or A2_MASTER)")
+    if a.cmd == "key":
+        print(format_key(key))
+        return
+    c = Client(a.url, key)
 
     if a.cmd == "hello":
         d = c.hello()

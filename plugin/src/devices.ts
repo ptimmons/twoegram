@@ -63,6 +63,18 @@ export class DeviceStore {
     return { device, written: formatKey(key) };
   }
 
+  /** A device whose key was made elsewhere (by the Apple, from its
+   * master secret) and typed here; null if that key is paired already. */
+  add(key: Buffer, name: string): Device | null {
+    this.fresh();
+    if (key.length !== 16) throw new Error("a device key is 16 bytes");
+    if (this.devices.has(deviceId(key))) return null;
+    const device = { id: deviceId(key), key: Buffer.from(key), name: name || "Apple //e", created: new Date().toISOString() };
+    this.devices.set(device.id, device);
+    this.save();
+    return device;
+  }
+
   revoke(id: string): boolean {
     this.fresh();
     const had = this.devices.delete(id);
