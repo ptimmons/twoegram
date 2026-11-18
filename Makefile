@@ -85,7 +85,7 @@ $(shell mkdir -p build; t='#define BUILD_ID "$(BUILD_ID)"'; [ "$$(cat build/buil
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk release run shots convo-shots charset host-test hermes-sdk hermes-test hermes-vectors clean
+.PHONY: all disk release run shots convo-shots charset host-test hermes-sdk hermes-test hermes-vectors relay-test relay-dist clean
 
 all: $(BIN) $(PRBIN)
 
@@ -260,6 +260,24 @@ hermes-sdk:
 
 hermes-test:
 	cd hermes && ../$(HERMES_PY) -m pytest -q -p no:cacheprovider
+
+# The relay (relay/, docs/RELAY.md). Its tests run in the Hermes test
+# environment (pytest), but need nothing of Hermes. relay-dist: one folder
+# for the LXC, with the modules it shares with the Hermes plugin copied in.
+RELAY_VERSION := $(shell sed -n 's/^VERSION = "\(.*\)"/\1/p' relay/twoegram_relay/__init__.py)
+RELAY_SHARED   = __init__.py protocol.py store.py server.py text.py tables.py
+
+relay-test:
+	cd relay && ../$(HERMES_PY) -m pytest -q -p no:cacheprovider
+
+relay-dist:
+	rm -rf build/twoegram-relay build/twoegram-relay-$(RELAY_VERSION).tgz
+	mkdir -p build/twoegram-relay/twoegram build/twoegram-relay/twoegram_relay
+	cp relay/twoegram-relay relay/install.sh relay/twoegram-relay.service relay/README.md build/twoegram-relay/
+	cp relay/twoegram_relay/*.py build/twoegram-relay/twoegram_relay/
+	cd hermes/twoegram && cp $(RELAY_SHARED) ../../build/twoegram-relay/twoegram/
+	cd build && COPYFILE_DISABLE=1 tar -czf twoegram-relay-$(RELAY_VERSION).tgz --uid 0 --gid 0 twoegram-relay
+	@echo "==> build/twoegram-relay-$(RELAY_VERSION).tgz"
 
 hermes-vectors:
 	node hermes/tools/vectors.ts > hermes/tests/vectors.json

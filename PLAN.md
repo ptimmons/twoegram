@@ -1400,3 +1400,59 @@ The Apple's half of RELAY.md part 1. Not yet on the card (K3: PROBE.md,
     Keys pasted quickly are dropped, since the //e holds one key at a
     time; shots.sh now types one at a time. Screenshots retaken.
 
+
+### R1 and R2: the relay (2026-11-18, relay 0.1.0)
+
+RELAY.md part 2, up to what can run without your LXC. Not yet on a
+container (R3) or the card (R4).
+
+- **R1:** `hermes/twoegram/server.py` is now two layers.
+  - `A2Session`: hello, sessions, signatures, lockouts. It has hooks
+    for the agent list (`agent_ids`), their names (`agent_label`), the
+    endpoint (`endpoint`) and `hello_done`.
+  - `A2Server(A2Session)`: the conversations, as before.
+  - The Hermes plugin's tests pass unchanged.
+- **R2:** `relay/`, standard library Python 3.11+.
+  - `Upstream` is an a2 client with two keep-alive sessions per gateway
+    (poll, and everything else). It says hello again on NO_SESSION or
+    REPLAY, or after 25 idle minutes, and checks every reply's signature.
+  - `RelayServer(A2Session)` passes send, poll and hist through:
+    - the Apple's 4 s poll waits 3 s upstream;
+    - the gateway's message numbers and folded text are kept;
+    - poll payloads get relay ids in their `unread` lines, and other
+      gateways' counts from a quiet poll every 20 s (only while an Apple
+      was heard from in the last 10 minutes);
+    - a payload is trimmed to MAX_PAYLOAD (with `more 1`) when the added
+      lines would not fit.
+  - Clashing ids get the gateway's name (`main-mini`), or an alias; at
+    most 8 agents are listed.
+  - A gateway down, or refusing the relay's key, is a signed BAD_REQUEST
+    whose why names it. UNKNOWN_AGENT upstream refreshes the agent list.
+  - CLI: `serve`, `pair`, `add`, `list`, `revoke`, and `upstream add
+    | list | remove`. Keys are asked for at a prompt and never printed.
+  - `install.sh` and a sandboxed systemd unit for the LXC.
+    `make relay-dist` builds `build/twoegram-relay-0.1.0.tgz`.
+- **Tests:**
+  - `make relay-test`: 15 tests with two real a2 servers with echo
+    agents and the Apple-like client of the Hermes tests. They cover:
+    - one list, clashes and aliases;
+    - send and answer through each gateway;
+    - history and numbers passing through;
+    - unread from the other gateway, and relay ids in a gateway's own
+      unread lines;
+    - a gateway down and back, the relay revoked at a gateway, a gateway
+      forgetting its sessions, and an agent gone;
+    - the Apple's own checks, long polls waking, and trimming;
+    - the CLI.
+  - End to end from the unpacked tarball, with `python3 -I` and clean
+    environments, the TypeScript dev server and the Python dev server
+    as gateways, and `tools/a2client.py --master` as the Apple, added
+    with `twoegram-relay add`:
+    - the merged list;
+    - messages through both gateways;
+    - a gateway stopped and started;
+    - the relay revoked at a gateway;
+    - a relay restart.
+  - macOS's Python 3.9 failed there: an asyncio lock was made outside a
+    running loop. The locks are now made where they are used, and the
+    script refuses Pythons older than 3.11.

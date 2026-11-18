@@ -8,8 +8,9 @@ and build. The detailed checklists stay in [PROBE.md](PROBE.md).
 ## Waiting
 
 One disk covers all of this: `build/TWOEGRAM-b037.po` (or later), with
-plugin 1.2.0 (`build/openclaw-twoegram-1.2.0.tgz`) on claw1 and the
-Hermes plugin 1.1.0 on the Mac mini. b037 keeps working with the key now
+plugin 1.2.0 (`build/openclaw-twoegram-1.2.0.tgz`) on claw1, the
+Hermes plugin 1.1.0 on the Mac mini, and for item 2 the relay
+(`build/twoegram-relay-0.1.0.tgz`) on a new LXC. b037 keeps working with the key now
 on the card, so the older items can be tried before item 1.
 
 ### 1. Keys made on the Apple (K2, b037, built 2026-11-18)
@@ -27,7 +28,33 @@ gateways first (listed there).
   (this replaces b034's check, which needed a typed key).
 - **The old key** on the card works with b037 until replaced.
 
-### 2. Twoegram on Hermes Agent (plugin 1.0.0 installed, built 2026-11-17)
+### 2. The relay on a Proxmox LXC (R3 and R4, relay 0.1.0, built 2026-11-18)
+
+Steps: [relay/README.md](../relay/README.md), "On a Proxmox LXC", with
+`build/twoegram-relay-0.1.0.tgz` (`make relay-dist`). Best after item
+1, since the Apple adds its key to the relay the same way. It needs you
+to make the container: unprivileged Ubuntu LTS, with a fixed address.
+
+- **install.sh** on the container: the user, the folders (mode 0700),
+  the systemd unit.
+- **Each gateway:** `openclaw a2 pair "relay"` on claw1 and `hermes a2
+  pair "relay"` on the mini, then `upstream add` on the container. Both
+  say "answering" in `upstream list`.
+- **The service** starts, and its log lists Pinchy's and Hermes's agents.
+- **The Apple:** key name `relay`, the container's address, Open-Apple-V,
+  then `twoegram-relay add`. One list: claw1's agents first, then the
+  mini's (`hermes`).
+- **Pinchy and Hermes in one session.** Send to each, and switch between
+  them. Do the unread marks show for the one you're not in? They come
+  within about 20 seconds.
+- **The firewall:** from another machine on the LAN, port 8417 on the
+  container is refused. The Apple still gets through.
+- **A gateway down:** stop the mini's gateway. Hermes gives a note,
+  "mini is not answering", and Pinchy still works. Start it again.
+- **The note on the Apple:** how a relay's BAD_REQUEST note reads on the
+  screen (`link.c` shows it, but its wording is untried on the card).
+
+### 3. Twoegram on Hermes Agent (plugin 1.0.0 installed, built 2026-11-17)
 
 Installed on the Mac mini on 2026-11-17 (Hermes v0.23.2): the plugin
 is enabled, `platforms.a2.enabled: true` is set, and the gateway listens
@@ -59,7 +86,7 @@ Then check:
 - **Busy:** the Apple shows Hermes working until the answer comes.
 - **The new words** (b036): the splash and set-up's help.
 
-### 3. Saving the conversation (b033, built 2026-11-17)
+### 4. Saving the conversation (b033, built 2026-11-17)
 
 Steps: PROBE.md, "Build b033".
 
@@ -69,7 +96,7 @@ Steps: PROBE.md, "Build b033".
 - **Esc** partway stops it and says how much was saved.
 - **A network disk:** writable, or not.
 
-### 4. The rest of the lock (b028, built 2026-11-16)
+### 5. The rest of the lock (b028, built 2026-11-16)
 
 Steps: PROBE.md, "Build b028", steps 4 and 5. Setting a passphrase,
 the lock and Open-Apple-P passed on 2026-11-17; these were not
@@ -79,7 +106,7 @@ mentioned:
 - **A fresh start** asks for the passphrase; a wrong one is caught by the
   gateway and asked again.
 
-### 5. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
+### 6. Straight to the start, scroll arrows, narrower list (b023, built 2026-11-16)
 
 Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
 
@@ -96,7 +123,7 @@ Steps: PROBE.md, "Build b023" (the b028 disk carries it too).
   a diamond and no count.
 - **The gap:** text stops one column before the arrows.
 
-### 6. Older items, not yet seen
+### 7. Older items, not yet seen
 
 - **The key-save error message** (b017). If the card cannot keep the
   key, set-up says "The key could not be kept on the card:" and the

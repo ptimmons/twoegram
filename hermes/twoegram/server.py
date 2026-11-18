@@ -1,11 +1,18 @@
-"""The /a2 endpoints (docs/PROTOCOL.md): sessions, signatures, lockouts, and
-each device's conversations.
+"""The /a2 endpoints (docs/PROTOCOL.md), in two layers.
 
-A port of plugin/src/server.ts. What answers is behind `Agents`: inside Hermes
-the adapter (adapter.py), in the tests the echo agent. Unlike the
-TypeScript, an answer does not come back through the delivery call: the
-agent hands it over later with `post()`, and says whether it is working with
-`set_busy()`, which is how Hermes delivers.
+`A2Session`: the hello, sessions, signatures and lockouts. Once a request is
+known to be genuine it hands it to three hooks: the agents to list, what each
+calls itself, and the endpoint (send, poll, hist) that makes the payload.
+
+`A2Server`: those hooks over each device's conversations, a port of
+plugin/src/server.ts. What answers is behind `Agents`: inside Hermes the
+adapter (adapter.py), in the tests the echo agent. Unlike the TypeScript, an
+answer does not come back through the delivery call: the agent hands it over
+later with `post()`, and says whether it is working with `set_busy()`, which
+is how Hermes delivers.
+
+The relay (relay/, docs/RELAY.md) is the other user of `A2Session`: its
+endpoints pass requests through to other gateways.
 """
 
 from __future__ import annotations
@@ -87,22 +94,38 @@ def hhmm(ms: float) -> str:
     return time.strftime("%H:%M", time.localtime(ms / 1000))
 
 
-class A2Server:
-    def __init__(self, devices: DeviceStore, agents: Agents, *, convs: Optional[ConvStore] = None,
-                 now: Callable[[], float] = _ms, log: Callable[[str], None] = lambda line: None,
-                 ident: str = "", seed: int = 0):
+class A2Session:
+    """Sessions, signatures and lockouts; subclasses supply the agents and the
+    endpoints."""
+
+    def __init__(self, devices: DeviceStore, *, now: Callable[[], float] = _ms,
+                 log: Callable[[str], None] = lambda line: None, ident: str = ""):
         self.devices = devices
-        self.agents = agents
-        self.convs = convs or ConvStore(None)
         self.now = now
         self.log = log
         self.ident = ident
-        self.seed = seed
         self._sessions: dict[str, _Session] = {}
-        self._convs: dict[str, _Conversation] = {}
-        self._waiters: dict[str, set[asyncio.Future]] = {}        # by device
         self._device_fails: dict[str, tuple[list[float], float]] = {}
         self._ip_refusals: dict[str, list[float]] = {}             # [count, start, until]
+
+    # ---- the hooks ----
+
+    def agent_ids(self) -> list[str]:
+        """The agents a hello lists, by the ids requests use."""
+        raise NotImplementedError
+
+    def agent_label(self, agent: str) -> Optional[str]:
+        """What an agent calls itself, if anything."""
+        return None
+
+    async def endpoint(self, device: str, agent: str, path: str, method: str, q: dict,
+                       body: bytes) -> bytes:
+        """The payload of a genuine request to an agent that agent_ids() lists.
+        Raise Refusal for anything else; it is signed and sent."""
+        raise NotImplementedError
+
+    def hello_done(self, device: str) -> None:
+        """Called after each good hello."""
 
     # ---- the handler ----
 
@@ -159,16 +182,11 @@ class A2Server:
         s.last_used = now
         try:
             agent = _one(q, "a") or ""
-            if agent not in self.agents.agents():
+            if agent not in self.agent_ids():
                 raise Refusal(Code.UNKNOWN_AGENT, "no such agent")
-            if url.path == "/a2/send" and req.method == "POST":
-                payload = await self._send(s.device, agent, req.body)
-            elif url.path == "/a2/poll" and req.method == "GET":
-                payload = await self._poll(s.device, agent, q)
-            elif url.path == "/a2/hist" and req.method == "GET":
-                payload = self._hist(s.device, agent, q)
-            else:
+            if (url.path, req.method) not in (("/a2/send", "POST"), ("/a2/poll", "GET"), ("/a2/hist", "GET")):
                 raise Refusal(Code.BAD_REQUEST, "no such request")
+            payload = await self.endpoint(s.device, agent, url.path, req.method, q, req.body)
             return signed(Code.OK, payload)
         except Refusal as e:
             return signed(e.code, f"why {e.why}\n".encode("latin-1"))
@@ -202,14 +220,15 @@ class A2Server:
             self._sessions.pop(mine.pop(0).sid, None)
 
         lines = [f"sid {sid}", f"sn {sn.hex()}", f"ver {VERSION}", f"time {int(now // 1000)}"]
-        agents = self.agents.agents()
+        agents = self.agent_ids()
         lines += [f"agent {a}" for a in agents]
         for a in agents:
-            label = display_label(self.agents.display_name(a))
+            label = display_label(self.agent_label(a))
             if label and label != a:
                 lines.append(f"name {a} {label}")
         payload = ("\n".join(lines) + "\n" + self._server_line()).encode("latin-1")
         self.log(f"a2: hello from {dev.name} ({ident}) at {ip}")
+        self.hello_done(ident)
         return reply(Code.OK, hello_mac(s.sk, payload), payload)
 
     def _server_line(self) -> str:
@@ -220,6 +239,69 @@ class A2Server:
         for x in list(self._sessions.values()):
             if x.device == device:
                 self._sessions.pop(x.sid, None)
+
+    # ---- lockouts ----
+
+    def _refuse(self, ip: str, code: int, why: str, counts: bool) -> Refusal:
+        if counts:
+            now = self.now()
+            r = self._ip_refusals.get(ip) or [0, now, 0]
+            if now - r[1] > IP_WINDOW_MS:
+                r[0], r[1] = 0, now
+            r[0] += 1
+            if r[0] >= IP_REFUSALS:
+                r[2] = now + IP_BLOCK_MS
+                self.log(f"a2: blocking {ip} for {IP_BLOCK_MS // 60_000} minutes")
+            self._ip_refusals[ip] = r
+        return Refusal(code, why)
+
+    def _ip_check(self, ip: str, now: float) -> None:
+        r = self._ip_refusals.get(ip)
+        if r and r[2] > now:
+            raise Refusal(Code.LOCKED, "address blocked")
+
+    def _device_fail(self, ident: str, now: float) -> None:
+        times, until = self._device_fails.get(ident, ([], 0))
+        times = [t for t in times if now - t < DEVICE_WINDOW_MS] + [now]
+        if len(times) >= DEVICE_FAILS:
+            until = now + DEVICE_LOCK_MS
+            times = []
+            self.log(f"a2: locking device {ident} for {DEVICE_LOCK_MS // 60_000} minutes")
+        self._device_fails[ident] = (times, until)
+
+    def _device_check(self, ident: str, now: float) -> None:
+        f = self._device_fails.get(ident)
+        if f and f[1] > now:
+            raise Refusal(Code.LOCKED, "device locked")
+
+
+
+class A2Server(A2Session):
+    """Each device's conversations with agents behind `Agents`."""
+
+    def __init__(self, devices: DeviceStore, agents: Agents, *, convs: Optional[ConvStore] = None,
+                 now: Callable[[], float] = _ms, log: Callable[[str], None] = lambda line: None,
+                 ident: str = "", seed: int = 0):
+        super().__init__(devices, now=now, log=log, ident=ident)
+        self.agents = agents
+        self.convs = convs or ConvStore(None)
+        self.seed = seed
+        self._convs: dict[str, _Conversation] = {}
+        self._waiters: dict[str, set[asyncio.Future]] = {}        # by device
+
+    def agent_ids(self) -> list[str]:
+        return self.agents.agents()
+
+    def agent_label(self, agent: str) -> Optional[str]:
+        return self.agents.display_name(agent)
+
+    async def endpoint(self, device: str, agent: str, path: str, method: str, q: dict,
+                       body: bytes) -> bytes:
+        if path == "/a2/send":
+            return await self._send(device, agent, body)
+        if path == "/a2/poll":
+            return await self._poll(device, agent, q)
+        return self._hist(device, agent, q)
 
     # ---- the conversation ----
 
@@ -345,40 +427,6 @@ class A2Server:
         before = _int(q, "before", c.next)
         older = [m for m in c.msgs if m.n < before]
         return _pack([], older[-k:], True, len(older))
-
-    # ---- lockouts ----
-
-    def _refuse(self, ip: str, code: int, why: str, counts: bool) -> Refusal:
-        if counts:
-            now = self.now()
-            r = self._ip_refusals.get(ip) or [0, now, 0]
-            if now - r[1] > IP_WINDOW_MS:
-                r[0], r[1] = 0, now
-            r[0] += 1
-            if r[0] >= IP_REFUSALS:
-                r[2] = now + IP_BLOCK_MS
-                self.log(f"a2: blocking {ip} for {IP_BLOCK_MS // 60_000} minutes")
-            self._ip_refusals[ip] = r
-        return Refusal(code, why)
-
-    def _ip_check(self, ip: str, now: float) -> None:
-        r = self._ip_refusals.get(ip)
-        if r and r[2] > now:
-            raise Refusal(Code.LOCKED, "address blocked")
-
-    def _device_fail(self, ident: str, now: float) -> None:
-        times, until = self._device_fails.get(ident, ([], 0))
-        times = [t for t in times if now - t < DEVICE_WINDOW_MS] + [now]
-        if len(times) >= DEVICE_FAILS:
-            until = now + DEVICE_LOCK_MS
-            times = []
-            self.log(f"a2: locking device {ident} for {DEVICE_LOCK_MS // 60_000} minutes")
-        self._device_fails[ident] = (times, until)
-
-    def _device_check(self, ident: str, now: float) -> None:
-        f = self._device_fails.get(ident)
-        if f and f[1] > now:
-            raise Refusal(Code.LOCKED, "device locked")
 
 
 # ---- helpers ----

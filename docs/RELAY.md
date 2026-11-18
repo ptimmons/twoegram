@@ -1,7 +1,8 @@
 # Several agents: keys made on the Apple, and the relay
 
-**Status:** planned 2026-11-17. K1 and K2 built 2026-11-18; K3 is the
-card test (see Milestones).
+**Status:** planned 2026-11-17. Built 2026-11-18: K1, K2 (b037), R1
+and R2 (`relay/`, 0.1.0). Waiting: K3 (the card), R3 (your LXC) and R4
+(the card through the relay); see Milestones.
 PLAN.md, "Several agents", tracks it.
 
 Twoegram holds one gateway and one key at a time. To talk to agents on
@@ -234,6 +235,27 @@ conversations through the relay start empty. What you said to Pinchy
 from the Apple directly stays with that direct pairing, and you can
 still reach it there.
 
+### As built (R2)
+
+- **The quiet poll's starting point.** Before the Apple has polled an
+  agent through the relay, the relay does not know what the Apple has
+  seen there. It asks for that agent's newest message (`hist`, which
+  marks nothing as seen) and counts only what arrives after it. The
+  gateway's own `unread` lines, for its other agents, are exact.
+- **After a restart**, the relay lists only the gateways that answer
+  its first hello. One that is down then is added within a minute of
+  coming back. One that goes down later keeps its agents listed.
+- **Code:**
+  - `relay/twoegram_relay/upstream.py`: the client;
+  - `relay.py`: `RelayServer`, an `A2Session`;
+  - `config.py` and `cli.py`;
+  - `relay/install.sh` and `twoegram-relay.service` for the LXC.
+  - `make relay-dist` builds `build/twoegram-relay-0.1.0.tgz`, with the
+    shared modules from `hermes/twoegram` copied in.
+- **Python 3.11 or later**, checked by the script itself and by
+  install.sh. (macOS's own Python 3.9 failed at one point, which is how
+  the check came about.)
+
 ### Its files
 
 | | |
@@ -349,8 +371,8 @@ All settled on 2026-11-18:
 | K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` (**done 2026-11-18**) |
 | K2 | the card's new marks, the key name in TWOEGRAM.CFG, set-up's screens | host tests pass; tried in Virtual ][ (**done 2026-11-18**, b037; the gateway list dropped for room) |
 | K3 | on the card | a master, two gateways, switching, the lock, one revoked |
-| R1 | `server.py` split; the Hermes plugin unchanged | its 130 tests pass |
-| R2 | the relay: upstream client, pass-through, CLI | the two-dev-server run passes |
+| R1 | `server.py` split; the Hermes plugin unchanged | its tests pass (**done 2026-11-18**) |
+| R2 | the relay: upstream client, pass-through, CLI | the two-dev-server run passes (**done 2026-11-18**, relay 0.1.0) |
 | R3 | the LXC: install, systemd, firewall | the Mac Studio talks through it; other addresses are refused |
 | R4 | on the card through the relay | Pinchy and Hermes in one session |
 

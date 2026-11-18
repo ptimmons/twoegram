@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""Run the relay: see twoegram_relay/cli.py. Works from the repository
+(the shared modules come from ../hermes) and from the installed folder,
+where they sit beside it (make relay-dist)."""
+import os
+import sys
+
+if sys.version_info < (3, 11):
+    sys.exit("twoegram-relay needs Python 3.11 or later")
+
+here = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, here)
+if not os.path.isdir(os.path.join(here, "twoegram")):
+    sys.path.insert(0, os.path.join(here, "..", "hermes"))
+
+from twoegram_relay.cli import main  # noqa: E402
+
+sys.exit(main())

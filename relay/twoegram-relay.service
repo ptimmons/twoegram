@@ -1,0 +1,40 @@
+# The Twoegram relay (docs/RELAY.md), as installed by relay/install.sh.
+# It reads its files and never writes them (the CLI does that, run as the
+# same user), so the whole system is read-only to it.
+[Unit]
+Description=Twoegram relay: one a2 gateway for the Apple, several behind it
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=twoegram-relay
+Group=twoegram-relay
+ExecStart=/usr/bin/python3 -I /opt/twoegram-relay/twoegram-relay serve
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
