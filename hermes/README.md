@@ -28,15 +28,13 @@ On the machine running Hermes:
    hermes plugins enable twoegram
    ```
 
-   Then add this to `~/.hermes/config.yaml`, inside its `gateway:`
-   section. If there is no `gateway:` section yet, add one.
-
-   ```yaml
-   gateway:
-     platforms:
-       a2:
-         enabled: true
+   ```bash
+   hermes config set gateway.platforms.a2.enabled true
    ```
+
+   Hermes saves the setting as `platforms.a2.enabled: true`, at the top
+   of `config.yaml`'s structure, which is where it prefers platform
+   settings.
 
 3. **Restart the gateway**:
 
@@ -44,7 +42,20 @@ On the machine running Hermes:
    hermes gateway restart
    ```
 
-   Its log should then say `a2: listening on http://0.0.0.0:8417/a2/`.
+   Its log, `~/.hermes/logs/gateway.log`, should then say
+   `a2: listening on http://0.0.0.0:8417/a2/`, and `hermes status`
+   should list the platform "Apple //e (Twoegram)".
+
+   The gateway has to be running whenever the Apple wants it. One
+   started by Hermes's desktop app or CLI keeps going while a platform
+   is set up, but nothing starts it again after a reboot. To run it as
+   a background service that starts at login:
+
+   ```bash
+   hermes gateway install --start-now --start-on-login
+   ```
+
+   `hermes gateway uninstall` removes the service.
 
 4. **Pair the Apple**:
 

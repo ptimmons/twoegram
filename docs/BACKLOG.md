@@ -12,8 +12,32 @@ plugin 1.1.0 (`build/openclaw-twoegram-1.1.0.tgz`) on the gateway.
 
 ### 1. Twoegram on Hermes Agent (plugin 1.0.0, built 2026-11-17)
 
-Steps: hermes/README.md, "Install", on the Mac mini (`mini.local`).
-Installing changes your running Hermes, so it waits for you.
+Installed on the Mac mini on 2026-11-17 (Hermes v0.23.2): the plugin
+is enabled, `platforms.a2.enabled: true` is set, and the gateway listens
+on port 8417. The config from before is in
+`~/.hermes/config.yaml.bak-before-twoegram`. A temporary device paired,
+signed in from the Mac Studio, saw `hermes (Hermes)`, and was revoked,
+so the mini has no devices.
+
+First, on the Mac mini:
+
+```bash
+hermes a2 pair "Apple IIe"
+```
+
+In Twoegram's set-up, type the gateway `192.168.1.30:8417` and that
+key. If Twoegram has a key for claw1 now, this replaces it: Twoegram
+holds one gateway at a time. To go back to Pinchy, type claw1's address
+and a key from `openclaw a2 pair`.
+
+**Optional:** make the gateway a background service, so it comes back
+after a reboot. I was not allowed to do this over SSH:
+
+```bash
+hermes gateway install --start-now --start-on-login
+```
+
+Then check:
 
 - **The Apple connects** to `http://192.168.1.30:8417`, with a key
   from `hermes a2 pair`. Hermes is listed as the one agent.

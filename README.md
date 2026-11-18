@@ -18,6 +18,7 @@ only.
 | [docs/MANUAL.md](docs/MANUAL.md) | the user's guide, in the manner of an Apple manual of 1985 |
 | [docs/INSTALL.md](docs/INSTALL.md) | installing the plugin on your gateway |
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | the wire protocol, version 1 |
+| [docs/RELAY.md](docs/RELAY.md) | planned: keys made on the Apple, and a relay to several gateways |
 | [PLAN.md](PLAN.md) | the plan, decisions, and what each milestone found |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | what is built and waiting to be tried on the real Apple |
 | `src/` | the Apple program, C and 6502 assembly for cc65 |

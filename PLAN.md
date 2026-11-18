@@ -8,7 +8,7 @@ Newsiie is the design language (80-column screen, splash, inverse status
 bar, MouseText help box) and the source of the screen, keyboard, prompt,
 CoGS and aux-memory code.
 
-**Status:** release 1.0 done: milestones 0 to 8 built and passed on the real card and your gateway (2026-11-16; the Apple's disk b019, plugin 1.0.1). Section 9's requests are built (2026-11-17). Also built 2026-11-17: the same channel for Hermes Agent (`hermes/`; see "Hermes Agent" below), not yet on the Mac mini.
+**Status:** release 1.0 done: milestones 0 to 8 built and passed on the real card and your gateway (2026-11-16; the Apple's disk b019, plugin 1.0.1). Section 9's requests are built (2026-11-17). Also built 2026-11-17: the same channel for Hermes Agent (`hermes/`; see "Hermes Agent" below), installed on the Mac mini the same day. Planned 2026-11-17: several agents on several gateways, by keys made on the Apple and a relay ([docs/RELAY.md](docs/RELAY.md); "Several agents" below).
 
 Sources read: `~/repos/newsiie` (PLAN.md, `cogs.h`, `ui.h`, `screen.h`);
 the CoGS Technical Reference (firmware 1.39, rev 33) chapters 1, 3, 4, 5,
@@ -1257,10 +1257,52 @@ only), so the Apple's disk needs no change beyond words.
   `allow_from`. All 130 tests pass again. A scratch v0.23.2 gateway,
   started with no provider keys in its environment, passed the same
   hello and message run, and contacted no provider.
+- **Installed on the Mac mini** (same day, after commit 70cd427):
+  - The plugin was copied to `~/.hermes/plugins/twoegram` and enabled.
+    `hermes config set gateway.platforms.a2.enabled true`, which Hermes
+    saved as top-level `platforms.a2`. The old config is in
+    `config.yaml.bak-before-twoegram`.
+  - `hermes gateway restart` brought up the listener on 8417. That
+    command runs the gateway in the foreground of the shell that ran it,
+    though it survived the SSH session ending.
+  - Making the gateway a launchd service
+    (`hermes gateway install --start-now --start-on-login`) was refused
+    by this session's permission rules, so that is left to you. Until
+    then, nothing starts the gateway after a reboot.
+  - A temporary device paired, signed in from the Mac Studio over the
+    LAN, saw `hermes (Hermes)` with an empty conversation, and was
+    revoked.
 - **Not yet done:**
-  - installing it on the Mac mini, which changes your running Hermes:
-    copy the plugin, enable it, add the config block, restart the
-    gateway;
   - the real card against it;
   - a real model's answers and an approval typed from the Apple.
 
+### Several agents (planned 2026-11-17)
+
+Asked for after the Hermes install: more than one agent at a time, at
+different addresses with different keys. The card holds one key, so the
+plan is [docs/RELAY.md](docs/RELAY.md), in two parts. Both keep the
+direct mode and leave the protocol unchanged.
+
+- **Keys made on the Apple** (K1 to K3):
+  - The card holds a master M (marks `$A4`/`$A5`).
+  - Each gateway's key is HMAC(M, "twoegram-gw" || name), cut to 16
+    bytes. Set-up shows it, and `a2 add` on the gateway takes it at a
+    prompt that does not echo.
+  - TWOEGRAM.CFG remembers up to 4 gateways, so switching is a choice in
+    set-up, not a new key.
+  - True public-key auth stays out: a minute or more of 6502 time for
+    each operation. X25519 pairing is noted under "Later".
+- **The relay** (R1 to R4):
+  - `twoegram-relay`, Python standard library, on its own Proxmox LXC.
+  - Facing the Apple, it is an a2 server. Facing each gateway, it is a
+    paired a2 client.
+  - It passes send, poll and hist through to the agent's upstream,
+    keeping the upstream's message numbers and folded text, and keeps no
+    conversations of its own.
+  - It merges the agent lists, and polls quietly for the other
+    upstreams' unread counts.
+  - It shares the session code of `hermes/twoegram/server.py`, which is
+    split first.
+- **Decided 2026-11-18:** key names typed in set-up; Ubuntu LTS on
+  the LXC; a suffix for clashing agent ids; and set-up no longer takes a typed
+  key, to save room (RELAY.md, "Decisions").

@@ -1,0 +1,354 @@
+# Several agents: keys made on the Apple, and the relay
+
+**Status:** planned 2026-11-17, nothing built yet. PLAN.md, "Several
+agents", tracks it.
+
+Twoegram holds one gateway and one key at a time. To talk to agents on
+several gateways (Pinchy on claw1, Hermes on the Mac mini, and others
+later), this plan builds two things, in this order:
+
+1. **Keys made on the Apple.** The card holds one master secret. From
+   it, the Apple derives a different key for each gateway, and you type
+   that key into the gateway. Moving between gateways then costs no
+   retyping and no pairing again.
+2. **The relay.** A small service on its own Proxmox LXC. The Apple
+   pairs with it like any gateway, and it lists every agent on every
+   gateway behind it.
+
+Both keep the current direct mode exactly as it is. The protocol
+([PROTOCOL.md](PROTOCOL.md)) does not change for either. The relay is
+just another gateway as far as the Apple can tell, so the same disk
+works direct, through the relay, or both.
+
+## Part 1. Keys made on the Apple
+
+### Why, and what it does not buy
+
+The keys stay symmetric (HMAC), so a gateway still holds a copy of the
+key it checks. Making the key on the Apple does not change that. Only
+public-key signatures would, and on the 6502 they would cost minutes for
+each one (section "Later", below). What the master secret does buy:
+
+- **One card, many gateways.** Each gateway gets its own key. Switching
+  gateways in set-up changes only which key is derived, so you never
+  retype a key. Today, switching from claw1 to the mini replaces the key,
+  and going back means pairing again.
+- **Gateways are kept apart.** A gateway that is broken into gives up its
+  own key, never the master, and never another gateway's key. Revoking
+  at one gateway leaves the others alone.
+- **The key is born on the Apple.** It is shown on the Apple's screen,
+  and typed at the gateway into a prompt that does not echo. It is never
+  in an SSH session's scrollback or a shell's history.
+- **The card still holds 16 bytes**, in the same `PREFS` slot.
+
+### The derivation
+
+    M      16 bytes from the card's RANDOM, made once in set-up
+    K(g)   the first 16 bytes of HMAC-SHA256(M, "twoegram-gw" || g)
+
+*g* is the gateway's **key name**: 1 to 16 of `a-z 0-9 - _`, chosen in
+set-up (for example `claw1`, `mini`, `relay`). Each gateway's key is
+then an ordinary device key, written in the usual 27-character form,
+with its own device id, SHA-256(`"twoegram-id"` || K(g)). The name is
+part of the key: renaming a gateway in set-up makes a new key, which
+has to be added again, and set-up says so before doing it.
+
+M comes from two 16-byte draws from `RANDOM`, hashed together with the
+Apple's tick count on the card. That is cheap insurance if one draw
+were ever poor.
+
+**M is never shown, sent, or written anywhere but the card.** There is
+no way to back it up. If the card is lost or replaced, you make a new
+master and add its keys at each gateway again, which is no worse than
+today.
+
+### On the card
+
+| Byte 15 | Bytes 16–31 |
+|---|---|
+| `$A2` | a gateway's key, as now |
+| `$A3` | a gateway's key, scrambled with a passphrase, as now |
+| `$A4` | the master M (new) |
+| `$A5` | M, scrambled with a passphrase (new) |
+
+Set-up no longer takes a typed key (decision 4). A card that already
+holds `$A2` or `$A3` keeps working as it does today: one key, used for
+whichever gateway is set. That costs only a few bytes, to load the old
+marks. Nothing changes until you make a master, and after that there is
+no way back to a typed key. The passphrase, the lock and Open-Apple-P work the same
+on M as they do on a key now (lock.h). After a lock, the passphrase is
+checked against the device id of the current gateway's derived key.
+
+### TWOEGRAM.CFG
+
+It remembers several gateways and which one is in use:
+
+    # Twoegram: the gateways
+    GATEWAY=claw1 http://192.168.1.20:8417
+    GATEWAY=mini http://192.168.1.30:8417
+    USE=claw1
+
+Today's one-line form, `GATEWAY=http://...` with no name, still loads
+as the only gateway. It has no key name, so it works only with a card
+that still holds a gateway's key (`$A2` or `$A3`). Set-up asks for a
+name for it when you make a master. The file's limit is 4 gateways. The
+reason is room in the set-up overlay, not any principle, so the limit
+can grow.
+
+### Set-up (the TWOEGRAM.SETUP overlay)
+
+- **The gateways**: a short list showing name, address, and the one in
+  use. You can add one, pick one, or remove one. Picking one says hello
+  to it at once.
+- **Make a master key**: asks first if the card already holds a key,
+  because the gateways that know the old key will stop working. Then it
+  makes M, saves it, and offers the passphrase as now.
+- **Show this gateway's key**: shows K(g) for the gateway in use, its
+  device id, and the command to type on the gateway:
+
+      openclaw a2 add "Apple IIe"
+      hermes a2 add "Apple IIe"
+      twoegram-relay add "Apple IIe"
+
+  This screen has to be asked for, and it needs the key unlocked if
+  there is a passphrase. The key is wiped from the screen when you
+  leave it.
+- **Typing a key is gone.** The base-32 parsing and check moves from
+  reading a key to writing one out, so the overlay gains the new screens
+  without carrying both.
+
+The Apple already has HMAC, so deriving a key at start-up or when you
+switch gateways costs a few dozen bytes of main memory. Writing a key
+out in base 32 with its check character is new code, and it goes in the
+overlay. Main memory has 2,462 bytes of heap. The overlay's growth is
+checked against its space by `memcheck.py` (PLAN.md, b028).
+
+### `a2 add`, on every server
+
+New in the OpenClaw plugin (1.2.0), the Hermes plugin (1.1.0), the
+stand-alone dev server and the relay:
+
+    openclaw a2 add "Apple IIe"
+    Key (from the Apple's set-up, not shown as you type):
+    Added "Apple IIe": device id 5c01e9a2. Check that the Apple shows the same id.
+
+- The key is read from a prompt that does not echo, never from an
+  argument, and its check character catches a mistyped key.
+- It refuses a key whose device id is already paired.
+- The device it adds is exactly what `pair` makes today: the same
+  file, the same `list` and `revoke`.
+- `pair` stays. The relay needs it for its own key at each upstream,
+  and so does an Apple on a disk from before K2.
+
+### Testing
+
+- **Shared vectors.** `derive_key(M, g)` goes in the Python
+  `protocol.py` and the TypeScript `protocol.ts`, and the vectors in
+  `hermes/tests/vectors.json` check it. The Apple's host tests check the
+  C against the same vectors.
+- **`tools/a2client.py --master`**, so the whole flow can be tried
+  against the dev servers without the Apple.
+- **Host tests:**
+  - the new marks, and the old ones still working;
+  - the config file's old and new forms;
+  - switching gateways;
+  - the lock with a master;
+  - making a master when a key is already stored.
+- **On the card:**
+  - make a master;
+  - add its key at claw1 and the mini;
+  - switch between them in set-up;
+  - lock and unlock;
+  - revoke at one gateway, and check that the other still works.
+
+## Part 2. The relay
+
+### What it is
+
+`twoegram-relay` is a small service, Python standard library only, run
+by systemd on its own LXC.
+
+- **Facing the Apple**, it is an ordinary a2 server: the same hello,
+  signatures, sessions, lockouts and limits as the plugins, from shared
+  code. Its own `devices.json` lists the Apples it serves, managed with
+  `twoegram-relay pair | add | list | revoke`.
+- **Facing the gateways**, it is an a2 client. Each gateway, an
+  **upstream**, knows the relay as one more paired device, with a key
+  made by that gateway's `a2 pair`. You can revoke it there like any
+  Apple.
+
+The Apple's hello at the relay lists every agent on every upstream.
+Messages to an agent go to the upstream that has it.
+
+### Pass-through, not a second copy
+
+I first sketched the relay keeping its own log of every conversation.
+On a closer look, **passing requests through** is simpler and loses
+nothing:
+
+| The Apple asks the relay | The relay asks the agent's upstream |
+|---|---|
+| `send?a=X` | `send?a=X'` (X's id on that upstream), same body |
+| `poll?a=X&after=n&w=4000` | `poll?a=X'&after=n&w=3000` (a margin for the extra hop, well under the card's 8 s cutoff) |
+| `hist?a=X&...` | `hist?a=X'&...`, unchanged |
+
+- **What gets copied, and what doesn't.** The relay checks the Apple's
+  signature, makes its own signed request upstream, checks the upstream's
+  signature on the reply, and signs the payload again for the Apple. The
+  message numbers are the upstream's, so history, paging, the start of
+  the conversation and busy all work unchanged. The relay keeps no
+  conversations, and it never folds text a second time: what the
+  upstream already folded and cut into parts passes through as it is.
+- **Unread marks.** Each upstream's poll reply carries `unread` lines for
+  that upstream's other agents. For the upstreams the Apple is not using
+  just then, the relay polls quietly every 20 seconds, with `w=0` and
+  `after` set to the last number the Apple has seen there, so nothing is
+  marked read that the Apple has not fetched. It adds those counts to the
+  `unread` lines it sends.
+- **Agent ids.** Ids pass through unchanged when they are unique. When
+  two clash, the upstreams file sets an alias. Without one, the later
+  upstream's agent gets its upstream's name as a suffix, such as
+  `main-mini`, cut to 16 characters. The Apple shows the agent's `name`
+  line in any case, so you still see "Pinchy" and "Hermes". The order is
+  that of the upstreams file, so ids stay put. The Apple lists at most 8
+  agents (`SES_AGENTS_MAX`). With more than that, the upstreams file
+  picks which ones to list.
+- **Sessions upstream.** The relay holds two sessions on each upstream,
+  one for long polls and one for everything else, because sequence
+  numbers must rise within a session. It says hello again on NO_SESSION,
+  on REPLAY, and after 25 idle minutes (the limit is 30).
+- **An upstream that is down** keeps its agents in the list. Requests to
+  them get a signed BAD_REQUEST, with `why claw1 is not answering`, or
+  `why claw1 refused the relay's key` after a revocation. The Apple
+  already shows that as a note and does not retry (`link.c`). Whether
+  that wording is right on the screen is a check for the card.
+- **A relay restart** loses nothing but its upstream sessions and the
+  unread counts from its quiet polls. Both are rebuilt within a poll.
+
+**One limitation:** each upstream sees the relay as a new device, so
+conversations through the relay start empty. What you said to Pinchy
+from the Apple directly stays with that direct pairing, and you can
+still reach it there.
+
+### Its files
+
+| | |
+|---|---|
+| `/etc/twoegram-relay/upstreams.json` | name, URL, key and aliases for each upstream; mode 0600 |
+| `/var/lib/twoegram-relay/devices.json` | the Apples it serves; mode 0600 |
+| `/etc/twoegram-relay/relay.conf` | listening address and port (8417) |
+
+`twoegram-relay upstream add claw1 http://192.168.1.20:8417` prompts for
+the key from claw1's `openclaw a2 pair`, says hello to check it, and
+lists the agents found. `upstream list` and `upstream remove` do the
+obvious. No command prints a stored key.
+
+### The security surface
+
+- **The relay is the most valuable box in the system.** It holds a key
+  for every gateway, so anyone who takes it can speak to every agent as
+  the relay. Keep it small, and keep it alone.
+- **LXC:** unprivileged Ubuntu LTS, Python 3 from the distribution,
+  nothing else installed beyond the base system. The service runs as its
+  own user, with systemd's sandboxing (`ProtectSystem=strict`,
+  `NoNewPrivileges`, `PrivateTmp`, and write access only to its two
+  folders).
+- **Firewall** (Proxmox's, on the container's interface):
+  - inbound TCP 8417 from the Apple's address only, and SSH from the
+    Mac Studio only;
+  - outbound only to each upstream's a2 port, plus DNS and package
+    mirrors while updating.
+- **Each gateway's side:** the relay is one device on its list. Revoke it
+  there and the relay is cut off from that gateway at once.
+- **Both legs are signed and not encrypted**, as everything is today.
+  Never forward 8417 to the internet.
+
+### Where the code lives
+
+The Hermes plugin's `protocol.py`, `text.py`, `store.py` and the
+session half of `server.py` are what the relay needs. The plan:
+
+1. **Split `hermes/twoegram/server.py`** into the session layer (hello,
+   signatures, sessions, lockouts) and the conversation layer (send,
+   poll, hist over a ConvStore). The Hermes plugin keeps its behaviour,
+   and its 130 tests prove it.
+2. **`relay/`** holds the relay's own pieces:
+   - the upstream client, an asyncio version of `tools/a2client.py`'s
+     protocol code;
+   - the pass-through layer;
+   - the CLI;
+   - the systemd unit.
+3. **`make relay-dist`** builds one tarball with the shared modules
+   copied in, because the Hermes plugin's folder has to stay
+   self-contained to install.
+
+### Testing
+
+- **No Apple, no gateway.** Run two dev servers on this Mac: the
+  TypeScript one (OpenClaw-shaped, with agents `main` and `coder`) and
+  the Python one (agent `hermes`). Put the relay in front of both and
+  drive it with `tools/a2client.py`. This covers:
+  - the merged agent list and an alias;
+  - send, poll and hist to each upstream;
+  - unread from the quiet upstream;
+  - an upstream stopped and started;
+  - the relay revoked at one upstream;
+  - a relay restart.
+  Each run gets a clean environment, with no provider keys.
+- **On the LXC:** install the tarball, then check that the firewall
+  refuses any other address.
+- **On the card:** pair the Apple with the relay, then talk to Pinchy and
+  Hermes in one session. Watch the unread marks move between them.
+
+## Later
+
+- **HTTPS from the Apple to the relay.** The card's TLS checks against
+  its bundled Mozilla roots and cannot add one of ours (PLAN.md section
+  2), so a home-made certificate will not do. The relay would need a
+  real certificate: a domain
+  name you own, Let's Encrypt by DNS challenge, and that name resolving
+  to the LXC on the LAN. The relay is the natural place for this, being
+  a single small box. A probe would first check that the card connects
+  to a LAN address by name with a public certificate.
+- **Pairing by X25519.** The Apple and a server would agree on a key
+  with one key exchange, then compare a short code on both screens, the
+  way Bluetooth pairing does. No secret would ever be shown or typed.
+  The cost is X25519 in 6502 code, which I estimate (not measured) at a
+  minute or two each pairing at 1 MHz. After pairing, everything stays
+  HMAC, as now.
+
+## Decisions
+
+All settled on 2026-11-18:
+
+1. **Key names are typed by you** in set-up, not taken from the
+   address, which can change.
+2. **The LXC is Ubuntu LTS**, unprivileged, from Proxmox's template, at
+   its own address on the LAN. That's your usual choice; nothing in the
+   relay depends on the distribution.
+3. **Clashing agent ids** get the upstream's name as a suffix
+   (`main-mini`), unless the upstreams file gives an alias.
+
+4. **Set-up no longer takes a typed key** (2026-11-18). Every byte
+   in the set-up overlay counts, and one way of pairing is easier to
+   explain and test.
+   - Every gateway the Apple talks to directly needs `a2 add`: the
+     OpenClaw plugin 1.2.0 or later, the Hermes plugin 1.1.0 or later,
+     or the relay.
+   - Once you make a master, there is no way back to a gateway's key on
+     that disk. An older disk still has its set-up for that.
+
+## Milestones
+
+| | What | Done when |
+|---|---|---|
+| K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` |
+| K2 | the card's new marks, TWOEGRAM.CFG's gateway list, set-up's screens | host tests pass; tried in Virtual ][ |
+| K3 | on the card | a master, two gateways, switching, the lock, one revoked |
+| R1 | `server.py` split; the Hermes plugin unchanged | its 130 tests pass |
+| R2 | the relay: upstream client, pass-through, CLI | the two-dev-server run passes |
+| R3 | the LXC: install, systemd, firewall | the Mac Studio talks through it; other addresses are refused |
+| R4 | on the card through the relay | Pinchy and Hermes in one session |
+
+K1 to K3 are useful without the relay. The relay doesn't depend on
+them, but it gets `add` for free once K1 is done.
