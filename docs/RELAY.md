@@ -317,8 +317,9 @@ obvious. No command prints a stored key.
 - **LXC:** unprivileged Ubuntu LTS, Python 3 from the distribution,
   nothing else installed beyond the base system. The service runs as its
   own user, with systemd's sandboxing (`ProtectSystem=strict`,
-  `NoNewPrivileges`, `PrivateTmp`, and write access only to its two
-  folders).
+  `NoNewPrivileges`, `PrivateTmp`, no capabilities). The service writes
+  nothing; its CLI, run as the same user, writes its two folders.
+  Nobody logs in as root: an admin user with sudo, by SSH key only.
 - **Firewall** (Proxmox's, on the container's interface):
   - inbound TCP 8417 from the Apple's address only, and SSH from the
     Mac Studio only;

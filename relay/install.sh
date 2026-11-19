@@ -1,6 +1,7 @@
 #!/bin/sh
 # install.sh -- put the relay in place on its LXC (docs/RELAY.md, R3).
-# Run as root from the unpacked twoegram-relay folder. Safe to run again to
+# Run with sudo, from your own login, on the unpacked twoegram-relay folder;
+# nothing else needs root, and the relay never runs as root. Safe to run again to
 # update: the gateways and Apples it knows are left alone.
 set -eu
 
@@ -30,6 +31,6 @@ Installed. Run the commands as the relay's own user:
 
   sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay upstream add claw1 192.168.1.20:8417
   sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay add "Apple IIe"
-  systemctl enable --now twoegram-relay
-  journalctl -u twoegram-relay -f
+  sudo systemctl enable --now twoegram-relay
+  sudo journalctl -u twoegram-relay -f
 MSG

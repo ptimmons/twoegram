@@ -25,28 +25,67 @@ does. Python 3.11 or later, standard library only.
 
 1. **The container:** unprivileged, Ubuntu LTS from Proxmox's
    templates, with a fixed address on the LAN. 1 core, 256 MB and 2 GB
-   are plenty. It needs `python3`, which the template has.
-2. **The relay.** On the Mac:
+   are plenty. It needs `python3`, which the template has. Give it the
+   Mac's SSH key when you make it (`--ssh-public-keys`).
+2. **Your own login.** Nobody logs in as root, and the relay never runs
+   as root. From the Proxmox console (`pct enter <CTID>`), once, as
+   root, make an admin user (below, `you`) with the Mac's key:
+
+   ```bash
+   adduser you && usermod -aG sudo you
+   ```
+
+   ```bash
+   install -d -m 700 -o you -g you /home/you/.ssh && install -m 600 -o you -g you /root/.ssh/authorized_keys /home/you/.ssh/
+   ```
+
+   Then turn off root and password logins. Put this in
+   `/etc/ssh/sshd_config.d/10-local.conf`:
+
+   ```
+   PermitRootLogin no
+   PasswordAuthentication no
+   KbdInteractiveAuthentication no
+   ```
+
+   ```bash
+   systemctl restart ssh
+   ```
+
+   Before leaving the console, check from the Mac that
+   `ssh you@RELAY-HOST` and `sudo -v` work. From here on, everything
+   is done as `you`.
+3. **The relay.** On the Mac:
 
    ```bash
    make relay-dist
    ```
 
    ```bash
-   scp build/twoegram-relay-0.1.0.tgz root@RELAY-HOST:
+   scp build/twoegram-relay-0.1.0.tgz you@RELAY-HOST:
    ```
 
-   On the container, as root:
+   On the container, unpack it as yourself. Only `install.sh` needs
+   root:
 
    ```bash
-   tar xzf twoegram-relay-0.1.0.tgz && twoegram-relay/install.sh
+   tar xzf twoegram-relay-0.1.0.tgz && sudo twoegram-relay/install.sh
    ```
 
-   The service runs as its own user, `twoegram-relay`, from
-   `/opt/twoegram-relay`. Its files are in `/etc/twoegram-relay` and
-   `/var/lib/twoegram-relay`, and only it can read them. systemd keeps
-   the rest of the system read-only to it.
-3. **Each gateway.** On the gateway, pair the relay like an Apple:
+   The service runs as its own user, `twoegram-relay`, with no login
+   shell, from `/opt/twoegram-relay` (owned by root, so the service
+   can't change its own code). Its files are in `/etc/twoegram-relay`
+   and `/var/lib/twoegram-relay`, and only it can read them. systemd
+   makes the whole system read-only to it, and the service has no
+   capabilities. The relay's own commands run as that user, so an
+   alias in `~/.bashrc` saves typing:
+
+   ```bash
+   alias relay='sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay'
+   ```
+
+   Afterwards, delete the tarball and the unpacked folder.
+4. **Each gateway.** On the gateway, pair the relay like an Apple:
 
    ```bash
    openclaw a2 pair "relay"
@@ -56,30 +95,32 @@ does. Python 3.11 or later, standard library only.
    shown):
 
    ```bash
-   sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay upstream add claw1 192.168.1.20:8417
+   relay upstream add claw1 192.168.1.20:8417
    ```
 
    It says hello to check, and lists the agents it found. For Hermes,
-   `hermes a2 pair "relay"` on the Mac mini, then `upstream add mini
-   192.168.1.30:8417`.
-4. **Start it:**
+   `hermes a2 pair "relay"` on the Mac mini, then `relay upstream add
+   mini 192.168.1.30:8417`.
+5. **Start it:**
 
    ```bash
-   systemctl enable --now twoegram-relay
+   sudo systemctl enable --now twoegram-relay
    ```
 
    ```bash
-   journalctl -u twoegram-relay -f
+   sudo journalctl -u twoegram-relay -f
    ```
 
    The log says `relay: listening on http://0.0.0.0:8417/a2/` and the
-   agents found.
-5. **The Apple.** In Twoegram, Settings (Open-Apple-K), Add a gateway:
+   agents found. To check it isn't running as root,
+   `ps -o user=,cmd= -C python3` should show `twoegram-relay`.
+   `systemd-analyze security twoegram-relay` scores the sandboxing.
+6. **The Apple.** In Twoegram, Settings (Open-Apple-K), Add a gateway:
    a key name for the relay, such as `relay`, and the container's
    address. The Apple shows its key. On the container:
 
    ```bash
-   sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay add "Apple IIe"
+   relay add "Apple IIe"
    ```
 
    The device id it prints should be the Apple's. Return on the Apple:
@@ -101,20 +142,21 @@ policy DROP, output policy DROP), allow only:
 
 | | |
 |---|---|
-| `twoegram-relay list`, `revoke <id>` | the Apples (take effect at their next request) |
-| `twoegram-relay upstream list` | the gateways, and whether each answers now |
-| `twoegram-relay upstream remove <name>` | then revoke the relay on that gateway too |
-| `systemctl restart twoegram-relay` | after changing the gateways |
+| `relay list`, `relay revoke <id>` | the Apples (take effect at their next request) |
+| `relay upstream list` | the gateways, and whether each answers now |
+| `relay upstream remove <name>` | then revoke the relay on that gateway too |
+| `sudo systemctl restart twoegram-relay` | after changing the gateways |
 
-Prefix each command with `sudo -u twoegram-relay /opt/twoegram-relay/`.
+`relay` is the alias from step 3, for
+`sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay`.
 No command prints a stored key.
 
 **Aliases**, in `/etc/twoegram-relay/upstreams.json`: `"aliases":
 {"main": "pinchy"}` on claw1's entry lists its `main` as `pinchy`. Then
 restart the relay.
 
-**Updating:** unpack a new tarball and run `install.sh` again. Then
-`systemctl restart twoegram-relay`.
+**Updating:** unpack a new tarball and run `sudo twoegram-relay/install.sh`
+again. Then `sudo systemctl restart twoegram-relay`.
 
 ## When a gateway is down
 

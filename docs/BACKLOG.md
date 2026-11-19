@@ -81,17 +81,22 @@ What is left is the relay, which needs a new container. Use
 - [ ] In Proxmox, make an unprivileged Ubuntu LTS container with a fixed
   address (1 core, 256 MB, 2 GB). Below, `RELAY` stands for that
   address.
+- [ ] Your own login, not root: an admin user with sudo and the Mac's
+  key, then root and password logins over SSH turned off
+  ([relay/README.md](../relay/README.md), step 2). Below, `you` is that
+  user. Check `ssh you@RELAY` and `sudo -v` before leaving the console.
 - [ ] From the Mac Studio:
 
   ```bash
-  scp ~/repos/twoegram/build/twoegram-relay-0.1.0.tgz root@RELAY:
+  scp ~/repos/twoegram/build/twoegram-relay-0.1.0.tgz you@RELAY:
   ```
 
-- [ ] On the container, as root. The checksum is
-  `dc71554a630329588c19ff0475f6d4cafd8ab3eb1d039308f0ddd02a9ef42489`:
+- [ ] On the container, as `you`; only `install.sh` gets root. The
+  checksum is
+  `f573649ecbf9b9bd70bdadc788e8c2294bdfed2bf93231249c824fdc8435440a`:
 
   ```bash
-  sha256sum twoegram-relay-0.1.0.tgz && tar xzf twoegram-relay-0.1.0.tgz && twoegram-relay/install.sh
+  sha256sum twoegram-relay-0.1.0.tgz && tar xzf twoegram-relay-0.1.0.tgz && sudo twoegram-relay/install.sh
   ```
 
 - [ ] Pair the relay at claw1 (on claw1):
@@ -117,11 +122,11 @@ What is left is the relay, which needs a new container. Use
 - [ ] Start it, and watch its log:
 
   ```bash
-  systemctl enable --now twoegram-relay
+  sudo systemctl enable --now twoegram-relay
   ```
 
   ```bash
-  journalctl -u twoegram-relay -f
+  sudo journalctl -u twoegram-relay -f
   ```
 
   The log says `relay: listening on http://0.0.0.0:8417/a2/`, with
