@@ -63,7 +63,7 @@ static uint8_t ask(const char *head, const char *why, uint8_t esc)
     pn = 0;
     draw_field();
     line(WHY_ROW, why, 1);
-    status_msg(esc ? "TYPE THE PASSPHRASE, THEN RETURN   ESC: SET-UP"
+    status_msg(esc ? "TYPE THE PASSPHRASE, THEN RETURN   ESC: SETTINGS"
                    : "TYPE THE PASSPHRASE, THEN RETURN");
     for (;;) {
         k = key_get();
@@ -89,9 +89,8 @@ static uint8_t ask(const char *head, const char *why, uint8_t esc)
 
 uint8_t lock_use(void)
 {
-    if (!ks_master) {
-        memcpy(ses_key, ks_secret, A2_KEY_LEN);
-        return 0;
+    if (!ks_have) {
+        return KS_NONE;
     }
     if (!cfg_name[0]) {
         return KS_NONAME;

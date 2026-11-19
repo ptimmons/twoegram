@@ -25,9 +25,9 @@ openclaw config set channels.a2 '{"host":"0.0.0.0","port":8417}' --strict-json
 openclaw gateway start
 ```
 
-Then add the Apple. On its set-up screen (Open-Apple-K), Open-Apple-M
-makes its key and Open-Apple-V shows the key for this gateway's key
-name. On the gateway:
+Then add the Apple. In Twoegram, add this gateway (at the first start,
+or Settings, Open-Apple-K, then Add a gateway): a key name and its
+address. The Apple shows its key for this gateway. On the gateway:
 
 ```bash
 openclaw a2 add "Apple //e"

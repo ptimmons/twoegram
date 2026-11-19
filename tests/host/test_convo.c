@@ -61,7 +61,9 @@ uint8_t key_get(void)
         /* Open-Apple-Q ends the conversation screen; a screen that ignores
          * it (the passphrase prompt) would wait for ever. */
         if (++past_end > 50) {
+            int r;
             printf("FAIL: the script ran out on a screen that does not quit\n");
+            for (r = 0; r < SCR_ROWS; ++r) printf("|%s|\n", screen[r]);
             exit(1);
         }
         key_oa = 1;
@@ -100,14 +102,30 @@ uint8_t tick_wait(uint16_t n) { (void)n; return 0; }
 
 char status_net[24] = "COGS 10.0.0.9";
 void net_check(void) {}
-uint8_t cfg_load(void) { return 1; }
-static char saved_cfg[200];
-uint8_t cfg_save(void)
+/* TWOEGRAM.CFG, in memory. Empty: no file, and cfg_load leaves the
+ * gateway as the test set it. */
+static char cfg_file[600];
+uint8_t cfg_load(void)
 {
-    char *p = saved_cfg;
-    p += sprintf(p, "# Twoegram: the gateway\rGATEWAY=");
-    if (cfg_name[0]) p += sprintf(p, "%s ", cfg_name);
-    sprintf(p, "%s\r", ses_base);
+    static char t[600];
+
+    if (!cfg_file[0]) return 1;
+    strcpy(t, cfg_file);
+    return cfg_parse(t);
+}
+uint16_t cfg_read(char *buf, uint16_t cap)
+{
+    size_t n = strlen(cfg_file);
+
+    if (n > (size_t)cap - 1) n = (size_t)cap - 1;
+    memcpy(buf, cfg_file, n);
+    buf[n] = 0;
+    return (uint16_t)n;
+}
+uint8_t cfg_write(const char *text, uint16_t n)
+{
+    memcpy(cfg_file, text, n);
+    cfg_file[n] = 0;
     return 0;
 }
 
@@ -172,6 +190,7 @@ static void test_screen(void)
     unsigned long hellos;
 
     gateway_reset();
+    ks_have = 1;                        /* a key in memory: the gateway's */
     CHECK(ses_hello() == 0);
     CHECK(st_init() == 0);
     msgs_mode(MSGS_LIVE);
@@ -495,7 +514,7 @@ static void test_errors(void)
     idle_for(2, 5);
     CHECK(!link_live && !link_waiting);
     CHECK(on_screen("THE GATEWAY DOES NOT KNOW THIS KEY"));
-    CHECK(link_badkey && on_screen("Add this Apple's key on the gateway again"));
+    CHECK(link_badkey && on_screen("shows this Apple's key, to add on the gateway again"));
     CHECK(idle_for(1, 10) == 0);
     /* Paired again (here: the gateway knows it again); Open-Apple-R. */
     strcpy(gw_id, "922fadb6");
@@ -508,7 +527,7 @@ static void test_errors(void)
     gw_refuse = 6; gw_refuse_left = -1;
     idle_for(1, 5);
     CHECK(!link_live && on_screen("WAIT 15 MINUTES"));
-    CHECK(!link_badkey && !on_screen("Add this Apple's key on the gateway"));
+    CHECK(!link_badkey && !on_screen("to add on the gateway again"));
     CHECK(idle_for(1, 10) == 0);
     gw_refuse = 0;
     keys[0] = 'r'; oa[0] = 1;
@@ -567,7 +586,7 @@ static void test_names(void)
     gw_agents = "agent main\nagent coder\n";
 }
 
-/* ---- the passphrase and the lock ---- */
+/* ---- watching the screen ---- */
 
 static const char *watch[6];
 static uint8_t seen[6];
@@ -600,146 +619,29 @@ static void watch_for(const char *a, const char *b, const char *c, const char *d
     on_key = watcher;
 }
 
-static void test_passphrase(void)
-{
-    static uint8_t keys[300], oa[300];
-    static const uint8_t card[15] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-    uint8_t plain[16], got[16];
-    unsigned n, i, hellos;
-
-    memset(oa, 0, sizeof oa);
-    memcpy(plain, gw_key, 16);
-    memcpy(prefs, card, 15);
-    prefs[15] = KS_MARK;
-    memcpy(prefs + 16, plain, 16);
-    prefs_len = 32;
-    lock_armed = 0;
-
-    /* Without a passphrase, Open-Apple-L says how to give one. */
-    keys[0] = 'l'; oa[0] = 1;
-    run(keys, oa, 1);
-    oa[0] = 0;
-    CHECK(on_screen("NO PASSPHRASE IS SET"));
-
-    /* Set-up: too short; typed twice differently; then twice the same. */
-    watch_for("AT LEAST 8", "TYPE THE PASSPHRASE AGAIN", "THE TWO DIFFER", "****");
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n++] = K_TAB;                          /* from the key name ... */
-    keys[n++] = K_TAB;                          /* ... past the address, to the passphrase */
-    n += type(keys + n, "short");
-    keys[n++] = K_RETURN;
-    for (i = 0; i < 5; ++i) keys[n++] = K_DELETE;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "correct horsf");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    hellos = (unsigned)gw_hellos;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
-    CHECK(!on_screen("correct"));               /* never shown */
-    /* The card: its own settings as they were, our mark, the key
-     * scrambled; the passphrase unscrambles it. */
-    CHECK(prefs_len == 32 && !memcmp(prefs, card, 15) && prefs[15] == KS_MARK_PASS);
-    CHECK(memcmp(prefs + 16, plain, 16) != 0);
-    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horse", 13) == 0);
-    CHECK(!memcmp(got, plain, 16));
-    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horsf", 13) == 0);
-    CHECK(memcmp(got, plain, 16) != 0);
-    CHECK(lock_armed && link_live && (unsigned)gw_hellos > hellos);
-    CHECK(!memcmp(ses_key, plain, 16));
-
-    /* Open-Apple-L: the screen, the key and the messages go; a wrong
-     * passphrase is refused on the Apple (no request); the right one
-     * signs in again. */
-    keys[0] = '>'; oa[0] = 1;
-    run(keys, oa, 1);
-    oa[0] = 0;
-    CHECK(on_screen("echo: while down"));
-    watch_for("Twoegram is locked.", "That is not the passphrase.", 0, 0);
-    n = 0;
-    keys[n] = 'l'; oa[n++] = 1;
-    n += type(keys + n, "not my passphrase");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    hellos = (unsigned)gw_hellos;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(seen[0] && seen[1] && !leaked);
-    CHECK((unsigned)gw_hellos == hellos + 1);   /* only the unlocked one */
-    CHECK(link_live && on_screen("echo: while down") && !memcmp(ses_key, plain, 16));
-
-    /* Ten minutes without a key lock it too. */
-    watch_for("Twoegram is locked.", 0, 0, 0);
-    n = 0;
-    for (i = 0; i < 89; ++i) keys[n++] = IDLE;
-    run(keys, oa, n);
-    CHECK(!seen[0] && on_screen("echo: while down"));      /* nine minutes and more: not yet */
-    n = 0;
-    for (i = 0; i < 91; ++i) keys[n++] = IDLE;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    run(keys, oa, n);
-    CHECK(seen[0] && !leaked && link_live && on_screen("echo: while down"));
-    /* ... and the count starts again: another five minutes, no lock. */
-    watch_for("Twoegram is locked.", 0, 0, 0);
-    n = 0;
-    for (i = 0; i < 45; ++i) keys[n++] = IDLE;
-    run(keys, oa, n);
-    CHECK(!seen[0] && on_screen("echo: while down"));
-
-    /* A fresh start with the key locked: the passphrase first. A wrong
-     * one makes a key the gateway does not know; it says so and asks
-     * again. */
-    ses_forget();
-    lock_armed = 0;
-    link_live = 0;
-    watch_for("This Apple's key is locked with a passphrase.",
-              "The gateway does not know the key that passphrase makes", 0, 0);
-    n = 0;
-    n += type(keys + n, "wrong guess!");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "correct horse");
-    keys[n++] = K_RETURN;
-    script = keys; script_oa = oa; script_n = n; script_i = 0;
-    link_start();
-    CHECK(seen[0] && seen[1] && script_i == n);
-    CHECK(link_live && lock_armed && !memcmp(ses_key, plain, 16));
-
-    /* Open-Apple-P on set-up takes the passphrase off: the key as it is
-     * on the card again. */
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n] = 'p'; oa[n++] = 1;
-    keys[n++] = 'y';
-    keys[n++] = K_RETURN;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(prefs[15] == KS_MARK && !memcmp(prefs + 16, plain, 16) && !lock_armed);
-    CHECK(!memcmp(prefs, card, 15) && link_live);
-    on_key = 0;
-}
-
 /* ---- keys made on the Apple (docs/RELAY.md, part 1) ---- */
+
+/* The gateway knows this key, as after `a2 add`. */
+static void gateway_knows(const uint8_t key[16])
+{
+    uint8_t buf[27], dig[32];
+
+    memcpy(gw_key, key, 16);
+    memcpy(buf, "twoegram-id", 11);
+    memcpy(buf + 11, key, 16);
+    sha256(buf, 27, dig);
+    a2_hex(gw_id, dig, 4);
+}
 
 /* What the gateway does with `a2 add`: the key from the screen, as the
  * user would type it. */
 static char shown_key[40];
 static void gateway_adds(void)
 {
-    uint8_t buf[27], dig[32];
+    uint8_t key[16];
 
-    CHECK(a2_key_parse(shown_key, gw_key) == 0);
-    memcpy(buf, "twoegram-id", 11);
-    memcpy(buf + 11, gw_key, 16);
-    sha256(buf, 27, dig);
-    a2_hex(gw_id, dig, 4);
+    CHECK(a2_key_parse(shown_key, key) == 0);
+    gateway_knows(key);
 }
 
 /* Called on every key while watching: a key on the screen is added at
@@ -760,123 +662,365 @@ static void read_shown_key(void)
     }
 }
 
-static void test_master(void)
+/* Watching, with keys shown added at the gateway. */
+static void watch_keys(const char *a, const char *b, const char *c, const char *d)
 {
-    static uint8_t keys[300], oa[300];
-    static const uint8_t own[15] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5 };
-    uint8_t want[16], got[16];
-    unsigned n, hellos;
+    watch_for(a, b, c, d);
+    on_key = read_shown_key;
+}
 
-    memset(oa, 0, sizeof oa);
+/* A script of keys: plain, Open-Apple, and text. */
+static uint8_t sk[600], so[600];
+static unsigned sn;
+static void k_(uint8_t c) { so[sn] = 0; sk[sn++] = c; }
+static void oa_(uint8_t c) { so[sn] = 1; sk[sn++] = c; }
+static void t_(const char *s) { while (*s) k_((uint8_t)*s++); }
+static void downs(unsigned n) { while (n--) k_(K_DOWN); }
+
+/* The script on the conversation screen (then Open-Apple-Q), or from the
+ * start; either must use all of it. */
+static void go(void)
+{
+    run(sk, so, sn);
+    CHECK(script_i == sn);
+    sn = 0;
+}
+static void go_start(void)
+{
+    script = sk; script_oa = so; script_n = sn; script_i = 0;
+    link_start();
+    CHECK(script_i == sn);
+    sn = 0;
+}
+
+static const uint8_t own[15] = { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5 };
+
+static void card_holds(const uint8_t m[16], uint8_t mark)
+{
+    memcpy(prefs, own, 15);
+    prefs[15] = mark;
+    memcpy(prefs + 16, m, 16);
+    prefs_len = 32;
+}
+
+/* A fresh start: nothing in memory. */
+static void fresh(void)
+{
     ses_forget();
     ks_forget();
+    memset(ses_key, 0, 16);
     lock_armed = 0;
     link_live = 0;
+}
+
+#define CFG_HEAD "# Twoegram: the gateways, the one in use first\r"
+
+/* ---- the passphrase and the lock (Settings) ---- */
+
+static void test_passphrase(void)
+{
+    static const uint8_t m[16] = { 0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE,
+                                   1, 2, 3, 4, 5, 6, 7, 8 };
+    uint8_t want[16], got[16];
+    unsigned i, hellos;
+
+    card_holds(m, KS_MASTER);
+    CHECK(ks_derive(m, "claw1", want) == 0);
+    gateway_knows(want);
+    strcpy(cfg_name, "claw1");
+    strcpy(ses_base, "http://10.0.0.2:8417");
+    cfg_file[0] = 0;
+    fresh();
+    go_start();
+    CHECK(link_live && !memcmp(ses_key, want, 16));
+
+    /* Without a passphrase, Open-Apple-L says how to give one. */
+    oa_('l');
+    go();
+    CHECK(on_screen("NO PASSPHRASE IS SET"));
+
+    /* Settings, the passphrase (the row after the gateway and Add): too
+     * short; typed twice differently; then twice the same. */
+    watch_for("at least 8 characters", "TYPE IT AGAIN", "The two differ", "****");
+    oa_('k');
+    downs(2);
+    k_(K_RETURN);
+    t_("short");
+    k_(K_RETURN);
+    t_("correct horse");
+    k_(K_RETURN);
+    t_("correct horsf");
+    k_(K_RETURN);
+    t_("correct horse");
+    k_(K_RETURN);
+    t_("correct horse");
+    k_(K_RETURN);
+    k_(K_ESC);
+    hellos = (unsigned)gw_hellos;
+    go();
+    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
+    CHECK(!on_screen("correct"));               /* never shown */
+    /* The card: its own settings as they were, the master scrambled; the
+     * passphrase unscrambles it. The session goes on. */
+    CHECK(prefs_len == 32 && !memcmp(prefs, own, 15) && prefs[15] == KS_MASTER_PASS);
+    CHECK(memcmp(prefs + 16, m, 16) != 0);
+    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horse", 13) == 0);
+    CHECK(!memcmp(got, m, 16));
+    CHECK(ks_load(got) == KS_LOCKED && ks_scramble(got, "correct horsf", 13) == 0);
+    CHECK(memcmp(got, m, 16) != 0);
+    CHECK(lock_armed && link_live && (unsigned)gw_hellos == hellos);
+    CHECK(!memcmp(ses_key, want, 16));
+
+    /* Open-Apple-L: the screen, the key and the messages go; a wrong
+     * passphrase is refused on the Apple (no request); the right one
+     * signs in again. */
+    oa_('>');
+    go();
+    CHECK(on_screen("echo: while down"));
+    watch_for("Twoegram is locked.", "That is not the passphrase.", 0, 0);
+    oa_('l');
+    t_("not my passphrase");
+    k_(K_RETURN);
+    t_("correct horse");
+    k_(K_RETURN);
+    hellos = (unsigned)gw_hellos;
+    go();
+    CHECK(seen[0] && seen[1] && !leaked);
+    CHECK((unsigned)gw_hellos == hellos + 1);   /* only the unlocked one */
+    CHECK(link_live && on_screen("echo: while down") && !memcmp(ses_key, want, 16));
+
+    /* Ten minutes without a key lock it too. */
+    watch_for("Twoegram is locked.", 0, 0, 0);
+    for (i = 0; i < 89; ++i) k_(IDLE);
+    go();
+    CHECK(!seen[0] && on_screen("echo: while down"));      /* nine minutes and more: not yet */
+    for (i = 0; i < 91; ++i) k_(IDLE);
+    t_("correct horse");
+    k_(K_RETURN);
+    go();
+    CHECK(seen[0] && !leaked && link_live && on_screen("echo: while down"));
+    /* ... and the count starts again: another five minutes, no lock. */
+    watch_for("Twoegram is locked.", 0, 0, 0);
+    for (i = 0; i < 45; ++i) k_(IDLE);
+    go();
+    CHECK(!seen[0] && on_screen("echo: while down"));
+
+    /* A fresh start with the key locked: the passphrase first. A wrong
+     * one makes a key the gateway does not know; it says so and asks
+     * again. */
+    fresh();
+    watch_for("This Apple's key is locked with a passphrase.",
+              "The gateway does not know the key that passphrase makes", 0, 0);
+    t_("wrong guess!");
+    k_(K_RETURN);
+    t_("correct horse");
+    k_(K_RETURN);
+    go_start();
+    CHECK(seen[0] && seen[1]);
+    CHECK(link_live && lock_armed && !memcmp(ses_key, want, 16));
+
+    /* Delete on the passphrase takes it off: the master as it is on the
+     * card again. */
+    oa_('k');
+    downs(2);
+    k_(K_DELETE);
+    k_('y');
+    k_(K_ESC);
+    go();
+    CHECK(prefs[15] == KS_MASTER && !memcmp(prefs + 16, m, 16) && !lock_armed);
+    CHECK(!memcmp(prefs, own, 15) && link_live);
+    on_key = 0;
+}
+
+/* ---- adding gateways, and Settings ---- */
+
+static void test_gateways(void)
+{
+    uint8_t want[16], got[16];
+    char addr[8];
+    unsigned i;
+
     memcpy(prefs, own, 15);
     prefs_len = 15;                             /* nothing of ours on the card */
     cfg_name[0] = 0;
+    cfg_file[0] = 0;
+    strcpy(ses_base, "http://10.0.0.2:8417");
+    fresh();
 
-    /* A fresh card: set-up first. Return is refused until there is a key;
-     * Open-Apple-M makes one, Open-Apple-V shows the gateway's, and with
-     * a key name Return saves and connects. */
-    watch_for("Make this Apple's key", "MAKE THIS APPLE'S KEY FIRST", "This Apple's key for the gateway:",
-              "GIVE THE GATEWAY A KEY NAME");
-    on_key = read_shown_key;
+    /* A first start, with no gateway and no key: adding one. A key name
+     * is needed (lowercased as typed); the address is already there.
+     * Then the key is made without asking, and shown to be added at the
+     * gateway; any key puts it away and connects. */
+    watch_keys("Twoegram: add a gateway", "GIVE THE GATEWAY A KEY NAME", "This Apple's key for claw1:", 0);
     shown_key[0] = 0;
-    n = 0;
-    keys[n++] = K_RETURN;                       /* no key yet */
-    keys[n] = 'm'; oa[n++] = 1;
-    keys[n++] = K_RETURN;                       /* a key, but no key name */
-    n += type(keys + n, "Claw1");               /* lowercased as typed */
-    keys[n] = 'v'; oa[n++] = 1;                 /* shown, and added at the gateway */
-    keys[n++] = ' ';                            /* the key is put away */
-    keys[n++] = K_RETURN;
-    hellos = (unsigned)gw_hellos;
-    script = keys; script_oa = oa; script_n = n; script_i = 0;
-    link_start();
-    CHECK(seen[0] && seen[1] && seen[2] && seen[3]);
-    on_key = watcher;
+    k_(K_RETURN);
+    t_("Claw1");
+    k_(K_RETURN);
+    k_(' ');
+    go_start();
+    CHECK(seen[0] && seen[1] && seen[2]);
     CHECK(prefs_len == 32 && !memcmp(prefs, own, 15) && prefs[15] == KS_MASTER);
-    CHECK(ks_master && ks_have && !memcmp(prefs + 16, ks_secret, 16));
+    CHECK(ks_have && !memcmp(prefs + 16, ks_secret, 16));
     CHECK(strlen(shown_key) == 32 && !on_screen(shown_key));    /* gone once a key was pressed */
     CHECK(ks_derive(ks_secret, "claw1", want) == 0);
     CHECK(a2_key_parse(shown_key, got) == 0 && !memcmp(got, want, 16));
-    memset(oa, 0, sizeof oa);
-    CHECK(script_i == n && link_live && (unsigned)gw_hellos > hellos && !memcmp(ses_key, want, 16));
-    CHECK(!strcmp(cfg_name, "claw1"));
-    CHECK(!strcmp(saved_cfg, "# Twoegram: the gateway\rGATEWAY=claw1 http://10.0.0.2:8417\r"));
+    CHECK(link_live && !memcmp(ses_key, want, 16) && !strcmp(cfg_name, "claw1"));
+    CHECK(!strcmp(cfg_file, CFG_HEAD "GATEWAY=claw1 http://10.0.0.2:8417\r"));
 
-    /* Another gateway: its name and address, no key typed. This gateway
-     * does not know the new key, so set-up says how to add it. */
-    watch_for("The gateway does not know this Apple's key", 0, 0, 0);
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE;
-    keys[n++] = K_DELETE; keys[n++] = K_DELETE;
-    n += type(keys + n, "mini");
-    keys[n++] = K_RETURN;
-    keys[n++] = K_ESC;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(seen[0] && !strcmp(cfg_name, "mini"));
-    CHECK(ks_derive(ks_secret, "mini", want) == 0 && !memcmp(ses_key, want, 16));
-    /* Back to claw1: its key again, with nothing more on the gateway. */
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE; keys[n++] = K_DELETE;
-    n += type(keys + n, "claw1");
-    keys[n++] = K_RETURN;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(link_live && ks_derive(ks_secret, "claw1", want) == 0 && !memcmp(ses_key, want, 16));
+    /* Another, from Settings: Add a gateway, with empty fields. It is
+     * first in the list, in use, and has its own key. */
+    watch_keys("Twoegram settings", "This Apple's key for mini:", 0, 0);
+    oa_('k');
+    downs(1);
+    k_(K_RETURN);
+    t_("mini");
+    k_(K_TAB);
+    t_("10.0.0.3");
+    k_(K_RETURN);
+    k_(' ');
+    go();
+    CHECK(seen[0] && seen[1]);
+    CHECK(!strcmp(cfg_file, CFG_HEAD "GATEWAY=mini http://10.0.0.3:8417\r"
+                            "GATEWAY=claw1 http://10.0.0.2:8417\r"));
+    CHECK(!strcmp(cfg_name, "mini") && !strcmp(ses_base, "http://10.0.0.3:8417"));
+    CHECK(ks_derive(ks_secret, "mini", want) == 0 && link_live && !memcmp(ses_key, want, 16));
 
-    /* A passphrase locks the master ($A5); the lock and a fresh start
-     * unlock it, and the key made is claw1's again. */
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n++] = K_TAB; keys[n++] = K_TAB;
-    n += type(keys + n, "a long passphrase");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "a long passphrase");
-    keys[n++] = K_RETURN;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(prefs[15] == KS_MASTER_PASS && memcmp(prefs + 16, ks_secret, 16) != 0 && lock_armed);
-    CHECK(link_live && !memcmp(ses_key, want, 16));
-    watch_for("Twoegram is locked.", "That is not the passphrase.", 0, 0);
-    n = 0;
-    keys[n] = 'l'; oa[n++] = 1;
-    n += type(keys + n, "a wrong passphrase");
-    keys[n++] = K_RETURN;
-    n += type(keys + n, "a long passphrase");
-    keys[n++] = K_RETURN;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(seen[0] && seen[1] && !leaked && link_live && !memcmp(ses_key, want, 16));
-    ses_forget();
-    ks_forget();
-    lock_armed = 0;
-    link_live = 0;
-    n = 0;
-    n += type(keys + n, "a long passphrase");
-    keys[n++] = K_RETURN;
-    script = keys; script_oa = oa; script_n = n; script_i = 0;
-    link_start();
-    CHECK(link_live && lock_armed && ks_master && !memcmp(ses_key, want, 16));
+    /* Back to claw1 from the list. This model gateway knows one key
+     * only, now mini's: so adding opens at claw1's key, by itself. */
+    watch_keys("The gateway does not know this Apple's key yet", "This Apple's key for claw1:", 0, 0);
+    oa_('k');
+    downs(1);
+    k_(K_RETURN);
+    k_(' ');
+    go();
+    CHECK(seen[0] && seen[1]);
+    CHECK(!strcmp(cfg_file, CFG_HEAD "GATEWAY=claw1 http://10.0.0.2:8417\r"
+                            "GATEWAY=mini http://10.0.0.3:8417\r"));
+    CHECK(ks_derive(ks_secret, "claw1", want) == 0 && link_live && !memcmp(ses_key, want, 16));
 
-    /* Esc on set-up changes nothing; and a second Open-Apple-M asks first. */
-    watch_for("EVERY GATEWAY MUST HAVE THIS APPLE ADDED AGAIN", 0, 0, 0);
+    /* K on a gateway shows its key again, then connects. */
+    watch_keys("This Apple's key for claw1:", 0, 0, 0);
+    oa_('k');
+    k_('k');
+    k_(' ');
+    go();
+    CHECK(seen[0] && link_live);
+
+    /* Forgetting mini: gone from the list; claw1 still in use. */
+    watch_keys("FORGET mini HERE?", 0, 0, 0);
+    oa_('k');
+    downs(1);
+    k_(K_DELETE);
+    k_('y');
+    k_(K_ESC);
+    go();
+    CHECK(seen[0] && !strcmp(cfg_file, CFG_HEAD "GATEWAY=claw1 http://10.0.0.2:8417\r"));
+    CHECK(link_live && !strcmp(cfg_name, "claw1"));
+
+    /* Start over (the row after Add and the passphrase): asked first; no
+     * changes nothing. Yes: a new master, and claw1's new key shown to be
+     * added. */
     memcpy(got, prefs + 16, 16);
-    n = 0;
-    keys[n] = 'k'; oa[n++] = 1;
-    keys[n] = 'm'; oa[n++] = 1;
-    keys[n++] = 'n';
-    keys[n++] = K_ESC;
-    run(keys, oa, n);
-    memset(oa, 0, sizeof oa);
-    CHECK(seen[0] && !memcmp(prefs + 16, got, 16) && prefs[15] == KS_MASTER_PASS && link_live);
+    oa_('k');
+    downs(3);
+    k_(K_RETURN);
+    k_('n');
+    k_(K_ESC);
+    go();
+    CHECK(!memcmp(prefs + 16, got, 16) && link_live);
+    watch_keys("EVERY GATEWAY MUST HAVE THIS APPLE ADDED AGAIN", "This Apple's key for claw1:", 0, 0);
+    oa_('k');
+    downs(3);
+    k_(K_RETURN);
+    k_('y');
+    k_(' ');
+    go();
+    CHECK(seen[0] && seen[1] && prefs[15] == KS_MASTER && memcmp(prefs + 16, got, 16) != 0);
+    CHECK(ks_derive(ks_secret, "claw1", want) == 0 && link_live && !memcmp(ses_key, want, 16));
+
+    /* Removing the key: off the card, not connected. Open-Apple-R then
+     * makes a new one, as adding a gateway does. */
+    oa_('k');
+    downs(4);
+    k_(K_RETURN);
+    k_('y');
+    go();
+    CHECK(prefs_len == 15 && !memcmp(prefs, own, 15) && !link_live && !ks_have);
+    CHECK(on_screen("The key is gone from the card"));
+    watch_keys("This Apple's key for claw1:", 0, 0, 0);
+    oa_('r');
+    k_(' ');
+    go();
+    CHECK(seen[0] && prefs[15] == KS_MASTER && link_live);
+
+    /* A gateway's key on the card, from before b048: no key at all now.
+     * The start makes a master over it and shows claw1's key. */
+    card_holds(own, KS_OLD);
+    fresh();
+    watch_keys("This Apple's key for claw1:", 0, 0, 0);
+    k_(' ');
+    go_start();
+    CHECK(seen[0] && prefs[15] == KS_MASTER && link_live);
+
+    /* A file from before key names: an address with no name. Adding a
+     * gateway asks for the name, with the address already in. */
+    strcpy(cfg_file, "# Twoegram: the gateway\rGATEWAY=http://10.0.0.4:8417\r");
+    cfg_name[0] = 0;
+    fresh();
+    watch_keys("This Apple's key for claw1:", 0, 0, 0);
+    t_("claw1");
+    k_(K_RETURN);
+    k_(' ');
+    go_start();
+    CHECK(seen[0] && link_live && !strcmp(cfg_file, CFG_HEAD "GATEWAY=claw1 http://10.0.0.4:8417\r"));
+
+    /* A forgotten passphrase: Esc at the prompt goes to Settings, where
+     * starting over needs none. */
+    oa_('k');
+    downs(2);
+    k_(K_RETURN);
+    t_("a long passphrase");
+    k_(K_RETURN);
+    t_("a long passphrase");
+    k_(K_RETURN);
+    k_(K_ESC);
+    go();
+    CHECK(prefs[15] == KS_MASTER_PASS && lock_armed);
+    fresh();
+    watch_keys("This Apple's key is locked with a passphrase.", "Locked: a new key", "This Apple's key for claw1:", 0);
+    k_(K_ESC);
+    downs(3);
+    k_(K_RETURN);
+    k_('y');
+    k_(' ');
+    go_start();
+    CHECK(seen[0] && seen[1] && seen[2]);
+    CHECK(prefs[15] == KS_MASTER && !lock_armed && link_live);
+
+    /* Four gateways at most: a fifth forgets the one used longest ago. */
+    for (i = 2; i <= 5; ++i) {
+        watch_keys("Four gateways at most", 0, 0, 0);
+        oa_('k');
+        downs(i - 1);                           /* to Add, after the gateways */
+        k_(K_RETURN);
+        sprintf(addr, "g%u", i);
+        t_(addr);
+        k_(K_TAB);
+        t_("10.0.0.9");
+        k_(K_RETURN);
+        if (i == 5) {
+            k_(' ');                            /* PRESS A KEY TO GO ON */
+        }
+        k_(' ');
+        go();
+        CHECK(link_live && seen[0] == (i == 5));
+    }
+    CHECK(!strcmp(cfg_file, CFG_HEAD "GATEWAY=g5 http://10.0.0.9:8417\rGATEWAY=g4 http://10.0.0.9:8417\r"
+                            "GATEWAY=g3 http://10.0.0.9:8417\rGATEWAY=g2 http://10.0.0.9:8417\r"));
+
     on_key = 0;
     cfg_name[0] = 0;
+    cfg_file[0] = 0;
     gateway_reset();
 }
 
@@ -1103,7 +1247,7 @@ int main(void)
     test_errors();
     test_names();
     test_passphrase();
-    test_master();
+    test_gateways();
     test_save();
     printf("convo: %d checks, %d failed\n", checks, fails);
     return fails != 0;

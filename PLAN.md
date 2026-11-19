@@ -1402,6 +1402,30 @@ fault in the set-up overlay, fixed in b046).
     time; shots.sh now types one at a time. Screenshots retaken.
 
 
+### K4: adding a gateway, and Settings (2026-11-18, b048)
+
+RELAY.md, "K4". Set-up's hot keys go: Open-Apple-M and Open-Apple-V
+confused on the card. Not yet on the card.
+
+- **Adding a gateway** (`setup.c`, TWOEGRAM.SETUP): key name and
+  address, then the key, shown by itself. The master is made there,
+  without asking, when the card has none.
+- **Settings** (`prefs.c`, TWOEGRAM.PREFS, a third overlay, Open-Apple-K):
+  the saved gateways, the passphrase, starting over, removing the key.
+- **TWOEGRAM.CFG** holds up to four gateways, the one in use first
+  (`setup_list.h`, shared by both overlays; `cfg_read` and `cfg_write`
+  in main memory).
+- **A gateway's old key** (`$A2`, `$A3`) is no longer used: it loads as
+  no key, and the key step makes a master over it.
+- **Open-Apple-R** shows the key step when the gateway refuses the key.
+- **Tests:** test_convo's passphrase test, through Settings, and a new
+  one for the whole flow: the first start, adding from Settings,
+  switching, K, forgetting, starting over, removing, an old key on the
+  card, a file from before key names, a forgotten passphrase, and a
+  fifth gateway. 1,533 checks.
+- **Pictures:** `make convo-shots` draws Settings, adding a gateway, and
+  its key, for the manual (Chapter 2, rewritten).
+
 ### R1 and R2: the relay (2026-11-18, relay 0.1.0)
 
 RELAY.md part 2, up to what can run without your LXC. Not yet on a

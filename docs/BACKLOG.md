@@ -1,17 +1,80 @@
 # Testing backlog
 
 What is built and waiting for the real Apple, the card, or your gateway.
-**"Next night: the relay"** is the next checklist, with every command
-in place: start there. "Waiting" below keeps each item's
+**"Next: adding a gateway, and Settings"** is the next checklist, then
+**"Next night: the relay"**, with every command in place: start there. "Waiting" below keeps each item's
 background, newest first. When an entry passes, it moves to "Passed",
 with the date and build. The older, detailed checklists stay in
 [PROBE.md](PROBE.md).
+
+## Next: adding a gateway, and Settings (K4, b048)
+
+Set-up is now two screens (RELAY.md, "K4"): **Add a gateway** (the key
+name and address, then the key, shown by itself) and **Settings**
+(Open-Apple-K). No more Open-Apple-M or Open-Apple-V. Boot
+`build/TWOEGRAM-b048.po`. Its TWOEGRAM.CFG lists claw1, then the mini.
+
+### A. Start-up and switching
+
+- [ ] It connects to Pinchy by itself, with nothing typed: the same
+  master as on b046, so the same key for claw1.
+- [ ] **Settings:** Open-Apple-K. Gateways: claw1 (`in use`) and mini,
+  then Add a gateway. Below: Passphrase `none`, Start over with a new
+  key, Remove the key from the card. The arrows move the bar, and the
+  two lines under the list and the status bar change with it. Esc goes
+  back to the conversation.
+- [ ] **To the mini:** Open-Apple-K, Down to mini, Return. If the mini
+  still has the Apple's key, Hermes is the agent. If you revoked it in
+  part E and didn't add it back, Add a Gateway opens at mini's key by
+  itself: `hermes a2 add "Apple IIe"` on the mini, then Return.
+- [ ] **Back to claw1:** Open-Apple-K, Down to claw1, Return: Pinchy,
+  with the conversation as it was.
+- [ ] **K:** Open-Apple-K, on claw1 press K. claw1's key shows, with the
+  same device id as `openclaw a2 list` on claw1. Return connects.
+
+### B. The passphrase, in Settings
+
+- [ ] Open-Apple-K, Down to Passphrase, Return. Type one (8 or more
+  characters), Return, then again, Return. The status bar says `THE KEY
+  IS LOCKED WITH THE PASSPHRASE`, and the line says `set`. Esc.
+- [ ] Open-Apple-L locks, and the passphrase unlocks, as before.
+- [ ] Quit and start Twoegram: the passphrase first. Press **Esc**
+  instead: Settings, with "Locked: a new key, without the passphrase, is
+  Start over below." at the foot. Esc again: the pane says `LOCKED`.
+  Open-Apple-R asks for the passphrase again; type it: Pinchy.
+- [ ] Open-Apple-K, Down to Passphrase, Delete, Y: `THE KEY NO LONGER
+  NEEDS A PASSPHRASE`, and the line says `none`.
+
+### C. Adding a gateway
+
+- [ ] Open-Apple-K, Down to Add a gateway, Return. The fields are empty.
+  Esc, and Esc again: back in the conversation, nothing changed.
+
+### D. Starting over (last: it means adding both keys again)
+
+This is the path a new card takes at its first start: the key step
+making the master.
+
+- [ ] Open-Apple-K, Down to Start over with a new key, Return, Y. It
+  says `MAKING THIS APPLE'S KEY`, then shows claw1's new key. How long
+  did that take? On claw1, `openclaw a2 add "Apple IIe"`; the device ids
+  match. Return: Pinchy, with an empty conversation (a new device).
+- [ ] The mini: Open-Apple-K, Down to mini, Return. The mini doesn't know
+  the new key, so its key shows by itself: `hermes a2 add "Apple IIe"`,
+  Return: Hermes.
+- [ ] Tidy both gateways: `openclaw a2 list` and `hermes a2 list` show
+  the old device as well. Revoke it on each (`a2 revoke <its id>`).
+
+### E. The screens
+
+- [ ] Do Settings and Add a gateway read well on the real screen? Is
+  anything unclear, or in the wrong place?
 
 ## Next night: the relay
 
 Parts A to E of the 2026-11-18 checklist passed on b046 (see "Passed").
 What is left is the relay, which needs a new container. Use
-`build/TWOEGRAM-b046.po`, or a later disk.
+`build/TWOEGRAM-b048.po`, or a later disk.
 
 ### The relay on a Proxmox LXC (R3 and R4)
 
@@ -63,8 +126,8 @@ What is left is the relay, which needs a new container. Use
 
   The log says `relay: listening on http://0.0.0.0:8417/a2/`, with
   claw1's agents and `hermes`.
-- [ ] On the Apple, Open-Apple-K: key name `relay`, Address `RELAY`,
-  Open-Apple-V. On the container:
+- [ ] On the Apple, Open-Apple-K, Add a gateway: key name `relay`,
+  Address `RELAY`, Return. The Apple shows its key. On the container:
 
   ```bash
   sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay add "Apple IIe"
@@ -83,32 +146,6 @@ What is left is the relay, which needs a new container. Use
   192.168.1.30:8417. The Apple still gets through, and port 8417 is
   refused from another machine.
 
-## Next to build: simpler set-up (decided 2026-11-18)
-
-Set-up's hot keys (OA-M, OA-V) were confusing. Decided, to build next
-(C to E have passed; it need not wait for the relay):
-
-- **No more master to make.** With no key on the card, the master is
-  made by itself the first time one is needed. "Start over with a new
-  key" (today's OA-M) moves to Settings, with a stronger warning.
-- **Keys from a gateway are dropped** (once C passes): every key is
-  made on the Apple. That also removes "THIS KEY CAME FROM A GATEWAY"
-  and its separate prompts.
-- **Set-up becomes a wizard for adding a gateway:** name and address,
-  then the key shown by itself with the `a2 add` command to type, then
-  connect. A gateway that refuses the key goes back to the key step.
-  At start-up a refused key opens the wizard at that step, already
-  filled in.
-- **A Settings page** (its own overlay, perhaps OA-comma):
-  - the passphrase (set, change, remove) and lock now, as it covers
-    every gateway;
-  - **a saved list of gateways** (about four, in TWOEGRAM.CFG): switch,
-    show a key again, forget (which does not revoke: `a2 revoke` on the
-    gateway does), add (the wizard);
-  - start over with a new key, and remove the key from the card.
-- Memory: two overlays at $0800 (each up to 6,144 bytes) instead of one
-  at 5,615, so more room, not less.
-
 ## Waiting
 
 ### 1. The relay on a Proxmox LXC (R3 and R4, relay 0.1.0, built 2026-11-18)
@@ -123,7 +160,7 @@ to make the container: unprivileged Ubuntu LTS, with a fixed address.
   pair "relay"` on the mini, then `upstream add` on the container. Both
   say "answering" in `upstream list`.
 - **The service** starts, and its log lists Pinchy's and Hermes's agents.
-- **The Apple:** key name `relay`, the container's address, Open-Apple-V,
+- **The Apple:** Add a gateway: key name `relay`, the container's address,
   then `twoegram-relay add`. One list: claw1's agents first, then the
   mini's (`hermes`).
 - **Pinchy and Hermes in one session.** Send to each, and switch between

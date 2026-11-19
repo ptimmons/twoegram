@@ -12,7 +12,8 @@ The release (`make release`, in `build/release/`) is two files and their
 checksums:
 
 - `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
-  It carries no address and no key; the set-up screen asks for both.
+  It carries no address and no key: Twoegram asks for a gateway at the
+  first start, and makes the key itself.
 - `openclaw-twoegram-1.2.0.tgz`: the plugin, compiled, with only the
   files OpenClaw loads.
 
@@ -112,18 +113,19 @@ show `a2` with no warning:
 ## 4. Add the Apple
 
 The Apple makes its own key (docs/RELAY.md, part 1). On the Apple: start
-Twoegram, and on the set-up screen press Open-Apple-M to make the key,
-type a key name for this gateway (such as `claw1`) and its address (for
-example `192.168.1.20:8417`), then press Open-Apple-V. The Apple shows
-the key for this gateway and a device id. On the gateway host:
+Twoegram. The first time, it asks for a gateway: type a key name for
+this gateway (such as `claw1`) and its address (for example
+`192.168.1.20:8417`), and press Return. (Another gateway later: Settings,
+Open-Apple-K, then Add a gateway.) The Apple shows its key for this
+gateway and a device id. On the gateway host:
 
 ```bash
 openclaw a2 add "Apple //e"
 ```
 
 It asks for the key without showing it, and prints the device id, which
-should be the one on the Apple's screen. Then press a key on the Apple,
-and Return. No restart is needed: the running gateway sees new devices,
+should be the one on the Apple's screen. Then press Return on the
+Apple. No restart is needed: the running gateway sees new devices,
 and revoked ones, on its next request.
 
 ```bash
@@ -137,7 +139,8 @@ openclaw a2 revoke <device-id>
 `revoke` also deletes that device's saved conversations.
 
 **An Apple with Twoegram 1.0** (build b036 or earlier) cannot make keys:
-its set-up screen takes one made by the gateway instead.
+its set-up screen takes one made by the gateway instead. From build b048
+on, Twoegram no longer uses a key made by the gateway.
 
 ```bash
 openclaw a2 pair "Apple //e"

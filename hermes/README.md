@@ -57,10 +57,10 @@ On the machine running Hermes:
 
    `hermes gateway uninstall` removes the service.
 
-4. **Add the Apple.** On Twoegram's set-up screen (Open-Apple-K),
-   Open-Apple-M makes the Apple's key (once, for every gateway), and
-   Open-Apple-V shows its key for this gateway's key name, such as
-   `mini`. Then:
+4. **Add the Apple.** In Twoegram, add this gateway (at the first
+   start, or Settings, Open-Apple-K, then Add a gateway): a key name,
+   such as `mini`, and its address. The Apple shows its key for this
+   gateway. Then:
 
    ```bash
    hermes a2 add "Apple IIe"

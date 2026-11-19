@@ -2,7 +2,7 @@
  * The passphrase and the lock.
  *
  * With a passphrase, the card holds the key scrambled with it
- * (KS_MARK_PASS, keystore.h). Twoegram asks for it at the start and
+ * (KS_MASTER_PASS, keystore.h). Twoegram asks for it at the start and
  * unscrambles the key in memory; the passphrase itself is never stored.
  * A wrong one makes a wrong key, which the gateway does not know.
  *
@@ -35,9 +35,9 @@ uint8_t lock_open(const char *why);
  * back in ses_key and no session open. */
 void lock_now(void);
 
-/* ses_key from ks_secret: the secret itself if it is a gateway's key,
- * else the key derived for cfg_name. 0, KS_NONAME, or a card code. In
- * the language card with the rest of this file. */
+/* ses_key from ks_secret: the key derived for cfg_name. 0, KS_NONE
+ * with no key in memory, KS_NONAME, or a card code. In the language
+ * card with the rest of this file. */
 uint8_t lock_use(void);
 
 #endif

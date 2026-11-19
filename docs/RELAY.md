@@ -2,7 +2,8 @@
 
 **Status:** planned 2026-11-17. Built 2026-11-18: K1, K2 (b037), R1
 and R2 (`relay/`, 0.1.0). K3 passed on the card 2026-11-18 (b046).
-Waiting: R3 (your LXC) and R4 (the card through the relay); see
+Built 2026-11-18: K4, adding a gateway and Settings (b048). Waiting: K4
+on the card, R3 (your LXC) and R4 (the card through the relay); see
 Milestones.
 PLAN.md, "Several agents", tracks it.
 
@@ -74,17 +75,17 @@ today.
 | `$A4` | the master M (new) |
 | `$A5` | M, scrambled with a passphrase (new) |
 
-Set-up no longer takes a typed key (decision 4). A card that already
-holds `$A2` or `$A3` keeps working as it does today: one key, used for
-whichever gateway is set. That costs only a few bytes, to load the old
-marks. Nothing changes until you make a master, and after that there is
-no way back to a typed key. The passphrase, the lock and Open-Apple-P work the same
+Set-up no longer takes a typed key (decision 4). Until b048, a card
+that already held `$A2` or `$A3` kept working as before: one key, used
+for whichever gateway was set. From b048 those marks load as no key, and
+the first gateway's key step makes a master over them (K4, below). The passphrase, the lock and Open-Apple-P work the same
 on M as they do on a key now (lock.h). After a lock, the passphrase is
 checked against the device id of the current gateway's derived key.
 
 ### TWOEGRAM.CFG
 
-It holds the gateway in use, with its key name before the address:
+(As built in K2; K4, below, makes it a list.) It holds the gateway in
+use, with its key name before the address:
 
     # Twoegram: the gateway
     GATEWAY=claw1 http://192.168.1.20:8417
@@ -101,7 +102,7 @@ again, which was the point.
 
 ### Set-up (the TWOEGRAM.SETUP overlay)
 
-As built in K2:
+As built in K2 (K4, below, replaces it):
 
 - **Three lines:** Key name, Address, Passphrase. Key names are
   lowercased as they are typed, and only `a-z 0-9 - _` are taken.
@@ -126,6 +127,44 @@ and its variables in their own segment, `OVL1DATA`, loaded with it.
 Moving set-up's variables out of main memory, and the file writer
 (`cfg_save`) into the overlay, gave main memory 223 bytes more: heap
 2,685, from 2,462. `ks_derive` and `lock_use` live in the language card.
+
+### K4: adding a gateway, and Settings (b048)
+
+K2's set-up worked on the card (K3), but its hot keys confused: when to
+press Open-Apple-M and when Open-Apple-V. Decided 2026-11-18, built the
+same night:
+
+- **No master to make by hand.** With no master on the card (or only a
+  gateway's old key), the first key step makes one, without asking.
+- **Adding a gateway** (TWOEGRAM.SETUP, `setup.c`) is two steps: the key
+  name and address, then the key, shown by itself, with the `a2 add`
+  commands. Return connects; while the gateway refuses the key, it comes
+  back at the key step, saying so. At start-up a refused key opens it
+  there, already filled in.
+- **Settings** (Open-Apple-K; TWOEGRAM.PREFS, `prefs.c`, a third
+  overlay) is one list: the saved gateways (connect, K to show the key
+  again, Delete to forget), Add a gateway, Passphrase (set, change,
+  remove: it covers every gateway), Start over with a new key, Remove
+  the key from the card. Anything that shows a key returns to `link.c`,
+  which opens the first overlay: two overlays cannot be loaded at once.
+  Starting over is clearing the card, so the key step makes the new
+  master.
+- **TWOEGRAM.CFG is a list again**, up to four, the one in use first:
+
+      # Twoegram: the gateways, the one in use first
+      GATEWAY=claw1 http://192.168.1.20:8417
+      GATEWAY=mini http://192.168.1.30:8417
+
+  The program reads only the first line; the list is the overlays'
+  (`setup_list.h`, included by both). A fifth forgets the last.
+- **Open-Apple-R** connects, and if the gateway refuses the key, or there
+  is none in memory, shows the key step.
+
+**Memory.** Splitting set-up in two is what made room for the list.
+TWOEGRAM.SETUP is 5,454 bytes with its data, TWOEGRAM.PREFS 6,064 of
+the 6,144 an overlay may take. Main memory's heap is 1,936 (from
+2,685): reading and writing the file moved into main memory, for both
+overlays, and `link.c` grew.
 
 ### `a2 add`, on every server
 
@@ -371,7 +410,8 @@ All settled on 2026-11-18:
 |---|---|---|
 | K1 | `derive_key` in all three languages, with vectors; `a2 add` in both plugins and the dev server | the tests pass; `a2client.py --master` pairs by `add` (**done 2026-11-18**) |
 | K2 | the card's new marks, the key name in TWOEGRAM.CFG, set-up's screens | host tests pass; tried in Virtual ][ (**done 2026-11-18**, b037; the gateway list dropped for room) |
-| K3 | on the card | a master, two gateways, switching, the lock, one revoked |
+| K3 | on the card | a master, two gateways, switching, the lock, one revoked (**done 2026-11-18**, b046) |
+| K4 | adding a gateway, and Settings, as two overlays; the list of gateways | host tests pass; on the card |
 | R1 | `server.py` split; the Hermes plugin unchanged | its tests pass (**done 2026-11-18**) |
 | R2 | the relay: upstream client, pass-through, CLI | the two-dev-server run passes (**done 2026-11-18**, relay 0.1.0) |
 | R3 | the LXC: install, systemd, firewall | the Mac Studio talks through it; other addresses are refused |

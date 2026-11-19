@@ -293,8 +293,8 @@ static const char *pane_note(uint8_t r)
     if (msgs_now == MSGS_NONE) {
         switch (r) {
         case 1: return link_err;
-        case 2: return link_badkey ? "Add this Apple's key on the gateway again: " OA "-K, " OA "-V." : "";
-        case 3: return OA "-K  set the gateway and key";
+        case 2: return link_badkey ? OA "-R shows this Apple's key, to add on the gateway again." : "";
+        case 3: return OA "-K  settings: gateways, the passphrase";
         case 4: return OA "-R  try to connect again";
         }
     }
@@ -759,7 +759,7 @@ static void poll_now(void)
 static void lock_screen(void)
 {
     if (!lock_armed) {
-        status_msg("NO PASSPHRASE IS SET: GIVE ONE ON THE SET-UP SCREEN, OPEN-APPLE-K");
+        status_msg("NO PASSPHRASE IS SET: GIVE ONE IN SETTINGS, OPEN-APPLE-K");
         return;
     }
     st_reset();
@@ -866,7 +866,7 @@ static uint8_t oa_key(uint8_t k)
             status_msg("NO COGS CARD: NOTHING TO CONNECT TO");
             break;
         }
-        link_connect();
+        link_again();
         restart();
         break;
     case 'n': case 'N':

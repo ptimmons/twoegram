@@ -74,9 +74,9 @@ does. Python 3.11 or later, standard library only.
 
    The log says `relay: listening on http://0.0.0.0:8417/a2/` and the
    agents found.
-5. **The Apple.** In Twoegram's set-up: a key name for the relay, such
-   as `relay`, the container's address, then Open-Apple-V. On the
-   container:
+5. **The Apple.** In Twoegram, Settings (Open-Apple-K), Add a gateway:
+   a key name for the relay, such as `relay`, and the container's
+   address. The Apple shows its key. On the container:
 
    ```bash
    sudo -u twoegram-relay /opt/twoegram-relay/twoegram-relay add "Apple IIe"

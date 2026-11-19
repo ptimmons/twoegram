@@ -53,7 +53,7 @@ static const struct help_row rows[] = {
     { OA "-Up Dn",  "page",            "ANYWHERE",   0 },
     { OA "-< >",    "start, newest",   OA "-B",      "hide, show agents" },
     { "Tab",        "to the agents",   OA "-N",      "next with news" },
-    { OA "-S",      "save to disk",    OA "-K",      "gateway and key" },
+    { OA "-S",      "save to disk",    OA "-K",      "settings" },
     { "",           "",                OA "-R",      "connect again" },
     { "",           "",                OA "-L",      "lock" },
     { "",           "",                OA "-?",      "this help" },

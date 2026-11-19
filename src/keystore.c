@@ -10,7 +10,6 @@ static uint8_t blob[COGS_PREFS_MAX], back[COGS_PREFS_MAX];
 
 uint8_t ks_secret[A2_KEY_LEN];
 uint8_t ks_have;
-uint8_t ks_master;
 
 void ks_forget(void)
 {
@@ -18,11 +17,11 @@ void ks_forget(void)
     ks_have = 0;
 }
 
-/* Whether byte 15 is one of ours: $A2 to $A5. */
+/* Whether byte 15 is one of ours: $A2 to $A5, so ours to write over. */
 static uint8_t ours(uint8_t n)
 {
     return (uint8_t)(n == COGS_PREFS_MAX &&
-                     (uint8_t)(blob[COGS_PREFS_FREE] - KS_MARK) <= KS_MASTER_PASS - KS_MARK);
+                     (uint8_t)(blob[COGS_PREFS_FREE] - KS_OLD) <= KS_MASTER_PASS - KS_OLD);
 }
 
 uint8_t ks_load(uint8_t key[A2_KEY_LEN])
@@ -32,12 +31,10 @@ uint8_t ks_load(uint8_t key[A2_KEY_LEN])
     if (rc) {
         return rc;
     }
-    ks_master = 0;
-    if (!ours(n)) {
+    if (!ours(n) || blob[COGS_PREFS_FREE] < KS_MASTER) {
         return KS_NONE;
     }
     memcpy(key, blob + COGS_PREFS_FREE + 1, A2_KEY_LEN);
-    ks_master = (uint8_t)(blob[COGS_PREFS_FREE] >= KS_MASTER);
     rc = (uint8_t)(blob[COGS_PREFS_FREE] & 1 ? KS_LOCKED : 0);
     memset(blob, 0, sizeof blob);
     return rc;

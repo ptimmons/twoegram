@@ -17,6 +17,8 @@
 #include "layout.h"
 #include "link.h"
 #include "ui.h"
+#include "keystore.h"
+#include "config.h"
 
 static uint8_t codes[SCR_ROWS][SCR_COLS];
 
@@ -29,8 +31,17 @@ static const uint8_t *script;
 static const uint8_t *script_oa;
 static unsigned script_n, script_i;
 
+/* A scene in the middle of a screen: saved when its key is asked for. */
+static const char *snap_name;
+static unsigned snap_at;
+static void save(const char *name);
+
 uint8_t key_get(void)
 {
+    if (snap_name && script_i == snap_at) {
+        save(snap_name);
+        snap_name = 0;
+    }
     if (script_i >= script_n) {
         key_oa = 1;
         return 'q';
@@ -65,7 +76,24 @@ uint8_t tick_wait(uint16_t n) { (void)n; return 0; }
 char status_net[24] = "COGS 192.168.1.42";
 void net_check(void) {}
 uint8_t cfg_load(void) { return 1; }
-uint8_t cfg_save(void) { return 0; }
+
+/* TWOEGRAM.CFG, in memory. */
+static char cfg_file[600];
+uint16_t cfg_read(char *buf, uint16_t cap)
+{
+    size_t n = strlen(cfg_file);
+
+    if (n > (size_t)cap - 1) n = (size_t)cap - 1;
+    memcpy(buf, cfg_file, n);
+    buf[n] = 0;
+    return (uint16_t)n;
+}
+uint8_t cfg_write(const char *text, uint16_t n)
+{
+    memcpy(cfg_file, text, n);
+    cfg_file[n] = 0;
+    return 0;
+}
 
 static uint8_t kb[400], oa[400];
 
@@ -193,5 +221,58 @@ int main(void)
     kb[0] = 'b'; oa[0] = 1;
     run(1);
     save("hidden");
+    kb[0] = 'b'; oa[0] = 1;
+    run(1);
+
+    /* Settings, with three gateways saved. A made-up master on the
+     * card, and the gateway knows claw1's key from it. */
+    {
+        static const uint8_t m[16] = { 0x5A, 0x11, 0xC3, 0x07, 0x9E, 0x42, 0x6B, 0xD0,
+                                       0x28, 0x83, 0xF1, 0x3C, 0x74, 0xA9, 0x0E, 0x65 };
+        uint8_t k[16], buf[27], dig[32];
+
+        memset(prefs, 0, 15);
+        prefs[15] = KS_MASTER;
+        memcpy(prefs + 16, m, 16);
+        prefs_len = 32;
+        memcpy(ks_secret, m, 16);
+        ks_have = 1;
+        ks_derive(m, "claw1", k);
+        memcpy(gw_key, k, 16);
+        memcpy(buf, "twoegram-id", 11);
+        memcpy(buf + 11, k, 16);
+        sha256(buf, 27, dig);
+        a2_hex(gw_id, dig, 4);
+        memcpy(ses_key, k, 16);
+        ses_hello();
+    }
+    strcpy(cfg_name, "claw1");
+    strcpy(ses_base, "http://192.168.1.20:8417");
+    strcpy(cfg_file, "GATEWAY=claw1 http://192.168.1.20:8417\r"
+                     "GATEWAY=mini http://192.168.1.31:8417\r"
+                     "GATEWAY=relay http://192.168.1.40:8417\r");
+    kb[0] = 'k'; oa[0] = 1;
+    kb[1] = K_ESC;
+    snap_name = "settings"; snap_at = 1;
+    run(2);
+
+    /* Adding a gateway: Add, after the three. */
+    kb[0] = 'k'; oa[0] = 1;
+    kb[1] = K_DOWN; kb[2] = K_DOWN; kb[3] = K_DOWN;
+    kb[4] = K_RETURN;
+    n = type(5, "studio");
+    kb[n++] = K_TAB;
+    n = type(n, "192.168.1.50");
+    snap_name = "add-gateway"; snap_at = n;
+    kb[n++] = K_ESC;
+    kb[n++] = K_ESC;
+    run(n);
+
+    /* Its key: K on claw1 in Settings. */
+    kb[0] = 'k'; oa[0] = 1;
+    kb[1] = 'k';
+    kb[2] = ' ';
+    snap_name = "add-key"; snap_at = 2;
+    run(3);
     return 0;
 }

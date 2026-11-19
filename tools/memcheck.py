@@ -36,9 +36,11 @@ def main():
 # must end before anything else in LOWBSS starts. Saving fetches as it
 # goes, so the reply buffer (session.o) must stay out of its way.
 OVERLAYS = (
-    ("OVERLAY1", "the set-up overlay", ("layout.o", "msgs.o", "session.o")),
-    ("OVL1DATA", "the set-up overlay's data", ("layout.o", "msgs.o", "session.o")),
+    ("OVERLAY1", "adding a gateway", ("layout.o", "msgs.o", "session.o")),
+    ("OVL1DATA", "adding a gateway's data", ("layout.o", "msgs.o", "session.o")),
     ("OVERLAY2", "the saving overlay", ("layout.o", "msgs.o")),
+    ("OVERLAY3", "settings", ("layout.o", "msgs.o", "session.o")),
+    ("OVL3DATA", "settings' data", ("layout.o", "msgs.o", "session.o")),
 )
 
 

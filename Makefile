@@ -38,6 +38,7 @@ APP = \
 	src/msgs.c \
 	src/link.c \
 	src/setup.c \
+	src/prefs.c \
 	src/lock.c \
 	src/overlay.c \
 	src/save.c \
@@ -67,6 +68,7 @@ HDRS = $(wildcard src/*.h)
 
 BIN   = build/TWOEGRAM.SYSTEM
 SETUP = build/TWOEGRAM.SETUP
+PREFS = build/TWOEGRAM.PREFS
 SAVE  = build/TWOEGRAM.SAVE
 PRBIN = build/A2PROBE.SYSTEM
 
@@ -113,7 +115,9 @@ $(BIN): $(call obj,$(APP) $(COMMON)) $(CFG) tools/memcheck.py
 	@echo "TWOEGRAM.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
 	@python3 -I tools/memcheck.py build/twoegram.map $(CFG) || { rm -f $@; exit 1; }
 	@cp $@.1 $(SETUP)
-	@echo "TWOEGRAM.SETUP: $$(wc -c < $(SETUP)) bytes, the set-up overlay"
+	@echo "TWOEGRAM.SETUP: $$(wc -c < $(SETUP)) bytes, adding a gateway"
+	@cp $@.3 $(PREFS)
+	@echo "TWOEGRAM.PREFS: $$(wc -c < $(PREFS)) bytes, settings"
 	@cp $@.2 $(SAVE)
 	@echo "TWOEGRAM.SAVE: $$(wc -c < $(SAVE)) bytes, the saving overlay"
 
@@ -131,11 +135,13 @@ disk: $(DISK)
 # Given once, URL= and KEY= are kept in probe.cfg (gitignored, never
 # committed: it holds a key) and every later disk carries them too.
 #
-# TWOEGRAM.CFG gets GATEWAY= from probe.cfg when it has one (the real
-# gateway: make disk GATEWAY=http://192.168.1.20:8417, kept like URL=),
-# else the probe's URL (the dev server).
+# TWOEGRAM.CFG gets the GATEWAY= lines from probe.cfg when it has any
+# (the real gateways, the one in use first, each a key name and an
+# address: make disk GATEWAY="claw1 http://192.168.1.20:8417" sets one,
+# kept like URL=; edit probe.cfg for several), else the probe's URL
+# (the dev server), with no key name, which set-up then asks for.
 $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
-	VOL=$(VOLUME) tools/mkdisk.sh $(DISK) $(BIN) $(SETUP) $(SAVE) $(PRBIN)
+	VOL=$(VOLUME) tools/mkdisk.sh $(DISK) $(BIN) $(SETUP) $(PREFS) $(SAVE) $(PRBIN)
 	@if [ -n "$(GATEWAY)" ] && [ -f probe.cfg ]; then \
 	    grep -v '^GATEWAY=' probe.cfg > probe.cfg.new; \
 	    printf 'GATEWAY=%s\n' "$(GATEWAY)" >> probe.cfg.new; \
@@ -148,9 +154,11 @@ $(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	@if [ -f probe.cfg ]; then \
 	    tr '\n' '\r' < probe.cfg | tools/ac -ptx $(DISK) A2PROBE.CFG; \
 	    echo "A2PROBE.CFG: $$(sed -n 's/^URL=//p' probe.cfg), with a key (from probe.cfg)"; \
-	    gw=$$(sed -n 's/^GATEWAY=//p' probe.cfg); gw=$${gw:-$$(sed -n 's/^URL=//p' probe.cfg)}; \
-	    printf '# Twoegram: the gateway%ss address\rGATEWAY=%s\r' "'" "$$gw" | tools/ac -ptx $(DISK) TWOEGRAM.CFG; \
-	    echo "TWOEGRAM.CFG: $$gw, no key (the key stays on the card)"; \
+	    if grep -q '^GATEWAY=' probe.cfg; then gws=$$(grep '^GATEWAY=' probe.cfg); \
+	    else gws="GATEWAY=$$(sed -n 's/^URL=//p' probe.cfg)"; fi; \
+	    { echo '# Twoegram: the gateways, the one in use first'; echo "$$gws"; } | \
+	        tr '\n' '\r' | tools/ac -ptx $(DISK) TWOEGRAM.CFG; \
+	    echo "TWOEGRAM.CFG: $$(echo "$$gws" | sed 's/^GATEWAY=//' | paste -sd ';' -), no key (the key stays on the card)"; \
 	else \
 	    echo "no A2PROBE.CFG (give URL= and KEY= once for the probe)"; \
 	fi
@@ -161,7 +169,7 @@ FORCE:
 
 # The release: build/release/ holds the disk (TWOEGRAM.SYSTEM and
 # A2PROBE.SYSTEM, volume /TWOEGRAM, and no .CFG file: no test key, no
-# address; the set-up screen asks), the plugin package (npm pack, only
+# address; adding a gateway asks), the plugin package (npm pack, only
 # the files OpenClaw loads), and their SHA-256 sums. The build number
 # goes up as for any disk, so the release's is its own.
 VERSION := $(shell sed -n 's/.*TWOEGRAM_VERSION "\(.*\)".*/\1/p' src/ui.h)
@@ -170,7 +178,7 @@ REL      = build/release
 release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	rm -rf $(REL)
 	mkdir -p $(REL)
-	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(SETUP) $(SAVE) $(PRBIN)
+	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(SETUP) $(PREFS) $(SAVE) $(PRBIN)
 	@if tools/ac -ll $(REL)/TWOEGRAM-$(VERSION).po | grep -q '\.CFG'; then \
 	    echo "release: a .CFG file is on the release disk" >&2; exit 1; \
 	fi
@@ -208,7 +216,7 @@ build/host/test_store: tests/host/test_store.c src/store.c tests/host/auxmodel.c
 
 # The conversation screen itself, on test_a2.c's model card and gateway,
 # with a text screen and scripted keys in place of the Apple's.
-HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup.c src/lock.c src/overlay.c src/save.c \
+HOST_CONVO = $(HOST_A2) src/convo.c src/layout.c src/msgs.c src/link.c src/setup.c src/prefs.c src/lock.c src/overlay.c src/save.c \
              src/help.c src/status.c src/screen.c
 
 build/host/test_convo: tests/host/test_convo.c tests/host/test_a2.c $(HOST_CONVO) $(HDRS) build/build.h | build/host

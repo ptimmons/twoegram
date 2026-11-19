@@ -2,11 +2,12 @@
  * Where the device key lives: the CoGS card's prefs blob, bytes 15-31,
  * which the card keeps in its flash for host programs (reference 4.2.5;
  * milestone 2 found them free on the user's card). Byte 15 marks the
- * blob as Twoegram's, bytes 16-31 are its secret: a key made by a
- * gateway (KS_MARK), or the master the Apple made itself (KS_MASTER),
- * from which each gateway's key is derived (docs/RELAY.md, part 1).
- * Either may be scrambled with a passphrase (lock.h), which nothing
- * stores. Never on a disk: a network disk is an image on a web server.
+ * blob as Twoegram's, bytes 16-31 are its secret: the master the Apple
+ * made itself (KS_MASTER), from which each gateway's key is derived
+ * (docs/RELAY.md, part 1). It may be scrambled with a passphrase
+ * (lock.h), which nothing stores. A key made by a gateway (KS_OLD, from
+ * before b048) is no longer used: it loads as no key, and the next
+ * master is written over it. Never on a disk: a network disk is an image on a web server.
  *
  * Bytes 0-14 are the card's own settings (timezone, clock sync, TLS,
  * equaliser) and are always written back exactly as read.
@@ -16,8 +17,7 @@
 
 #include "proto.h"
 
-#define KS_MARK     0xA2            /* byte 15: a gateway's key follows */
-#define KS_MARK_PASS 0xA3           /* ... scrambled with a passphrase */
+#define KS_OLD      0xA2            /* byte 15: a gateway's key (and $A3, locked): unused */
 #define KS_MASTER   0xA4            /* the master the Apple made */
 #define KS_MASTER_PASS 0xA5         /* ... scrambled with a passphrase */
 
@@ -25,23 +25,22 @@
 #define KS_NOROOM   0xD1            /* the card has none of its own settings stored yet */
 #define KS_INUSE    0xD2            /* bytes 15-31 hold something else's data */
 #define KS_LOCKED   0xD3            /* the key is scrambled: a passphrase is needed */
-#define KS_NONAME   0xD4            /* a master, but the gateway has no key name */
+#define KS_NONAME   0xD4            /* the gateway has no key name */
 
-/* The card's secret in memory, as ks_load found it and lock.c unlocked
- * it: ks_have says it is there. ks_master: the card holds a master
- * (set by ks_load whatever it loads into). */
+/* The card's master in memory, as ks_load found it and lock.c unlocked
+ * it: ks_have says it is there. */
 extern uint8_t ks_secret[A2_KEY_LEN];
 extern uint8_t ks_have;
-extern uint8_t ks_master;
 
 /* Wipe ks_secret (at the lock, and at quit). */
 void ks_forget(void);
 
 /* The mark to save ks_secret under, plain or with a passphrase. */
-#define KS_MARK_FOR(pass) ((uint8_t)((ks_master ? KS_MASTER : KS_MARK) | ((pass) ? 1 : 0)))
+#define KS_MARK_FOR(pass) ((uint8_t)((pass) ? KS_MASTER_PASS : KS_MASTER))
 
-/* 0 with the secret; KS_LOCKED with it scrambled, to be unscrambled
- * with the passphrase; KS_NONE; or a card code. Sets ks_master. */
+/* 0 with the master; KS_LOCKED with it scrambled, to be unscrambled
+ * with the passphrase; KS_NONE (also for a gateway's old key); or a
+ * card code. */
 uint8_t ks_load(uint8_t key[A2_KEY_LEN]);
 
 /* The secret under mark (KS_MARK_FOR: already scrambled if it says

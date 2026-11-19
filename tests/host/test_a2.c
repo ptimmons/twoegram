@@ -919,18 +919,18 @@ static void test_keystore(void)
     /* Nothing stored at all: the card's own settings would be invented. */
     prefs_len = 0;
     CHECK(ks_load(got) == KS_NONE);
-    CHECK(ks_save(key, KS_MARK) == KS_NOROOM && prefs_len == 0);
+    CHECK(ks_save(key, KS_MASTER) == KS_NOROOM && prefs_len == 0);
 
     /* The user's card: 15 bytes of its own. */
     memcpy(prefs, orig, 15);
     prefs_len = 15;
     CHECK(ks_load(got) == KS_NONE);
-    CHECK(ks_save(key, KS_MARK) == 0);
-    CHECK(prefs_len == 32 && !memcmp(prefs, orig, 15) && prefs[15] == KS_MARK);
+    CHECK(ks_save(key, KS_MASTER) == 0);
+    CHECK(prefs_len == 32 && !memcmp(prefs, orig, 15) && prefs[15] == KS_MASTER);
     CHECK(ks_load(got) == 0 && !memcmp(got, key, 16));
     /* Saving again replaces our own key. */
     key[0] = 0x99;
-    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0 && got[0] == 0x99);
+    CHECK(ks_save(key, KS_MASTER) == 0 && ks_load(got) == 0 && got[0] == 0x99);
     /* Clearing goes back to the card's own fifteen bytes. */
     CHECK(ks_clear() == 0 && prefs_len == 15 && !memcmp(prefs, orig, 15));
     CHECK(ks_load(got) == KS_NONE);
@@ -940,34 +940,40 @@ static void test_keystore(void)
     memcpy(prefs, orig, 15);
     memset(prefs + 15, 0x11, 17);
     prefs_len = 32;
-    CHECK(ks_save(key, KS_MARK) == KS_INUSE && prefs[15] == 0x11);
+    CHECK(ks_save(key, KS_MASTER) == KS_INUSE && prefs[15] == 0x11);
     CHECK(ks_load(got) == KS_NONE);
     /* All zero there counts as free. */
     memset(prefs + 15, 0, 17);
-    CHECK(ks_save(key, KS_MARK) == 0 && prefs[15] == KS_MARK && !memcmp(prefs, orig, 15));
+    CHECK(ks_save(key, KS_MASTER) == 0 && prefs[15] == KS_MASTER && !memcmp(prefs, orig, 15));
     /* A key under a passphrase: loaded as locked, scrambled bytes and all;
      * saved over and cleared like the plain one. */
-    CHECK(ks_save(key, KS_MARK_PASS) == 0 && prefs[15] == KS_MARK_PASS);
+    CHECK(ks_save(key, KS_MASTER_PASS) == 0 && prefs[15] == KS_MASTER_PASS);
     CHECK(ks_load(got) == KS_LOCKED && !memcmp(got, key, 16));
-    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0);
-    CHECK(ks_save(key, KS_MARK_PASS) == 0 && ks_clear() == 0 && prefs_len == 15);
+    CHECK(ks_save(key, KS_MASTER) == 0 && ks_load(got) == 0);
+    CHECK(ks_save(key, KS_MASTER_PASS) == 0 && ks_clear() == 0 && prefs_len == 15);
     CHECK(ks_load(got) == KS_NONE && !memcmp(prefs, orig, 15));
-    /* A master, plain and locked: loaded the same way, and said so. */
-    CHECK(ks_save(key, KS_MASTER) == 0 && prefs[15] == KS_MASTER);
-    CHECK(ks_load(got) == 0 && ks_master && !memcmp(got, key, 16));
-    CHECK(ks_save(key, KS_MASTER_PASS) == 0 && ks_load(got) == KS_LOCKED && ks_master);
-    ks_master = 1;
+    /* A gateway's key from before b048 ($A2, or $A3 locked): ours, but
+     * no longer used. It loads as no key, and a master is written over
+     * it (or it is cleared) like our own. */
     CHECK(KS_MARK_FOR(0) == KS_MASTER && KS_MARK_FOR(1) == KS_MASTER_PASS);
-    CHECK(ks_save(key, KS_MARK) == 0 && ks_load(got) == 0 && !ks_master);
-    CHECK(KS_MARK_FOR(0) == KS_MARK && KS_MARK_FOR(1) == KS_MARK_PASS);
-    CHECK(ks_clear() == 0 && ks_load(got) == KS_NONE && !ks_master);
+    for (i = 0; i < 2; ++i) {
+        memcpy(prefs, orig, 15);
+        prefs[15] = (uint8_t)(KS_OLD + i);
+        memset(prefs + 16, 0x77, 16);
+        prefs_len = 32;
+        CHECK(ks_load(got) == KS_NONE);
+        CHECK(ks_save(key, KS_MASTER) == 0 && prefs[15] == KS_MASTER && ks_load(got) == 0);
+        CHECK(!memcmp(got, key, 16) && !memcmp(prefs, orig, 15));
+        prefs[15] = (uint8_t)(KS_OLD + i);
+        CHECK(ks_clear() == 0 && prefs_len == 15 && !memcmp(prefs, orig, 15));
+    }
     /* $A6 and above are not ours. */
     memset(prefs + 15, 0, 17);
     prefs[15] = 0xA6;
     prefs_len = 32;
-    CHECK(ks_load(got) == KS_NONE && ks_save(key, KS_MARK) == KS_INUSE);
+    CHECK(ks_load(got) == KS_NONE && ks_save(key, KS_MASTER) == KS_INUSE);
     memset(prefs + 15, 0, 17);
-    CHECK(ks_save(key, KS_MARK) == 0);
+    CHECK(ks_save(key, KS_MASTER) == 0);
 }
 
 /* Keys derived from a master secret, against hermes/tests/vectors.json

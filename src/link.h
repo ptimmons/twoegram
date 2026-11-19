@@ -1,7 +1,7 @@
 /*
  * Getting to the gateway: the address from TWOEGRAM.CFG, the key from the
- * card, the set-up screen when either is missing or the gateway does not
- * know the key, and the hello. With no CoGS card (an emulator) the app
+ * card, adding a gateway when there is none or it does not know the key,
+ * and the hello. With no CoGS card (an emulator) the app
  * shows milestone 0's made-up conversations instead.
  */
 #ifndef LINK_H
@@ -46,14 +46,16 @@ extern uint8_t link_badkey;         /* no session: the gateway refused the key *
  * against (30 s; the card's own timeouts come first). */
 void link_begin(void);
 
-/* Say hello again (Open-Apple-R). 0, or why not. */
+/* Say hello again. 0, or why not. */
 uint8_t link_connect(void);
 
-/* The set-up screen, then hello (Open-Apple-K). */
+/* Open-Apple-R: hello again, and if the gateway refuses the key (or
+ * there is none), show it to be added there. */
+void link_again(void);
+
+/* Settings, then whatever it asks for (Open-Apple-K). */
 void link_setup(void);
 
-/* The set-up screen (overlay.h): 1 if the address and key were set, 0 if
- * cancelled. */
 #include "overlay.h"
 
 #endif

@@ -99,9 +99,9 @@ uint8_t cfg_parse(char *text)
 #include <unistd.h>
 #include <errno.h>
 
-static char text[160];
+static char text[160];             /* the first line is all the program needs */
 
-uint8_t cfg_load(void)
+uint16_t cfg_read(char *buf, uint16_t cap)
 {
     int fd, n;
 
@@ -109,13 +109,44 @@ uint8_t cfg_load(void)
     if (fd < 0) {
         return 0;
     }
-    n = read(fd, text, sizeof text - 1);
+    n = read(fd, buf, cap - 1);
     close(fd);
     if (n <= 0) {
         return 0;
     }
-    text[n] = 0;
-    return cfg_parse(text);
+    buf[n] = 0;
+    return (uint16_t)n;
+}
+
+uint8_t cfg_write(const char *buf, uint16_t n)
+{
+    int fd;
+    uint8_t tries, rc;
+
+    /* A block write to a CoGS network disk can fail with $27 (Newsiie's
+     * milestone 8 notes): write the whole file again, up to three times. */
+    for (tries = 0; tries < 3; ++tries) {
+        _filetype = 0x04;           /* TXT */
+        _auxtype = 0;
+        fd = open(CFG_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+            rc = _oserror ? _oserror : 0xFF;
+        } else {
+            rc = write(fd, buf, n) == (int)n ? 0 : (_oserror ? _oserror : 0xFF);
+            if (close(fd) && !rc) {
+                rc = _oserror ? _oserror : 0xFF;
+            }
+        }
+        if (rc != 0x27) {
+            return rc;
+        }
+    }
+    return rc;
+}
+
+uint8_t cfg_load(void)
+{
+    return cfg_read(text, sizeof text) ? cfg_parse(text) : 0;
 }
 
 #endif

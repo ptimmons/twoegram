@@ -153,42 +153,70 @@ uint8_t link_connect(void)
 }
 
 static void open_locked(void);
+static void after_prefs(uint8_t act, uint8_t locked);
 
 /* Whether the card's key is locked with a passphrase and not yet
  * unlocked: then the passphrase comes before connecting. */
 static uint8_t card_locked(void)
 {
     static uint8_t scrambled[A2_KEY_LEN];
-    uint8_t rc = (uint8_t)(!lock_armed && ks_load(scrambled) == KS_LOCKED);
+    uint8_t rc = (uint8_t)(!ks_have && !lock_armed && ks_load(scrambled) == KS_LOCKED);
 
     memset(scrambled, 0, sizeof scrambled);
     return rc;
 }
 
-/* The gateway said no to this key: set-up again, until it is right or
- * cancelled. */
+/* The gateway refused the key itself: it does not know it, or the
+ * signature did not check. */
+static uint8_t refused(uint8_t rc)
+{
+    return (uint8_t)(rc == SES_E_REFUSED &&
+                     (ses_reply.code == A2_UNKNOWN_DEVICE || ses_reply.code == A2_BAD_SIGNATURE));
+}
+
+/* Connect to the gateway in use. Without one, add one; without a key
+ * for it (no master on the card yet), or while the gateway does not
+ * know it, show it to be added there: until it is right, or cancelled. */
 static void connect_or_setup(void)
 {
-    uint8_t rc;
+    const char *why = "The gateway does not know this Apple's key yet: add it there.";
 
-    if (card_locked()) {
-        open_locked();
+    if (!cogs_slot) {
+        offline("NO COGS CARD", "No CoGS card was found in any slot.");
         return;
     }
     for (;;) {
-        rc = link_connect();
-        if (rc != SES_E_REFUSED ||
-            (ses_reply.code != A2_UNKNOWN_DEVICE && ses_reply.code != A2_BAD_SIGNATURE)) {
+        if (!cfg_name[0]) {
+            if (!setup_run(0, 0)) {
+                offline("NOT SET UP", "No gateway yet: " OA "-K, then Add a gateway.");
+                return;
+            }
+            continue;
+        }
+        if (card_locked()) {
+            open_locked();
             return;
         }
-        if (!setup_run("The gateway does not know this Apple's key: " OA "-V shows it, to add there.")) {
+        if (lock_use()) {
+            /* No master on the card: adding the key makes one. */
+            if (!setup_run(1, "This Apple needs its key on the gateway.")) {
+                offline("NO KEY", "This Apple's key is not added on the gateway: " OA "-R.");
+                return;
+            }
+            continue;
+        }
+        if (!refused(link_connect())) {
             return;
         }
+        if (!setup_run(1, why)) {
+            return;
+        }
+        why = "The gateway still does not know this key: is it added there?";
     }
 }
 
 /* The card's key is locked with a passphrase: ask for it, until the
- * gateway knows the key it makes, or Esc goes to set-up. */
+ * gateway knows the key it makes, or Esc goes to Settings. */
 static void open_locked(void)
 {
     const char *why = 0;
@@ -196,11 +224,7 @@ static void open_locked(void)
 
     for (;;) {
         if (!lock_open(why)) {
-            if (setup_run("To make a new key instead: " OA "-M.")) {
-                connect_or_setup();
-            } else {
-                offline("LOCKED", "The key on the card is locked with a passphrase: " OA "-K for set-up.");
-            }
+            after_prefs(prefs_run("Locked: a new key, without the passphrase, is Start over below."), 1);
             return;
         }
         rc = link_connect();
@@ -211,36 +235,49 @@ static void open_locked(void)
     }
 }
 
+/* After Settings: what it asked for. */
+static void after_prefs(uint8_t act, uint8_t locked)
+{
+    if (act == PREFS_KEY) {
+        setup_run(1, 0);
+    }
+    if (act == PREFS_USE || act == PREFS_KEY || (act == PREFS_ADD && setup_run(0, 0))) {
+        connect_or_setup();
+    } else if (act == PREFS_GONE) {
+        ses_forget();
+        memset(ses_key, 0, A2_KEY_LEN);
+        offline("NO KEY", "The key is gone from the card: " OA "-R makes a new one, to add there.");
+    } else if (locked) {
+        offline("LOCKED", "The key on the card is locked with a passphrase: " OA "-K for settings.");
+    }
+}
+
 void link_start(void)
 {
-    uint8_t have_gw, rc;
+    uint8_t rc;
 
-    if (!cogs_slot) {
-        offline("NO COGS CARD", "No CoGS card was found in any slot.");
-        return;
-    }
-    /* The disk before any network use; then the card. */
-    have_gw = cfg_load();
+    /* The disk before any network use; then the card (with none, both
+     * come to nothing, and connect_or_setup says so). */
+    cfg_load();
     rc = ks_load(ks_secret);
-    if (rc == KS_LOCKED) {
-        ks_forget();                            /* lock_open reads it again */
-        rc = ks_master && !cfg_name[0] ? KS_NONAME : 0;
-    } else if (!rc) {
+    if (rc) {
+        ks_forget();                            /* locked: lock_open reads it again */
+    } else {
         ks_have = 1;
-        rc = lock_use();
-    }
-    if (!have_gw || rc) {
-        if (!setup_run(have_gw ? "Make this Apple's key (" OA "-M), and give the gateway a key name." : 0)) {
-            offline("NOT SET UP", "Not set up yet.");
-            return;
-        }
     }
     connect_or_setup();
 }
 
 void link_setup(void)
 {
-    if (setup_run(0)) {
+    after_prefs(prefs_run(0), 0);
+}
+
+void link_again(void)
+{
+    /* With no key in memory (locked, or none on the card), a hello would
+     * only count as a bad try at the gateway. */
+    if (!ks_have || refused(link_connect())) {
         connect_or_setup();
     }
 }

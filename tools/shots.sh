@@ -2,8 +2,10 @@
 # shots.sh <image.po> <dir> -- capture the screens Virtual ][ can show.
 #
 # Virtual ][ has no CoGS card, so it shows what Twoegram shows without
-# one: the splash, the conversation screen saying there is no card, help,
-# and the set-up screen. The conversation itself is tested on the Mac
+# one: the splash, the conversation screen saying there is no card, and
+# help. Settings and adding a gateway are drawn on the Mac, by
+# tests/host/shots.c (make convo-shots), with example addresses: here
+# they would show the disk's real gateways, from probe.cfg. The conversation itself is tested on the Mac
 # (tests/host/test_convo.c) and photographed on the real card.
 set -euo pipefail
 
@@ -32,21 +34,3 @@ snap no-card
 "$V" await "KEYBOARD COMMANDS" 10
 snap help
 "$V" text " " >/dev/null
-
-"$V" oa k >/dev/null
-"$V" await "Twoegram set-up" 10
-snap setup
-# A key name and the gateway's address typed in (an example address).
-# One key at a time: the //e's keyboard holds only one.
-slow() {
-    local i
-    for ((i = 0; i < ${#1}; i++)); do
-        "$V" text "${1:i:1}" >/dev/null
-        sleep 0.3
-    done
-}
-slow "claw1"
-"$V" tab >/dev/null
-slow "192.168.1.20:8417"
-snap setup-gateway
-"$V" key esc >/dev/null
