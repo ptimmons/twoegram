@@ -1348,8 +1348,9 @@ Apple's set-up does not use it yet (K2).
 
 ### K2: the Apple makes its key (2026-11-18, b037, plugins 1.2.0 and 1.1.0)
 
-The Apple's half of RELAY.md part 1. Not yet on the card (K3: PROBE.md,
-"Build b037").
+The Apple's half of RELAY.md part 1. Passed on the card as K3
+(2026-11-18, b046: b037 froze at Open-Apple-V, from a cc65 layout
+fault in the set-up overlay, fixed in b046).
 
 - **The card.** Marks `$A4` (a master) and `$A5` (a master under a
   passphrase) join `$A2`/`$A3`. `ks_load` sets `ks_master`. The secret

@@ -133,9 +133,14 @@ static void say(uint8_t row, const char *s, uint8_t inverse)
     scr_blit(row);
 }
 
+/* At file scope, as all the overlay's constants must be: with code and
+ * constants in one segment, cc65 puts a function's own static const
+ * table at the function's entry, where it runs as instructions
+ * (tools/cc65check.py). */
+static const uint8_t rows[3] = { NAME_ROW, ADDR_ROW, PASS_ROW };
+
 static void draw_field(uint8_t f)
 {
-    static const uint8_t rows[3] = { NAME_ROW, ADDR_ROW, PASS_ROW };
     const char *text = f == 0 ? nm : f == 1 ? gw : line;
     uint8_t n = f == 0 ? nmn : f == 1 ? gwn : pn, x;
 
@@ -244,9 +249,12 @@ static void card_trouble(uint8_t rc)
 
 /* k in the written form (PROTOCOL.md section 1), with the device id it
  * makes, into line. */
+/* At file scope, like rows: inside write_key, this ran as code on the
+ * real 65C02, and froze OA-V. */
+static const char alphabet[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ*~$=U";
+
 static void write_key(void)
 {
-    static const char alphabet[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ*~$=U";
     uint8_t i, j, v, pos = 0;
     uint16_t sum = 0;
     char *p = line;

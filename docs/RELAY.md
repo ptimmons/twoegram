@@ -1,8 +1,9 @@
 # Several agents: keys made on the Apple, and the relay
 
 **Status:** planned 2026-11-17. Built 2026-11-18: K1, K2 (b037), R1
-and R2 (`relay/`, 0.1.0). Waiting: K3 (the card), R3 (your LXC) and R4
-(the card through the relay); see Milestones.
+and R2 (`relay/`, 0.1.0). K3 passed on the card 2026-11-18 (b046).
+Waiting: R3 (your LXC) and R4 (the card through the relay); see
+Milestones.
 PLAN.md, "Several agents", tracks it.
 
 Twoegram holds one gateway and one key at a time. To talk to agents on

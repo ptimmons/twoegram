@@ -26,6 +26,17 @@ milestone 2). tests/cc65/struct_return.c reproduces it. cc65 marks each
 function with a comment giving its prototype; a return type of struct or
 union there is reported.
 
+And it refuses data at a function's entry. In a file whose code and
+constants share one segment (#pragma code-name and rodata-name the same,
+as in the set-up overlay), cc65 emits a function's own static const
+table into that segment right after the function's label, ahead of its
+first instruction. A call then runs the table as code. Twoegram b037:
+write_key's base-32 alphabet ran as code, pushing a byte with PHA ('H')
+and writing zero page, and Open-Apple-V crashed on the real Apple. Some
+of those bytes are undefined opcodes, which emulators decode
+differently, so it worked in Virtual ][. The cure is a constant at file
+scope.
+
 Exit status 1 if any are found.
 
 tests/cc65/ldaxysp_y0.c reproduces it. With Homebrew's cc65 2.19 bottle it
@@ -76,10 +87,42 @@ def check(path):
             y = None
     return problems
 
+SEGMENT = re.compile(r'^\.segment\s+"(\w+)"')
+DATA = re.compile(r"^(?:[A-Za-z_.@][\w.@]*:)?\s*\.(byte|word|addr|dword|res)\b")
+INSN = re.compile(r"^(?:[A-Za-z_.@][\w.@]*:)?\s+[a-z]{3}\b")
+
+def check_entries(path):
+    """Data in a function's own segment before its first instruction."""
+    problems = []
+    seg = "CODE"
+    proc = None          # (name, its segment), until its first instruction
+    cur = seg
+    for n, line in enumerate(open(path), 1):
+        m = SEGMENT.match(line)
+        if m:
+            cur = m.group(1)
+            if proc is None:
+                seg = cur
+            continue
+        m = re.match(r"^\.proc\s+(\S+)", line)
+        if m:
+            proc = (m.group(1).rstrip(":"), seg)
+            cur = seg
+            continue
+        if proc is None or cur != proc[1]:
+            continue
+        if DATA.match(line):
+            problems.append(f"{path}:{n}: {proc[0]}: data at its entry, which runs as code: "
+                            "move its static const to file scope")
+            proc = None
+        elif INSN.match(line):
+            proc = None
+    return problems
+
 def main():
     found = []
     for path in sys.argv[1:]:
-        found += check(path)
+        found += check(path) + check_entries(path)
     for p in found:
         print(p)
     print(f"cc65check: {len(found)} problem(s) in {len(sys.argv) - 1} file(s)")
