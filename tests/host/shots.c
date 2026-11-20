@@ -73,7 +73,6 @@ void tick_reset(void) { ticks = 0; }
 uint8_t tick_poll(void) { ++ticks; return 1; }
 uint8_t tick_wait(uint16_t n) { (void)n; return 0; }
 
-char status_net[24] = "COGS 192.168.1.42";
 void net_check(void) {}
 uint8_t cfg_load(void) { return 1; }
 
@@ -156,6 +155,7 @@ int main(void)
 {
     unsigned n;
 
+    strcpy(status_net, "COGS 192.168.1.42");   /* status.c's, set as net.c would */
     conv_demo = demo;
     conv_base = sizeof demo / sizeof demo[0];
     gw_agents = "agent main\nagent coder\nagent research\nname main Juniper\n";

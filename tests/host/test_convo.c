@@ -101,7 +101,6 @@ void tick_reset(void) { ticks = 0; }
 uint8_t tick_poll(void) { ++ticks; return 1; }
 uint8_t tick_wait(uint16_t n) { (void)n; return 0; }
 
-char status_net[24] = "COGS 10.0.0.9";
 void net_check(void) {}
 /* TWOEGRAM.CFG, in memory. Empty: no file, and cfg_load leaves the
  * gateway as the test set it. */
@@ -1244,6 +1243,7 @@ static void test_glyphs(void)
 
 int main(void)
 {
+    strcpy(status_net, "COGS 10.0.0.9");   /* status.c's, set as net.c would */
     cogs_slot = 4;
     test_glyphs();
     test_screen();
