@@ -228,7 +228,7 @@ static void conv_text(unsigned n, char *dst)
         return;
     }
     for (i = 0; i < len; ++i) {
-        dst[i] = (char)(i < t ? tag[i] : (i % 61 == 60) ? '\n' : 'a' + (n + i) % 26);
+        dst[i] = i < t ? tag[i] : (i % 61 == 60) ? '\n' : (char)('a' + (n + i) % 26);
     }
 }
 
