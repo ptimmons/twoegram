@@ -83,7 +83,7 @@ relay, with SHA256SUMS. The first b052 never left the Mac: its Settings
 said b050, because the Makefile's list of files showing the build
 number had left out prefs.c. The list is now found from the source.
 
-- [ ] **The release disk** (`TWOEGRAM-1.0.po`, checksum
+- [x] **The release disk** (`TWOEGRAM-1.0.po`, checksum
   `78818b5268b4ed0e59a6554f8e891c86677a0158f0dc5d6c478de12bf793afc9`) boots,
   asks for a gateway (it has none), and Settings says build b052.
 
