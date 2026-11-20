@@ -343,6 +343,18 @@ describe("the conversation", () => {
     expect(again.lines.some(([k]) => k === "unread")).toBe(false);
   });
 
+  it("counts what a poll returns as seen", async () => {
+    // The answer comes in a poll from before it; the Apple switches agents
+    // before polling coder again. coder has nothing unread.
+    const sent = await c.call("POST", "/a2/send?a=coder", "hi coder");
+    await new Promise((r) => setTimeout(r, 100));
+    const got = await c.call("GET", `/a2/poll?a=coder&after=${sent.msgs[0].n}`);
+    expect(got.msgs.length).toBeGreaterThan(0);
+    expect(got.msgs[got.msgs.length - 1].mine).toBe(false);
+    const onMain = await c.call("GET", "/a2/poll?a=main&after=0");
+    expect(onMain.lines.some(([k]) => k === "unread")).toBe(false);
+  });
+
   it("serves history, newest page first, oldest first on the wire", async () => {
     for (let i = 1; i <= 6; i++) await c.call("POST", "/a2/send?a=main", `message ${i}`);
     await new Promise((r) => setTimeout(r, 100));

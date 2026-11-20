@@ -37,6 +37,19 @@ of those bytes are undefined opcodes, which emulators decode
 differently, so it worked in Virtual ][. The cure is a constant at file
 scope.
 
+And it refuses a branch straight after a call to a C function. cc65
+compiled
+
+        if (a == cur ? cur_news() : agent_unread(a))
+
+to call either function and then beq, testing no register first. A
+function with arguments returns through "jmp incsp1", whose inc sp sets
+the flags from the stack pointer, so the branch read nearly every count
+as nonzero: Twoegram b048 drew an unread diamond beside every agent but
+the open one. tests/cc65/ternary_flags.c reproduces it. The call may also
+reach the branch by a bra or jmp to it. The cure is the value in a
+variable, tested on its own.
+
 Exit status 1 if any are found.
 
 tests/cc65/ldaxysp_y0.c reproduces it. With Homebrew's cc65 2.19 bottle it
@@ -119,10 +132,50 @@ def check_entries(path):
             proc = None
     return problems
 
+BRANCH = re.compile(r"^\s+(beq|bne|bmi|bpl|bcc|bcs|bvc|bvs)\b")
+CALL = re.compile(r"^(?:[A-Za-z_.@][\w.@]*:)?\s+jsr\s+(_\w+)")
+GOTO = re.compile(r"^\s+(?:bra|jmp)\s+(L\w+)\s*$")
+
+def check_flags(path):
+    """A conditional branch on the flags a C function's return left."""
+    lines = open(path).read().split("\n")
+    labels = {}
+    for i, line in enumerate(lines):
+        m = LABEL.match(line)
+        if m:
+            labels[m.group(0)[:-1]] = i
+
+    def insn(i):
+        """The first instruction from line i on, without its label."""
+        while i < len(lines):
+            text = LABEL.sub("", lines[i], count=1)
+            if text.strip() and not text.strip().startswith(";"):
+                return text
+            i += 1
+        return ""
+
+    problems = []
+    proc = "?"
+    for n, line in enumerate(lines, 1):
+        m = re.match(r"^\.proc\s+(\S+)", line)
+        if m:
+            proc = m.group(1).rstrip(":")
+        m = CALL.match(line)
+        if not m:
+            continue
+        nxt = insn(n)
+        g = GOTO.match(nxt)
+        if g and g.group(1) in labels:
+            nxt = insn(labels[g.group(1)])
+        if BRANCH.match(nxt):
+            problems.append(f"{path}:{n}: {proc}: {BRANCH.match(nxt).group(1)} on the flags {m.group(1)} "
+                            "returned with: test its value in a variable")
+    return problems
+
 def main():
     found = []
     for path in sys.argv[1:]:
-        found += check(path) + check_entries(path)
+        found += check(path) + check_entries(path) + check_flags(path)
     for p in found:
         print(p)
     print(f"cc65check: {len(found)} problem(s) in {len(sys.argv) - 1} file(s)")

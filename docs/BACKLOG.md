@@ -76,6 +76,53 @@ Parts A to E of the 2026-11-18 checklist passed on b046 (see "Passed").
 What is left is the relay, which needs a new container. Use
 `build/TWOEGRAM-b048.po`, or a later disk.
 
+### The diamond on every agent but the open one (b049)
+
+Found 2026-11-20 on the card, through the relay. Whatever the counts,
+the list drew a diamond beside each agent but the open one: Open-Apple-N
+said `NOTHING NEW ELSEWHERE` and the hidden list's heading counted
+nothing. cc65 branched on the flags `agent_unread` returned with, which
+describe the C stack pointer, not the count (tests/cc65/ternary_flags.c).
+`tools/cc65check.py` now refuses that pattern. The gateways and the
+relay are not involved.
+
+- [ ] **b049** on the card. Open Pinchy, then Hermes: neither row has a
+  diamond while nothing is new. Open-Apple-N still says
+  `NOTHING NEW ELSEWHERE`.
+- [ ] Then the unread fix's two checks below, which b048 could not show.
+- [ ] **b050**, the new wording: the splash says `Authenticated chat
+  for your Apple //e`. In Settings, the help under Add a gateway,
+  Passphrase, Start over with a new key and Remove the key from the
+  card reads as asked, nothing cut off at the right.
+
+### The unread fix (OpenClaw plugin 1.2.1, Hermes plugin 1.1.1, relay 0.1.1)
+
+Found 2026-11-20 through the relay, though it happens direct too.
+Switch agents within 5 seconds of an answer, before the Apple's next
+idle poll, and the agent you left keeps a diamond for the answer you
+just read. A gateway now counts what a poll returns as seen, not only
+what `after` says (PROTOCOL.md, `poll`). The relay keeps its own count
+for what its quiet polls take. The disk is unchanged. Put all three in
+place together: a relay 0.1.1 in front of an older gateway counts the
+quiet polls' finds twice for an agent sharing that gateway.
+
+- [ ] **claw1:** `build/openclaw-twoegram-1.2.1.tgz` (checksum
+  `f41383f66e8f27b10a1cf1fe1f4429e9599cdf59d22d2802bb92901c24037afc`), installed as
+  INSTALL.md steps 1 and 2 say (`openclaw gateway stop` first), then
+  `openclaw gateway start`. `openclaw plugins list` shows `a2` at 1.2.1.
+- [ ] **The mini:** `hermes/twoegram` copied over
+  `~/.hermes/plugins/twoegram`, then `hermes gateway restart`.
+- [ ] **The relay:** `build/twoegram-relay-0.1.1.tgz` (checksum
+  `fe34d3ef8cfc88500158f6ba0c0e844e7f5c39bc92332436543665cd388a613b`)
+  to the container. Unpack it, `sudo twoegram-relay/install.sh`, then
+  `sudo systemctl restart twoegram-relay`. Its gateways and Apples stay.
+- [ ] Send to Pinchy, and switch to Hermes as soon as the answer is on
+  the screen. Wait 30 seconds: Pinchy has no diamond. The same the
+  other way round.
+- [ ] While you're on Hermes, have Pinchy send something (or wait for a
+  late answer): Pinchy's diamond comes within about 20 seconds, and
+  goes once you open Pinchy.
+
 ### The relay on a Proxmox LXC (R3 and R4)
 
 - [ ] In Proxmox, make an unprivileged Ubuntu LTS container with a fixed
@@ -88,15 +135,15 @@ What is left is the relay, which needs a new container. Use
 - [ ] From the Mac Studio:
 
   ```bash
-  scp ~/repos/twoegram/build/twoegram-relay-0.1.0.tgz you@RELAY:
+  scp ~/repos/twoegram/build/twoegram-relay-0.1.1.tgz you@RELAY:
   ```
 
 - [ ] On the container, as `you`; only `install.sh` gets root. The
   checksum is
-  `f573649ecbf9b9bd70bdadc788e8c2294bdfed2bf93231249c824fdc8435440a`:
+  `fe34d3ef8cfc88500158f6ba0c0e844e7f5c39bc92332436543665cd388a613b`:
 
   ```bash
-  sha256sum twoegram-relay-0.1.0.tgz && tar xzf twoegram-relay-0.1.0.tgz && sudo twoegram-relay/install.sh
+  sha256sum twoegram-relay-0.1.1.tgz && tar xzf twoegram-relay-0.1.1.tgz && sudo twoegram-relay/install.sh
   ```
 
 - [ ] Pair the relay at claw1 (on claw1):
@@ -156,7 +203,7 @@ What is left is the relay, which needs a new container. Use
 ### 1. The relay on a Proxmox LXC (R3 and R4, relay 0.1.0, built 2026-11-18)
 
 Steps: [relay/README.md](../relay/README.md), "On a Proxmox LXC", with
-`build/twoegram-relay-0.1.0.tgz` (`make relay-dist`). Since the Apple adds its key to the relay the same way. It needs you
+`build/twoegram-relay-0.1.1.tgz` (`make relay-dist`). Since the Apple adds its key to the relay the same way. It needs you
 to make the container: unprivileged Ubuntu LTS, with a fixed address.
 
 - **install.sh** on the container: the user, the folders (mode 0700),

@@ -68,19 +68,19 @@ static const char *const tell_gw[2] = {
     "Forgetting it here leaves the key on the gateway, until a2 revoke there.",
 };
 static const char *const tell_add[2] = {
-    "Its key name and address, then this Apple's key for it, to type there.",
-    0,
+    "Create a new gateway configuration. Can be an individual Twoegram client",
+    "or a Twoegram relay server.",
 };
 static const char *const tell_pass[2] = {
-    "It locks this Apple's key on the card, for every gateway, and is asked",
-    "for at each start and after " OA "-L. Nothing keeps it.",
+    "Locks the key on the card and enables a passphrase protected screensaver",
+    "after 10 minutes. Use " OA "-L to lock the screen manually.",
 };
 static const char *const tell_new[2] = {
-    "A new key: every gateway must have it added again, and the passphrase",
-    "goes. For a key that may have been seen, or a passphrase forgotten.",
+    "Regenerates this machine's key and removes the passphrase. All gateways",
+    "will need to add the new key.",
 };
 static const char *const tell_gone[2] = {
-    "As before passing the card on. A new key is made when a gateway is added.",
+    "Removes the key from the card. (A new key is made when a gateway is added.)",
     0,
 };
 

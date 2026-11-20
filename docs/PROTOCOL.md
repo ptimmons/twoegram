@@ -92,7 +92,11 @@ higher than the last it accepted.
 `poll` waits up to *w* milliseconds (at most 4,000, under the card's 8 s
 keep-alive cutoff) for something to report, and answers at once if
 there is something already. `poll` also tells the plugin that the Apple
-has every message up to *after*, which is what clears unread counts.
+has every message up to *after*, and every message the reply carries:
+that is what clears unread counts. (Before OpenClaw plugin 1.2.1, Hermes
+plugin 1.1.1 and relay 0.1.1, only *after* counted. The answer that came
+in the last poll then stayed unread when the Apple switched agents
+before polling again, which it does every 5 seconds when idle.)
 
 `hist` takes `before` or `after`, not both (BAD_REQUEST). With neither,
 it is the newest page. With `before`, `more 1` means there are older

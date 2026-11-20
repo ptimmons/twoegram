@@ -156,6 +156,48 @@ async def test_unread_from_the_other_gateway(w):
     assert not any(k == "unread" and v.startswith("hermes") for k, v in r.lines)
 
 
+async def test_an_answer_read_is_not_unread_after_switching(w):
+    # The answer comes in the poll that says busy 0. The Apple switches
+    # within its 5 seconds to the next idle poll, so never polls again with
+    # an `after` past the answer: neither the gateway nor the relay may count
+    # it as unread then, through the gateway or the relay's quiet polls.
+    await w.apple.hello()
+    cur, other = "main", "hermes"
+    for _ in range(4):
+        r = await w.apple.call("POST", f"/a2/send?a={cur}", f"hi {cur}")
+        await answer(w.apple, cur, r.msgs[0].n)
+        h = await w.apple.call("GET", f"/a2/hist?a={other}&k=8")
+        last = h.msgs[-1].n if h.msgs else 0
+        await w.apple.call("GET", f"/a2/poll?a={other}&after={last}&w=0")
+        await asyncio.sleep(0.1)
+        w.relay._polled.clear()
+        await w.relay.quiet_round()
+        r = await w.apple.call("GET", f"/a2/poll?a={other}&after={last}&w=0")
+        assert not any(k == "unread" for k, _ in r.lines), (cur, r.lines)
+        cur, other = other, cur
+
+
+async def test_a_quiet_polls_news_kept_on_its_own_gateway(w):
+    # A quiet poll takes claw1's main's new message, so claw1 counts it as
+    # seen. Opening coder, on claw1 too, still shows main's diamond.
+    await w.apple.hello()
+    relay_on_claw1 = w.claw1.store.list()[0].id
+    await w.apple.call("GET", "/a2/poll?a=main&after=0&w=0")
+    await w.apple.call("GET", "/a2/poll?a=hermes&after=0&w=0")
+    w.claw1.a2.post(relay_on_claw1, "main", "News from Pinchy.")
+    w.relay._polled.clear()
+    await w.relay.quiet_round()
+    r = await w.apple.call("GET", "/a2/poll?a=hermes&after=0&w=0")
+    assert ("unread", "main 1") in r.lines
+    r = await w.apple.call("GET", "/a2/poll?a=coder&after=0&w=0")
+    assert ("unread", "main 1") in r.lines
+    # Opening main: fetched, and no longer counted.
+    r = await w.apple.call("GET", "/a2/poll?a=main&after=0&w=0")
+    assert any(m.text == "News from Pinchy." for m in r.msgs)
+    r = await w.apple.call("GET", "/a2/poll?a=coder&after=0&w=0")
+    assert not any(k == "unread" for k, _ in r.lines)
+
+
 async def test_unread_ids_on_the_same_gateway_are_the_relays(w):
     await w.apple.hello()
     relay_on_mini = w.mini.store.list()[0].id

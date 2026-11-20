@@ -370,6 +370,17 @@ async def test_unread_counts(c):
     assert not any(k == "unread" for k, _ in again.lines)
 
 
+async def test_what_a_poll_returns_is_seen(c):
+    # The answer comes in a poll from before it; the Apple switches agents
+    # before polling coder again. coder has nothing unread.
+    r = await c.call("POST", "/a2/send?a=coder", "hi coder")
+    await asyncio.sleep(0.1)
+    got = await c.call("GET", f"/a2/poll?a=coder&after={r.msgs[0].n}")
+    assert got.msgs and not got.msgs[-1].mine
+    on_main = await c.call("GET", "/a2/poll?a=main&after=0")
+    assert not any(k == "unread" for k, _ in on_main.lines)
+
+
 async def test_history_newest_page_first(c):
     for i in range(1, 7):
         await c.call("POST", "/a2/send?a=main", f"message {i}")

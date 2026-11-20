@@ -5,7 +5,7 @@ text, store, server) need only the standard library; adapter.py and cli.py
 need Hermes, so they are imported only when Hermes loads the plugin.
 """
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 
 def register(ctx):

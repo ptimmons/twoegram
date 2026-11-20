@@ -62,14 +62,14 @@ does. Python 3.11 or later, standard library only.
    ```
 
    ```bash
-   scp build/twoegram-relay-0.1.0.tgz you@RELAY-HOST:
+   scp build/twoegram-relay-0.1.1.tgz you@RELAY-HOST:
    ```
 
    On the container, unpack it as yourself. Only `install.sh` needs
    root:
 
    ```bash
-   tar xzf twoegram-relay-0.1.0.tgz && sudo twoegram-relay/install.sh
+   tar xzf twoegram-relay-0.1.1.tgz && sudo twoegram-relay/install.sh
    ```
 
    The service runs as its own user, `twoegram-relay`, with no login

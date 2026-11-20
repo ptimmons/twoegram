@@ -1,6 +1,6 @@
 {
   "name": "openclaw-twoegram",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "The a2 channel: OpenClaw agents for the Apple //e Twoegram client, signed over the LAN",
   "license": "MIT",
   "private": true,

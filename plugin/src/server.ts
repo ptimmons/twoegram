@@ -334,7 +334,12 @@ export class A2Server {
       if (n) head.push(`unread ${other} ${n}`);
     }
     const fresh = c.msgs.filter((m) => m.n > after);
-    return pack([`busy ${c.busy > 0 ? 1 : 0}`, ...head], fresh, false, fresh.length);
+    const [body, kept] = pack([`busy ${c.busy > 0 ? 1 : 0}`, ...head], fresh, false, fresh.length);
+    // What this reply carries is fetched, so seen: not only what `after`
+    // says. The Apple may switch agents before it polls this one again
+    // (PROTOCOL.md, "unread").
+    if (kept) c.seen = Math.max(c.seen, fresh[kept - 1].n);
+    return body;
   }
 
   private hist(device: string, agent: string, url: URL): Buffer {
@@ -346,11 +351,11 @@ export class A2Server {
       if (url.searchParams.has("before")) throw new Refusal(Code.BAD_REQUEST, "before or after, not both");
       const after = intParam(url, "after", 0);
       const newer = c.msgs.filter((m) => m.n > after);
-      return pack([], newer.slice(0, k), false, newer.length);
+      return pack([], newer.slice(0, k), false, newer.length)[0];
     }
     const before = intParam(url, "before", c.next);
     const older = c.msgs.filter((m) => m.n < before);
-    return pack([], older.slice(-k), true, older.length);
+    return pack([], older.slice(-k), true, older.length)[0];
   }
 
   // ---- lockouts ----
@@ -437,7 +442,7 @@ function readBody(req: IncomingMessage): Promise<Buffer | null> {
  * from the newest, so the most recent older messages are the ones kept;
  * the wire is always oldest first.
  */
-function pack(lines: string[], msgs: Msg[], fromNewest: boolean, total: number): Buffer {
+function pack(lines: string[], msgs: Msg[], fromNewest: boolean, total: number): [Buffer, number] {
   const head = Buffer.from(lines.map((l) => l + "\n").join(""), "latin1");
   const moreLen = "more 0\n".length;
   let room = MAX_PAYLOAD - head.length - moreLen;
@@ -451,7 +456,7 @@ function pack(lines: string[], msgs: Msg[], fromNewest: boolean, total: number):
   }
   if (fromNewest) kept.reverse();
   const more = Buffer.from(`more ${kept.length < total ? 1 : 0}\n`, "latin1");
-  return Buffer.concat([more, head, ...kept]);
+  return [Buffer.concat([more, head, ...kept]), kept.length];
 }
 
 /** Made-up history: questions and answers of varied length, a code block

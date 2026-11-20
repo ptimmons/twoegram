@@ -47,7 +47,11 @@ class RelayServer(A2Session):
         self._ids: list[str] = []
         self._map: dict[str, tuple[Upstream, str]] = {}     # relay id -> (gateway, its id)
         self._seen: dict[str, int] = {}                     # relay id -> the Apple's last `after`
-        self._unread: dict[str, int] = {}                   # relay id -> from the quiet polls
+        self._unread: dict[str, int] = {}                   # relay id -> a quiet poll's unread lines
+        # relay id -> messages the relay took from the gateway that the Apple
+        # has not fetched: a quiet poll's own, or ones trimmed from a reply.
+        # The gateway counts them as seen, so they are added to its counts.
+        self._taken: dict[str, int] = {}
         self._polled: dict[str, float] = {}                 # gateway -> when the Apple last polled it
         self._active_until = 0.0
         self._tasks: list[asyncio.Task] = []
@@ -125,35 +129,48 @@ class RelayServer(A2Session):
             raise Refusal(r.code, r.line("why") or "refused")
         if path != "/a2/poll":
             return r.payload
-        self._seen[agent] = _int(q, "after", 0)
         self._polled[up.name] = time.monotonic()
-        return self._poll_payload(up, r)
+        payload, kept = self._poll_payload(up, r, agent)
+        # What the Apple got is seen, as the gateway counts it: not only
+        # what `after` says (PROTOCOL.md, "unread").
+        self._seen[agent] = max(_int(q, "after", 0), r.msgs[kept - 1].n if kept else 0)
+        dropped = sum(1 for m in r.msgs[kept:] if not m.mine)
+        if dropped:
+            self._taken[agent] = dropped
+        return payload
 
-    def _poll_payload(self, up: Upstream, r) -> bytes:
-        """The gateway's poll payload, with relay ids in its unread lines and
-        the other gateways' unread counts added; trimmed to fit."""
+    def _poll_payload(self, up: Upstream, r, agent: str) -> tuple[bytes, int]:
+        """The gateway's poll payload for the Apple's poll of agent, with relay
+        ids in its unread lines and the relay's own counts added; trimmed to
+        fit. Also how many of the gateway's messages went in."""
         back = {a: rid for rid, (u, a) in self._map.items() if u is up}
         head: list[str] = []
         busy = r.line("busy")
         if busy is not None:
             head.append(f"busy {busy}")
+        said: dict[str, int] = {}
         for k, v in r.lines:
             if k == "unread":
                 a, _, n = v.partition(" ")
-                if a in back:
-                    head.append(f"unread {back[a]} {n}")
+                if a in back and n.isdigit():
+                    said[back[a]] = int(n)
+        self._taken.pop(agent, None)                # the Apple is fetching them now
         for rid, (u, a) in self._map.items():
             if u is up:
                 self._unread.pop(rid, None)         # the gateway just said
-            elif self._unread.get(rid):
-                head.append(f"unread {rid} {self._unread[rid]}")
+                n = said.get(rid, 0)
+            else:
+                n = self._unread.get(rid, 0)
+            n += self._taken.get(rid, 0)
+            if n and rid != agent:
+                head.append(f"unread {rid} {n}")
         more = r.line("more") == "1"
         records = [msg_record(m) for m in r.msgs]
         while True:
             payload = (f"more {1 if more else 0}\n" + "".join(f"{h}\n" for h in head)).encode("latin-1") \
                 + b"".join(records)
             if len(payload) <= MAX_PAYLOAD or not records:
-                return payload
+                return payload, len(records)
             records.pop()
             more = True
 
@@ -223,6 +240,10 @@ class RelayServer(A2Session):
                     a, _, n = v.partition(" ")
                     if a in back and n.isdigit():
                         self._unread[back[a]] = int(n)
+            # The gateway now counts what it returned as seen, though the
+            # Apple has not fetched it: the relay keeps that count itself.
             fresh = sum(1 for m in r.msgs if not m.mine and m.n > after)
             if fresh:
-                self._unread[rid] = fresh
+                self._taken[rid] = fresh
+            else:
+                self._taken.pop(rid, None)

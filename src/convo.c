@@ -205,8 +205,11 @@ static void row_begin(uint8_t row)
     /* The diamond, in its own column: something new, below the screen
      * here, or from that agent. (The count went to make room for
      * 16-character names; the heading still counts them when the list
-     * is hidden.) */
-    if (a == cur ? cur_news() : agent_unread(a)) {
+     * is hidden.) In a variable, tested on its own: cc65 branched on the
+     * flags agent_unread's return left, not its value, and drew the
+     * diamond for every agent but the open one (tools/cc65check.py). */
+    n = a == cur ? cur_news() : agent_unread(a);
+    if (n) {
         linebuf[DIAMOND_COL] = sc_char(GL_DIAMOND, bar);
     }
 }

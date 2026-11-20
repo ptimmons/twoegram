@@ -411,7 +411,13 @@ class A2Server(A2Session):
             if n:
                 head.append(f"unread {other} {n}")
         fresh = [m for m in c.msgs if m.n > after]
-        return _pack([f"busy {1 if c.busy else 0}", *head], fresh, False, len(fresh))
+        body, kept = _pack([f"busy {1 if c.busy else 0}", *head], fresh, False, len(fresh))
+        if kept:
+            # What this reply carries is fetched, so seen: not only what
+            # `after` says. The Apple may switch agents before it polls
+            # this one again (PROTOCOL.md, "unread").
+            c.seen = max(c.seen, fresh[kept - 1].n)
+        return body
 
     def _hist(self, device: str, agent: str, q: dict) -> bytes:
         c = self._conv(device, agent)
@@ -423,10 +429,10 @@ class A2Server(A2Session):
                 raise Refusal(Code.BAD_REQUEST, "before or after, not both")
             after = _int(q, "after", 0)
             newer = [m for m in c.msgs if m.n > after]
-            return _pack([], newer[:k], False, len(newer))
+            return _pack([], newer[:k], False, len(newer))[0]
         before = _int(q, "before", c.next)
         older = [m for m in c.msgs if m.n < before]
-        return _pack([], older[-k:], True, len(older))
+        return _pack([], older[-k:], True, len(older))[0]
 
 
 # ---- helpers ----
@@ -445,11 +451,11 @@ def _int(q: dict, name: str, default: int) -> int:
     return int(v)
 
 
-def _pack(lines: list[str], msgs: list[Msg], from_newest: bool, total: int) -> bytes:
+def _pack(lines: list[str], msgs: list[Msg], from_newest: bool, total: int) -> tuple[bytes, int]:
     """A `more` line, the other lines, then as many whole messages as fit
-    MAX_PAYLOAD. `more` is 1 when fewer than total went in. History fills from
-    the newest, so the most recent older messages are the ones kept; the wire
-    is always oldest first."""
+    MAX_PAYLOAD, and how many went in. `more` is 1 when fewer than total went
+    in. History fills from the newest, so the most recent older messages are
+    the ones kept; the wire is always oldest first."""
     head = "".join(f"{l}\n" for l in lines).encode("latin-1")
     room = MAX_PAYLOAD - len(head) - len(b"more 0\n")
     kept: list[bytes] = []
@@ -462,7 +468,7 @@ def _pack(lines: list[str], msgs: list[Msg], from_newest: bool, total: int) -> b
     if from_newest:
         kept.reverse()
     more = f"more {1 if len(kept) < total else 0}\n".encode("latin-1")
-    return more + head + b"".join(kept)
+    return more + head + b"".join(kept), len(kept)
 
 
 def _seed_messages(agent: str, n: int) -> list[tuple[bool, str]]:
