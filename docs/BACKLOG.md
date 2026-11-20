@@ -113,7 +113,7 @@ quiet polls' finds twice for an agent sharing that gateway.
 - [ ] **The mini:** `hermes/twoegram` copied over
   `~/.hermes/plugins/twoegram`, then `hermes gateway restart`.
 - [ ] **The relay:** `build/twoegram-relay-0.1.1.tgz` (checksum
-  `fe34d3ef8cfc88500158f6ba0c0e844e7f5c39bc92332436543665cd388a613b`)
+  `dab7642382bac6fdd4a6c572fecc80a4b7ad1f1f945278a4bf4d714fe76ef439`)
   to the container. Unpack it, `sudo twoegram-relay/install.sh`, then
   `sudo systemctl restart twoegram-relay`. Its gateways and Apples stay.
 - [ ] Send to Pinchy, and switch to Hermes as soon as the answer is on
@@ -140,7 +140,7 @@ quiet polls' finds twice for an agent sharing that gateway.
 
 - [ ] On the container, as `you`; only `install.sh` gets root. The
   checksum is
-  `fe34d3ef8cfc88500158f6ba0c0e844e7f5c39bc92332436543665cd388a613b`:
+  `dab7642382bac6fdd4a6c572fecc80a4b7ad1f1f945278a4bf4d714fe76ef439`:
 
   ```bash
   sha256sum twoegram-relay-0.1.1.tgz && tar xzf twoegram-relay-0.1.1.tgz && sudo twoegram-relay/install.sh
