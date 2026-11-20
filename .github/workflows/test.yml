@@ -1,0 +1,62 @@
+# Every test that needs no Apple, card, emulator or gateway, on each push.
+# Not here: the disk image (AppleCommander), the screenshots (Virtual ][),
+# and everything on the card (docs/BACKLOG.md).
+name: test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apple:
+    name: Apple build and host tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: cc65
+        run: sudo apt-get update -q && sudo apt-get install -y -q cc65
+      # Compiles every file through tools/cc65check.py and links with
+      # tools/memcheck.py: a known miscompile or a short heap fails here.
+      - name: TWOEGRAM.SYSTEM and A2PROBE.SYSTEM
+        run: make -j4 all
+      - name: Host tests
+        run: make host-test
+
+  openclaw:
+    name: OpenClaw plugin
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: openclaw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      # The OpenClaw SDK's types, at the version the plugin is built for.
+      - run: npm run sdk
+      - run: npm run typecheck:openclaw
+
+  python:
+    name: Hermes plugin and relay
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # Hermes's own source at the commit the gateway runs, for the
+      # adapter tests; the relay's tests use the same environment.
+      - name: Hermes SDK
+        run: make hermes-sdk
+      - name: Hermes plugin tests
+        run: make hermes-test
+      - name: Relay tests
+        run: make relay-test
