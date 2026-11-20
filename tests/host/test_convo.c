@@ -7,6 +7,7 @@
  * screen exactly one row, whether the window slides over held messages or
  * fetches more from the gateway; so a reader never loses their place.
  */
+#define _GNU_SOURCE                 /* mkdtemp and memmem, on Linux */
 #define A2_NO_MAIN
 #include "test_a2.c"
 
@@ -955,7 +956,10 @@ static void test_gateways(void)
 
     /* A gateway's key on the card, from before b048: no key at all now.
      * The start makes a master over it and shows claw1's key. */
-    card_holds(own, KS_OLD);
+    {
+        static const uint8_t old[16] = { 0xA2, 0xA3, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+        card_holds(old, KS_OLD);
+    }
     fresh();
     watch_keys("This Apple's key for claw1:", 0, 0, 0);
     k_(' ');
