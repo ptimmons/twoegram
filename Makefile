@@ -87,7 +87,7 @@ $(shell mkdir -p build; t='#define BUILD_ID "$(BUILD_ID)"'; [ "$$(cat build/buil
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk release run shots convo-shots charset host-test hermes-sdk hermes-test hermes-vectors relay-test relay-dist clean
+.PHONY: all disk release run shots convo-shots charset host-test hermes-sdk hermes-dist hermes-test hermes-vectors relay-test relay-dist clean
 
 all: $(BIN) $(PRBIN)
 
@@ -102,7 +102,9 @@ build/%.o: src/%.c $(HDRS) tools/cc65check.py | build build/asm
 	python3 -I tools/cc65check.py build/asm/$*.s > /dev/null || python3 -I tools/cc65check.py build/asm/$*.s
 	$(CL65) -t $(TARGET) -c -o $@ build/asm/$*.s
 
-build/splash.o build/help.o build/setup.o build/a2probe.o: build/build.h
+# Every file that shows the build number, found by its #include: a
+# hand-kept list once left out prefs.c, and Settings said b050 on b052.
+$(patsubst src/%.c,build/%.o,$(shell grep -l '"build.h"' src/*.c)): build/build.h
 
 build/%.o: src/%.s | build
 	$(CL65) -t $(TARGET) -c -o $@ $<
@@ -169,13 +171,14 @@ FORCE:
 
 # The release: build/release/ holds the disk (TWOEGRAM.SYSTEM and
 # A2PROBE.SYSTEM, volume /TWOEGRAM, and no .CFG file: no test key, no
-# address; adding a gateway asks), the plugin package (npm pack, only
-# the files OpenClaw loads), and their SHA-256 sums. The build number
-# goes up as for any disk, so the release's is its own.
+# address; adding a gateway asks), the OpenClaw plugin package (npm pack,
+# only the files OpenClaw loads), the Hermes plugin (hermes-dist) and the
+# relay (relay-dist), and their SHA-256 sums. The build number goes up as
+# for any disk, so the release's is its own.
 VERSION := $(shell sed -n 's/.*TWOEGRAM_VERSION "\(.*\)".*/\1/p' src/ui.h)
 REL      = build/release
 
-release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
+release: $(BIN) $(PRBIN) tools/mkdisk.sh hermes-dist relay-dist FORCE
 	rm -rf $(REL)
 	mkdir -p $(REL)
 	VOL=TWOEGRAM tools/mkdisk.sh $(REL)/TWOEGRAM-$(VERSION).po $(BIN) $(SETUP) $(PREFS) $(SAVE) $(PRBIN)
@@ -183,9 +186,10 @@ release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	    echo "release: a .CFG file is on the release disk" >&2; exit 1; \
 	fi
 	cd openclaw && npm pack --pack-destination ../$(REL) >/dev/null
+	cp build/twoegram-hermes-$(HERMES_VERSION).tgz build/twoegram-relay-$(RELAY_VERSION).tgz $(REL)/
 	cd $(REL) && shasum -a 256 *.po *.tgz > SHA256SUMS
 	@echo $$(( $(BUILD) + 1 )) > BUILDNUM
-	@echo "==> $(REL): Twoegram $(VERSION) (build $(BUILD_ID)) and the a2 plugin"
+	@echo "==> $(REL): Twoegram $(VERSION) (build $(BUILD_ID)), the OpenClaw and Hermes plugins, the relay"
 	@cat $(REL)/SHA256SUMS
 
 run: $(DISK)
@@ -265,6 +269,17 @@ hermes-sdk:
 	test -x $(HERMES_PY) || python3 -m venv .sdk/hermes-venv
 	$(HERMES_PY) -c 'import tomllib; [print(d) for d in tomllib.load(open(".sdk/hermes-agent/pyproject.toml","rb"))["project"]["dependencies"] if not d.startswith("browser-harness")]' > .sdk/hermes-deps.txt
 	$(HERMES_PY) -m pip install -q -r .sdk/hermes-deps.txt pytest pytest-asyncio
+
+# The Hermes plugin as one folder, twoegram/, to unpack in
+# ~/.hermes/plugins (hermes/README.md, "Install").
+HERMES_VERSION := $(shell sed -n 's/^VERSION = "\(.*\)"/\1/p' hermes/twoegram/__init__.py)
+
+hermes-dist:
+	rm -rf build/twoegram-hermes build/twoegram-hermes-$(HERMES_VERSION).tgz
+	mkdir -p build/twoegram-hermes/twoegram
+	cp hermes/twoegram/*.py hermes/twoegram/plugin.yaml build/twoegram-hermes/twoegram/
+	cd build/twoegram-hermes && COPYFILE_DISABLE=1 tar -czf ../twoegram-hermes-$(HERMES_VERSION).tgz --uid 0 --gid 0 twoegram
+	@echo "==> build/twoegram-hermes-$(HERMES_VERSION).tgz"
 
 hermes-test:
 	cd hermes && ../$(HERMES_PY) -m pytest -q -p no:cacheprovider

@@ -76,6 +76,17 @@ Parts A to E of the 2026-11-18 checklist passed on b046 (see "Passed").
 What is left is the relay, which needs a new container. Use
 `build/TWOEGRAM-b048.po`, or a later disk.
 
+### Release 1.0 (b052)
+
+On GitHub as v1.0: the disk, the OpenClaw and Hermes plugins and the
+relay, with SHA256SUMS. The first b052 never left the Mac: its Settings
+said b050, because the Makefile's list of files showing the build
+number had left out prefs.c. The list is now found from the source.
+
+- [ ] **The release disk** (`TWOEGRAM-1.0.po`, checksum
+  `78818b5268b4ed0e59a6554f8e891c86677a0158f0dc5d6c478de12bf793afc9`) boots,
+  asks for a gateway (it has none), and Settings says build b052.
+
 ### The diamond on every agent but the open one (b049)
 
 Found 2026-11-20 on the card, through the relay. Whatever the counts,
@@ -113,7 +124,7 @@ quiet polls' finds twice for an agent sharing that gateway.
 - [ ] **The mini:** `hermes/twoegram` copied over
   `~/.hermes/plugins/twoegram`, then `hermes gateway restart`.
 - [ ] **The relay:** `build/twoegram-relay-0.1.1.tgz` (checksum
-  `dab7642382bac6fdd4a6c572fecc80a4b7ad1f1f945278a4bf4d714fe76ef439`)
+  `dfce6946c3d0232a86fa7f22492c5ac07e7acd6a1f809582b601076ea72c8210`)
   to the container. Unpack it, `sudo twoegram-relay/install.sh`, then
   `sudo systemctl restart twoegram-relay`. Its gateways and Apples stay.
 - [ ] Send to Pinchy, and switch to Hermes as soon as the answer is on
@@ -140,7 +151,7 @@ quiet polls' finds twice for an agent sharing that gateway.
 
 - [ ] On the container, as `you`; only `install.sh` gets root. The
   checksum is
-  `dab7642382bac6fdd4a6c572fecc80a4b7ad1f1f945278a4bf4d714fe76ef439`:
+  `dfce6946c3d0232a86fa7f22492c5ac07e7acd6a1f809582b601076ea72c8210`:
 
   ```bash
   sha256sum twoegram-relay-0.1.1.tgz && tar xzf twoegram-relay-0.1.1.tgz && sudo twoegram-relay/install.sh

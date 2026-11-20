@@ -22,6 +22,13 @@ On the machine running Hermes:
    scp -r hermes/twoegram you@hermes-host:.hermes/plugins/twoegram
    ```
 
+   Or, from a release, copy `twoegram-hermes-<version>.tgz` there and
+   unpack it in the plugin folder:
+
+   ```bash
+   mkdir -p ~/.hermes/plugins && tar xzf twoegram-hermes-*.tgz -C ~/.hermes/plugins
+   ```
+
 2. **Enable it**, and turn the platform on:
 
    ```bash
