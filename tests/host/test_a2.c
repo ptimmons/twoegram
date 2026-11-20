@@ -2,7 +2,7 @@
  * Host tests for the protocol's C side: src/proto.c (key, hex, replies),
  * src/hmac.c (on a model card that really hashes), and src/cogs_http.c
  * (HTTP and PREFS on that model). Known answers come from the plugin's
- * TypeScript (plugin/src/protocol.ts) and RFC 4231, so the two
+ * TypeScript (openclaw/src/protocol.ts) and RFC 4231, so the two
  * implementations check each other.
  */
 #include <stdio.h>
@@ -647,7 +647,7 @@ static void test_hmac(void)
     CHECK(hmac_parts(big, 64, p, 1, mac) == 0);
     CHECK(hmac_parts(big, 65, p, 1, mac) == COGS_E_TOOBIG);
 
-    /* The protocol's signatures, against plugin/src/protocol.ts. */
+    /* The protocol's signatures, against openclaw/src/protocol.ts. */
     unhex(key, "00112233445566778899aabbccddeeff");
     unhex(cn, "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf");
     unhex(sn, "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf");
@@ -977,7 +977,7 @@ static void test_keystore(void)
 }
 
 /* Keys derived from a master secret, against hermes/tests/vectors.json
- * (made by plugin/src/protocol.ts). */
+ * (made by openclaw/src/protocol.ts). */
 static void test_derive(void)
 {
     uint8_t m[16], key[16], want[16];

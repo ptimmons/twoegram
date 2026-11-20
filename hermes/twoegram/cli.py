@@ -1,6 +1,6 @@
 """`hermes a2 pair | add | list | revoke`, run on the Hermes host. They edit the
 device file; the running gateway notices on its next request, so no restart
-is needed. A port of plugin/src/commands.ts."""
+is needed. A port of openclaw/src/commands.ts."""
 
 from __future__ import annotations
 

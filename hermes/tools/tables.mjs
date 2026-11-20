@@ -1,4 +1,4 @@
-// Prints plugin/src/text.ts's tables as JSON, read from the source itself (for hermes/tools/tables.py).
+// Prints openclaw/src/text.ts's tables as JSON, read from the source itself (for hermes/tools/tables.py).
 import { readFileSync } from "node:fs";
 const src = readFileSync(process.argv[2], "utf8");
 const grab = (name) => {

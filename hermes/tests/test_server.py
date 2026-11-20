@@ -1,5 +1,5 @@
 """The endpoints over real HTTP, with a client that does what the Apple will:
-verify every reply before believing it. A port of plugin/test/server.test.ts."""
+verify every reply before believing it. A port of openclaw/test/server.test.ts."""
 
 from __future__ import annotations
 

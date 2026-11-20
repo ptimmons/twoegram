@@ -1,7 +1,7 @@
 """The echo agent, for the tests and the stand-alone dev server: answers every
 message after a short pause by saying it back, in Markdown with a little
 Unicode so the folding is exercised. A message containing "long" gets an
-answer long enough to arrive in several parts. As plugin/src/agent.ts."""
+answer long enough to arrive in several parts. As openclaw/src/agent.ts."""
 
 from __future__ import annotations
 

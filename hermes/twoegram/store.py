@@ -1,6 +1,6 @@
 """The devices the plugin knows, and each conversation's numbered messages.
 
-Ports of plugin/src/devices.ts and convstore.ts, with the same JSON files,
+Ports of openclaw/src/devices.ts and convstore.ts, with the same JSON files,
 readable only by their owner. The device file is read again whenever its
 modification time changes, so `hermes a2 pair` and `revoke`, run in another
 process, take effect at the running gateway's next request.

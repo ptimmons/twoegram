@@ -1,7 +1,7 @@
 """The agent's text, turned into what the //e can draw (PROTOCOL.md section 5),
 and cut into parts that fit a reply.
 
-A port of plugin/src/text.ts, regular expression for regular expression.
+A port of openclaw/src/text.ts, regular expression for regular expression.
 JavaScript's \\w is ASCII-only and its \\s Unicode, so \\w is written out
 here as W and \\s is left to Python's Unicode default. tests/vectors.json,
 made by the TypeScript, checks the two agree.

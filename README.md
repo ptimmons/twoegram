@@ -22,7 +22,7 @@ only.
 | [PLAN.md](PLAN.md) | the plan, decisions, and what each milestone found |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | what is built and waiting to be tried on the real Apple |
 | `src/` | the Apple program, C and 6502 assembly for cc65 |
-| `plugin/` | the OpenClaw channel plugin, TypeScript |
+| `openclaw/` | the OpenClaw channel plugin, TypeScript |
 | `hermes/` | the same channel for Hermes Agent, Python |
 | `relay/` | the relay: one gateway for the Apple, several behind it (docs/RELAY.md) |
 | `tests/host/` | the Apple code's tests, run on the Mac against a model card and gateway |
@@ -38,7 +38,7 @@ make host-test
 ```
 
 ```bash
-cd plugin && npm install && npm test
+cd openclaw && npm install && npm test
 ```
 
 ```bash

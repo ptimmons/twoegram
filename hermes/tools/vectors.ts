@@ -3,7 +3,7 @@
 //
 //   node hermes/tools/vectors.ts > hermes/tests/vectors.json
 //
-// Run it again whenever plugin/src/protocol.ts or text.ts changes.
+// Run it again whenever openclaw/src/protocol.ts or text.ts changes.
 
 import { createHash } from "node:crypto";
 import {
@@ -17,9 +17,9 @@ import {
   replyMac,
   requestMac,
   sessionKey,
-} from "../../plugin/src/protocol.ts";
-import { displayLabel } from "../../plugin/src/server.ts";
-import { foldAscii, forApple, plainMarkdown, split } from "../../plugin/src/text.ts";
+} from "../../openclaw/src/protocol.ts";
+import { displayLabel } from "../../openclaw/src/server.ts";
+import { foldAscii, forApple, plainMarkdown, split } from "../../openclaw/src/text.ts";
 
 // Bytes that look random but are the same every run.
 function bytes(seed: string, n: number): Buffer {

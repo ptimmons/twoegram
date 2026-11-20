@@ -1,4 +1,4 @@
-# Generated from plugin/src/text.ts's tables by hermes/tools/tables.py: do not edit.
+# Generated from openclaw/src/text.ts's tables by hermes/tools/tables.py: do not edit.
 
 PUNCT = {
     '\u2018': "'",

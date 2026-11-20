@@ -117,7 +117,7 @@ Files:
 
 | File | |
 |---|---|
-| `twoegram/protocol.py` | keys, signatures, replies; a port of `plugin/src/protocol.ts` |
+| `twoegram/protocol.py` | keys, signatures, replies; a port of `openclaw/src/protocol.ts` |
 | `twoegram/text.py`, `tables.py` | folding to what the //e can draw; a port of `text.ts` |
 | `twoegram/store.py` | the device and conversation files |
 | `twoegram/server.py` | the `/a2/` endpoints, and a small HTTP/1.1 listener |
@@ -140,7 +140,7 @@ Without Hermes's source, the protocol and server tests still run.
 - **Shared vectors.** `tests/vectors.json` holds what the TypeScript
   plugin computes for a fixed set of keys, signatures and texts, so the
   two implementations are checked against the same bytes. Remake it after
-  changing `plugin/src/protocol.ts` or `text.ts`:
+  changing `openclaw/src/protocol.ts` or `text.ts`:
 
   ```bash
   make hermes-vectors

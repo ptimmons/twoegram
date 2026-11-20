@@ -182,7 +182,7 @@ release: $(BIN) $(PRBIN) tools/mkdisk.sh FORCE
 	@if tools/ac -ll $(REL)/TWOEGRAM-$(VERSION).po | grep -q '\.CFG'; then \
 	    echo "release: a .CFG file is on the release disk" >&2; exit 1; \
 	fi
-	cd plugin && npm pack --pack-destination ../$(REL) >/dev/null
+	cd openclaw && npm pack --pack-destination ../$(REL) >/dev/null
 	cd $(REL) && shasum -a 256 *.po *.tgz > SHA256SUMS
 	@echo $$(( $(BUILD) + 1 )) > BUILDNUM
 	@echo "==> $(REL): Twoegram $(VERSION) (build $(BUILD_ID)) and the a2 plugin"

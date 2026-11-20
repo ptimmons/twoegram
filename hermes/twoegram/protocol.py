@@ -1,6 +1,6 @@
 """The wire format of docs/PROTOCOL.md: keys, signatures, replies and records.
 
-A port of plugin/src/protocol.ts. No I/O here, so the tests and the server
+A port of openclaw/src/protocol.ts. No I/O here, so the tests and the server
 share it. tests/vectors.json, made by the TypeScript, checks the two agree.
 """
 

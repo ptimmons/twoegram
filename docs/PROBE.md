@@ -330,7 +330,7 @@ screen. Nothing is sent to OpenClaw: the dev server's echo agent answers.
 ## 1. On the Mac: a test key and the server
 
 ```bash
-cd plugin && npm install
+cd openclaw && npm install
 ```
 
 ```bash

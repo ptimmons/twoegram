@@ -230,7 +230,7 @@ cc65 C with ca65 for the hot paths, Newsiie's build checks included.
 | `cogs_http.c` — `HTTP`, `PREFS`, `HASH`, `RANDOM` | new |
 | `hmac.c`, `auth.c` — HMAC, handshake, sequence numbers, base-32 | new, portable C |
 | `proto.c`, `store.c`, `agents.c`, `convo.c`, `compose.c`, `poll.c` | new |
-| `plugin/` — the OpenClaw channel, with a stand-alone dev server and an echo agent | new, TypeScript |
+| `openclaw/` — the OpenClaw channel, with a stand-alone dev server and an echo agent | new, TypeScript |
 
 Main memory holds the program; aux memory (47K) holds the open
 conversation. Newsiie's 18K of parser, cleaner and buffers is not
@@ -484,7 +484,7 @@ Still open, neither blocks milestones 0 to 5:
   - **The device id is derived from the key**, so nothing extra is typed.
   - **Unverified requests never get signed replies,** or anyone could
     collect signed refusals for future sequence numbers and replay them.
-- **The plugin** (`plugin/`, TypeScript run directly by Node with type
+- **The plugin** (`openclaw/`, TypeScript run directly by Node with type
   stripping, no build step, no runtime dependencies): `protocol.ts`
   (keys, HMACs, records), `text.ts` (Markdown and Unicode to ASCII,
   splitting), `devices.ts` (keys in a JSON file, mode 0600), `server.ts`
@@ -505,7 +505,7 @@ Still open, neither blocks milestones 0 to 5:
   signed send and its answer by long poll, a long answer in seven parts
   with the code block's indent kept (a bug this found and fixed), a
   mistyped key caught before sending, an unknown key refused.
-- **Running it:** in `plugin/`, `npm install`, then `npm run pair` to make
+- **Running it:** in `openclaw/`, `npm install`, then `npm run pair` to make
   a key and `npm run dev` for the server (loopback; `--host 0.0.0.0` for
   the LAN). Node here is v25.6.1; OpenClaw asks for 24 or 26.
 - **Dev dependencies** moved to Vitest 4 after `npm audit` flagged
@@ -980,7 +980,7 @@ All passed, on the real gateway (OpenClaw 2026.11.3, agent "Pinchy"):
 - **Also:** a top-level README.md; docs/INSTALL.md leads with the package
   and keeps the linked folder as the development install (its `rsync`
   now leaves out `dist/`, which would otherwise be loaded in place of
-  newer source); plugin/README.md and plugin/LICENSE go in the package.
+  newer source); openclaw/README.md and openclaw/LICENSE go in the package.
 - **For the card and your gateway** (docs/PROBE.md, "Release 1.0"):
   switch the gateway to the package, boot the release disk as a newcomer
   would, run the audit, and see a long answer arrive in parts.

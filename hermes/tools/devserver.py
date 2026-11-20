@@ -1,5 +1,5 @@
 """The Python a2 server on its own, with the echo agent, for trying a client
-against it without Hermes (as plugin/src/dev-server.ts is for the TypeScript).
+against it without Hermes (as openclaw/src/dev-server.ts is for the TypeScript).
 
     python3 hermes/tools/devserver.py [--port 8417] [--store .dev-py] [--seed N]
     python3 hermes/tools/devserver.py --store .dev-py pair

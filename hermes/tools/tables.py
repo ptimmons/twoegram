@@ -1,4 +1,4 @@
-"""Writes hermes/twoegram/tables.py from plugin/src/text.ts's tables, read by
+"""Writes hermes/twoegram/tables.py from openclaw/src/text.ts's tables, read by
 tables.mjs, so the two foldings use the same characters.
 
     python3 hermes/tools/tables.py
@@ -10,9 +10,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-d = json.loads(subprocess.run(["node", str(ROOT / "hermes/tools/tables.mjs"), str(ROOT / "plugin/src/text.ts")],
+d = json.loads(subprocess.run(["node", str(ROOT / "hermes/tools/tables.mjs"), str(ROOT / "openclaw/src/text.ts")],
                               check=True, capture_output=True, text=True).stdout)
-out = ["# Generated from plugin/src/text.ts's tables by hermes/tools/tables.py: do not edit.", ""]
+out = ["# Generated from openclaw/src/text.ts's tables by hermes/tools/tables.py: do not edit.", ""]
 out.append("PUNCT = {")
 out += [f"    {ascii(k)}: {ascii(v)}," for k, v in d["PUNCT"].items()]
 out.append("}\n")

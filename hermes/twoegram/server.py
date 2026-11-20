@@ -5,7 +5,7 @@ known to be genuine it hands it to three hooks: the agents to list, what each
 calls itself, and the endpoint (send, poll, hist) that makes the payload.
 
 `A2Server`: those hooks over each device's conversations, a port of
-plugin/src/server.ts. What answers is behind `Agents`: inside Hermes the
+openclaw/src/server.ts. What answers is behind `Agents`: inside Hermes the
 adapter (adapter.py), in the tests the echo agent. Unlike the TypeScript, an
 answer does not come back through the delivery call: the agent hands it over
 later with `post()`, and says whether it is working with `set_busy()`, which

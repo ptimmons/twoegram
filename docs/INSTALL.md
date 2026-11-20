@@ -184,13 +184,13 @@ straight from a folder, so an update is an `rsync` and a gateway restart.
 From the Mac:
 
 ```bash
-rsync -a --exclude node_modules --exclude .dev --exclude dist ~/repos/twoegram/plugin/. GATEWAY-HOST:twoegram-plugin/
+rsync -a --exclude node_modules --exclude .dev --exclude dist ~/repos/twoegram/openclaw/. GATEWAY-HOST:twoegram-plugin/
 ```
 
 The `/.` at the end of the source means "the folder's contents". A
 plain trailing slash means the same to rsync, but zsh removes a slash
 that tab completion added as soon as you type a space, and then rsync
-copies the folder itself, to `~/twoegram-plugin/plugin/`. Afterwards
+copies the folder itself, to `~/twoegram-plugin/openclaw/`. Afterwards
 `~/twoegram-plugin` should hold `package.json`, `openclaw.plugin.json`,
 `index.ts` and `src/` directly. (`dist/`, the compiled copy, stays out:
 an old one would be loaded in place of the newer source.)
