@@ -11,6 +11,7 @@
   "include": [
     "index.ts",
     "setup-entry.ts",
+    "doctor-contract-api.ts",
     "src"
   ],
   "exclude": [

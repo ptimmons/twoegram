@@ -106,6 +106,34 @@ relay are not involved.
   Passphrase, Start over with a new key and Remove the key from the
   card reads as asked, nothing cut off at the right.
 
+### OpenClaw 2026.11.6's Doctor (OpenClaw plugin 1.2.2)
+
+Found 2026-11-21 updating claw1 from OpenClaw 2026.11.3 to 2026.11.6.
+The update left `deferred-plugin-migration:a2` pending ("Plugin "a2"
+data/settings upgrade is unfinished"), `openclaw doctor --fix` did not
+settle it, and `openclaw plugins install --force` of 1.2.1 stopped with
+`Plugin config repair could not be inspected: a2`. 2026.11.6 treats a
+channel plugin with a setup entry as stateless only when it declares
+`doctorContract.stateMigrations` and ships a matching Doctor module.
+1.2.2 declares an empty list (`doctor-contract-api.ts`) and lists
+`<state-dir>/a2` under `backupResources`, so recovery copies keep the
+keys and conversations. In a test profile on claw1, 2026.11.6's Doctor
+now reports a2 as stateless (1.2.1: not inspected). The Apple and the
+protocol are unchanged. The `provenance-invalid` trust label stays: a
+fresh archive install gets it too.
+
+- [x] **claw1** (2026-11-21, `build/release/openclaw-twoegram-1.2.2.tgz`
+  of release b053, checksum
+  `7c69dadddb7c9c99754bc87deea79f18644ac3df3bb8be760fdca3484c628c84`):
+  installed as INSTALL.md steps 1 and 2 say (`openclaw gateway stop
+  --force` first), then `openclaw gateway start`. It ended `Installed
+  plugin: a2`; `openclaw plugins inspect a2` shows 1.2.2.
+- [x] `deferred-plugin-migration:a2` is `completed`, and `openclaw
+  update status` no longer warns about a2 above its "Last recorded
+  update" (that section keeps the 2026.11.6 update's own report).
+  `openclaw a2 list` still shows `tgramrelay`, `devices.json` unchanged.
+- [ ] Send to Pinchy through the relay; the answer arrives.
+
 ### The unread fix (OpenClaw plugin 1.2.1, Hermes plugin 1.1.1, relay 0.1.1)
 
 Found 2026-11-20 through the relay, though it happens direct too.

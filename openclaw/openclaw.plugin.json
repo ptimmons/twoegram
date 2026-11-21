@@ -4,6 +4,12 @@
   "name": "Apple //e (Twoegram)",
   "description": "Chat with your agents from an Apple //e running Twoegram, over the LAN, signed",
   "categories": ["channels"],
+  "doctorContract": {
+    "stateMigrations": []
+  },
+  "backupResources": [
+    { "disposition": "include", "scope": "state", "relativePath": "a2" }
+  ],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

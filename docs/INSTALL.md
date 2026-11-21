@@ -14,7 +14,7 @@ checksums:
 - `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
   It carries no address and no key: Twoegram asks for a gateway at the
   first start, and makes the key itself.
-- `openclaw-twoegram-1.2.1.tgz`: the plugin, compiled, with only the
+- `openclaw-twoegram-1.2.2.tgz`: the plugin, compiled, with only the
   files OpenClaw loads.
 
 ## 1. Copy the plugin to the gateway host
@@ -22,7 +22,7 @@ checksums:
 From the Mac:
 
 ```bash
-scp build/release/openclaw-twoegram-1.2.1.tgz build/release/SHA256SUMS GATEWAY-HOST:
+scp build/release/openclaw-twoegram-1.2.2.tgz build/release/SHA256SUMS GATEWAY-HOST:
 ```
 
 On the gateway host, check it arrived whole:
@@ -38,6 +38,11 @@ With the gateway stopped:
 ```bash
 openclaw gateway stop
 ```
+
+OpenClaw 2026.11.6 refuses to stop a gateway that runs as a service
+(`This stops the operator's running gateway service`) and leaves it
+running; add `--force`, as it says. Check that it stopped before going
+on: `openclaw gateway status` says `stopped`.
 
 **Coming from a linked folder** (the development install below), do
 this first, or the install ends with `Plugin "a2" has no authoritative
@@ -57,7 +62,7 @@ openclaw plugins registry --refresh
 Then install:
 
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.2.1.tgz --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.2.2.tgz --force --accept-capabilities
 ```
 
 It should end with `Saved for the next Gateway start.` Leave the gateway

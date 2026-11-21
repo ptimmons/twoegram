@@ -14,7 +14,7 @@ Needs OpenClaw 2026.11.3 or later (before 2026.12) and Node 24.16+ or
 With the gateway stopped:
 
 ```bash
-openclaw plugins install ./openclaw-twoegram-1.2.1.tgz --force --accept-capabilities
+openclaw plugins install ./openclaw-twoegram-1.2.2.tgz --force --accept-capabilities
 ```
 
 ```bash
