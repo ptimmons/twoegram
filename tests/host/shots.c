@@ -66,7 +66,6 @@ uint8_t key_ready(void)
     return 1;
 }
 void key_flush(void) {}
-void key_poll(void) {}
 
 uint16_t ticks;
 void tick_reset(void) { ticks = 0; }

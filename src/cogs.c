@@ -18,6 +18,7 @@
  */
 #include <stddef.h>
 #include "cogs.h"
+#include "kbd.h"
 
 #define OP_STATUS       0x01
 #define OP_TIME         0x05
@@ -113,12 +114,15 @@ uint8_t cogs_open(uint8_t s)
     return COGS_OK;
 }
 
-/* Read n bytes in pieces cogs_getn can take. Nonzero on timeout. */
+/* Read n bytes in pieces cogs_getn can take. Nonzero on timeout. Between
+ * pieces, catch a key (type-ahead; see kbd.h): a long reply is read
+ * without waiting, so the idle hook doesn't run. */
 static uint8_t get_bytes(uint8_t *dst, uint16_t n)
 {
     uint8_t piece;
 
     while (n) {
+        key_poll();
         piece = n > 255 ? 255 : (uint8_t)n;
         if (cogs_getn(dst, piece)) {
             return 1;
@@ -152,6 +156,7 @@ uint8_t cogs_send(uint8_t op, const cogs_part_t *parts, uint8_t nparts)
         return lost(COGS_LOST_SEND, op);
     }
     for (i = 0; i < nparts; ++i) {
+        key_poll();                 /* type-ahead, as in get_bytes() */
         if (parts[i].n && cogs_putn(parts[i].p, parts[i].n)) {
             return lost(COGS_LOST_SEND, op);
         }

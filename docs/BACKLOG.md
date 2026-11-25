@@ -267,6 +267,15 @@ to make the container: unprivileged Ubuntu LTS, with a fixed address.
 
 ## Passed
 
+- **No keys lost while typing** (2026-11-25, b054): the //e latches only
+  the last key, and Twoegram caught keys only while waiting on the card,
+  so keys typed during a poll or a redraw (the compose box growing a
+  row) overwrote each other. `key_poll()` now also runs for every screen
+  row drawn (`scr_blit`), between the pieces of a card request or reply,
+  and for each message laid out. On the //e through the relay, a
+  192-character message typed at the bench's pace reached the gateway
+  with 175 characters on b053 (16 in a row lost) and all 192 on b054.
+
 - **OpenClaw 2026.11.6's Doctor** (2026-11-21, release b053, OpenClaw
   plugin 1.2.2): claw1's update to 2026.11.6 had left a2's data/settings
   upgrade pending, and 1.2.1 would not reinstall ("Plugin config repair

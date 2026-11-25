@@ -128,8 +128,10 @@ static uint8_t  news_below;         /* messages came in below the screen */
 static void lay_one(uint16_t i)
 {
     uint16_t n;
-    const char *p = msg_text(i, &n);
+    const char *p;
 
+    key_poll();                     /* relayout runs up to 40 of these */
+    p = msg_text(i, &n);
     lay_msg(i, p, n, msg_mine(i), txt_len(msg_meta(i)));
 }
 

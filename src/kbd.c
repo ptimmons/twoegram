@@ -1,8 +1,11 @@
 /*
- * The keyboard, with type-ahead. The //e latches one key at $C000; while
- * a request waits on the network, key_poll() (called from the wait's idle
- * hook) moves keys into a small ring so none is lost, and key_get()
- * takes from the ring first. See kbd.h.
+ * The keyboard, with type-ahead. The //e latches one key at $C000, so a
+ * key typed while the program is busy is lost when the next one comes.
+ * key_poll() moves a latched key into a small ring, and key_get() takes
+ * from the ring first. key_poll() runs wherever the program is busy for
+ * long: in the network wait's idle hook (link.c), between the pieces of a
+ * request or reply (cogs.c), on every screen row drawn (scr_blit, blit.s)
+ * and for each message laid out (convo.c). See kbd.h.
  */
 #include "kbd.h"
 

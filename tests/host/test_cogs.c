@@ -268,6 +268,10 @@ uint8_t cogs_putn(const uint8_t *src, uint16_t n)
 uint8_t cogs_resync(void) { qh = qt = frn = 0; ++nresync; return 0; }
 void cogs_irq_off(void) {}
 
+/* kbd.c's type-ahead: count the times cogs.c looks for a key. */
+static unsigned nkeypoll;
+void key_poll(void) { ++nkeypoll; }
+
 /* ---- tests ---- */
 
 static void test_commands(void)
@@ -463,6 +467,27 @@ static void test_streams(void)
     cogs_idle = NULL;
 }
 
+/* A reply longer than one cogs_getn() piece is read without the idle
+ * hook, so cogs.c must look for a key between pieces, or keys typed
+ * meanwhile overwrite each other in the //e's one-key latch. */
+static void test_type_ahead(void)
+{
+    static uint8_t big[600], got[600];
+    unsigned i;
+    uint8_t op;
+    uint16_t len;
+
+    reset_model();
+    for (i = 0; i < sizeof big; ++i) {
+        big[i] = (uint8_t)i;
+    }
+    put(0x85, big, sizeof big);
+    nkeypoll = 0;
+    CHECK(cogs_next(&op, &len) == 0 && op == 0x85 && len == sizeof big);
+    CHECK(cogs_read(got, len) == 0 && memcmp(got, big, sizeof big) == 0);
+    CHECK(nkeypoll >= 3);                   /* 255 + 255 + 90 */
+}
+
 static void test_fmt(void)
 {
     char b[64];
@@ -499,6 +524,7 @@ int main(void)
     test_commands();
     test_events_and_errors();
     test_streams();
+    test_type_ahead();
     test_fmt();
     if (fails) {
         printf("%d of %d checks FAILED\n", fails, checks);

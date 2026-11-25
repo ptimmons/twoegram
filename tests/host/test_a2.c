@@ -553,6 +553,7 @@ uint8_t cogs_putn(const uint8_t *src, uint16_t n)
 }
 uint8_t cogs_resync(void) { qh = qt = frn = 0; return 0; }
 void cogs_irq_off(void) {}
+void key_poll(void) {}                  /* kbd.c: no keyboard here */
 
 /* ---- helpers ---- */
 

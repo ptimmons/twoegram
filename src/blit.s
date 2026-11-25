@@ -14,6 +14,7 @@
         .export         _scr_blit
         .export         _lc_ram
         .import         _linebuf
+        .import         _key_poll
         .importzp       ptr1
 
 CLR80STORE      = $C000
@@ -82,7 +83,16 @@ _lc_ram:
         rts
 
 ; void __fastcall__ scr_blit(unsigned char row) -- copy linebuf to a row.
+;
+; First, key_poll(): the //e latches only the last key, and a full redraw
+; (a new compose row, a poll's news) takes long enough for keys typed
+; meanwhile to overwrite each other. Every screen is drawn a row at a
+; time through here, so a key is caught at least once a row and waits in
+; kbd.c's type-ahead ring. key_poll() is C, so A (the row) is saved.
 _scr_blit:
+        pha
+        jsr     _key_poll
+        pla
         tax
         lda     rowlo,x
         sta     ptr1
