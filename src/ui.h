@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define TWOEGRAM_VERSION "1.0"
+#define TWOEGRAM_VERSION "1.1"
 
 void splash_show(void);         /* draws the splash; caller waits for a key */
 void help_show(void);           /* draws the help box over the body rows */

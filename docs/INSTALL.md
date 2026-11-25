@@ -11,7 +11,7 @@ gateway already has. It has no npm dependencies.
 The release (`make release`, in `build/release/`) is two files and their
 checksums:
 
-- `TWOEGRAM-1.0.po`: the Apple's disk, with Twoegram and the card probe.
+- `TWOEGRAM-1.1.po`: the Apple's disk, with Twoegram and the card probe.
   It carries no address and no key: Twoegram asks for a gateway at the
   first start, and makes the key itself.
 - `openclaw-twoegram-1.2.2.tgz`: the plugin, compiled, with only the

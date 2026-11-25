@@ -76,6 +76,17 @@ Parts A to E of the 2026-11-18 checklist passed on b046 (see "Passed").
 What is left is the relay, which needs a new container. Use
 `build/TWOEGRAM-b048.po`, or a later disk.
 
+### Release 1.1 (b055)
+
+On GitHub as v1.1: the fix for keys lost while typing (b054, see
+"Passed"), and OpenClaw plugin 1.2.2 for 2026.11.6's Doctor. The Hermes
+plugin (1.1.1) and the relay (0.1.1) are unchanged. Host tests, the
+plugin tests and a Virtual ][ boot pass on the release disk.
+
+- [ ] **The release disk** (`TWOEGRAM-1.1.po`, checksum
+  `931df451622284da64bda36e53eb3a1cf825f3c5b1cd6beb2c62b169fb08e5c5`) boots
+  on the card, and twoegram-bench's typing and chat tests pass on it.
+
 ### Release 1.0 (b052)
 
 On GitHub as v1.0: the disk, the OpenClaw and Hermes plugins and the

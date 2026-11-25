@@ -2,7 +2,7 @@
 
 ### Conversations with Your Agents, for the Apple IIe
 
-#### User's Guide · Version 1.0
+#### User's Guide · Version 1.1
 
 ![The Twoegram title screen](images/splash.png)
 

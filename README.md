@@ -46,8 +46,8 @@ make release
 ```
 
 `make release` leaves in `build/release/` the Apple's disk
-(`TWOEGRAM-1.0.po`, with no address or key on it), the plugin package
-(`openclaw-twoegram-1.1.0.tgz`), and `SHA256SUMS`. Then follow
+(`TWOEGRAM-1.1.po`, with no address or key on it), the plugin package
+(`openclaw-twoegram-1.2.2.tgz`), and `SHA256SUMS`. Then follow
 [docs/INSTALL.md](docs/INSTALL.md), and the manual's Chapter 2 on the
 Apple.
 
